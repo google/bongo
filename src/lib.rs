@@ -1,7 +1,7 @@
 #![feature(rust_2018_preview, nll)]
 
-use std::collections as col;
 use std::cmp;
+use std::collections as col;
 use std::ops;
 use std::rc;
 
@@ -44,11 +44,15 @@ struct OrdAsKey<T>(T);
 
 impl<T> ops::Deref for OrdAsKey<T> {
     type Target = T;
-    fn deref(&self) -> &T { &self.0 }
+    fn deref(&self) -> &T {
+        &self.0
+    }
 }
 
 impl<T> ops::DerefMut for OrdAsKey<T> {
-    fn deref_mut(&mut self) -> &mut T { &mut self.0 }
+    fn deref_mut(&mut self) -> &mut T {
+        &mut self.0
+    }
 }
 
 impl<T: OrdAs> Ord for OrdAsKey<T> {
@@ -63,9 +67,7 @@ impl<T: OrdAs> PartialOrd for OrdAsKey<T> {
     }
 }
 
-impl<T: OrdAs> Eq for OrdAsKey<T> {
-
-}
+impl<T: OrdAs> Eq for OrdAsKey<T> {}
 
 impl<T: OrdAs> PartialEq for OrdAsKey<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -73,13 +75,14 @@ impl<T: OrdAs> PartialEq for OrdAsKey<T> {
     }
 }
 
-
 #[derive(Copy, Clone, Debug)]
 struct RefMapKey<'a, K: 'a>(&'a K);
 
 impl<'a, K: 'a> OrdAs for RefMapKey<'a, K> {
     type AsType = *const K;
-    fn ord_as(&self) -> *const K { self.0 }
+    fn ord_as(&self) -> *const K {
+        self.0
+    }
 }
 
 struct RefMap<'a, K: 'a, V> {
@@ -110,7 +113,9 @@ enum ReducedLayout {
 struct ReducedLayoutRef(rc::Rc<ReducedLayout>);
 
 impl ReducedLayoutRef {
-    fn new(layout: ReducedLayout) -> Self { ReducedLayoutRef(rc::Rc::new(layout)) }
+    fn new(layout: ReducedLayout) -> Self {
+        ReducedLayoutRef(rc::Rc::new(layout))
+    }
 }
 
 impl ops::Deref for ReducedLayoutRef {
@@ -122,63 +127,77 @@ impl ops::Deref for ReducedLayoutRef {
 
 mod layout_reducer {
 
-use super::LayoutContents;
-use super::ReducedLayout;
-use super::ReducedLayoutRef;
-use super::LayoutRef;
+    use super::LayoutContents;
+    use super::LayoutRef;
+    use super::ReducedLayout;
+    use super::ReducedLayoutRef;
 
-use std::collections as col;
+    use std::collections as col;
 
-struct LayoutReducer {
-    memo: col::BTreeMap<(*const LayoutContents, Option<*const ReducedLayout>), ReducedLayoutRef>,
-}
-
-impl LayoutReducer {
-    fn new() -> Self {
-        LayoutReducer { memo: col::BTreeMap::new() }
+    struct LayoutReducer {
+        memo:
+            col::BTreeMap<(*const LayoutContents, Option<*const ReducedLayout>), ReducedLayoutRef>,
     }
 
-    fn reduce(&mut self, layout: &LayoutRef, trailer: Option<&ReducedLayoutRef>) -> ReducedLayoutRef {
-        let layout_ptr = &**layout;
-        let trailer_ptr = trailer.map(|t| &**t as *const ReducedLayout);
-        match self.memo.get(&(layout_ptr, trailer_ptr)) {
-            Some(v) => v.clone(),
-            None => {
-                let result = self.reduce_real(layout, trailer);
-                self.memo.insert((layout_ptr, trailer_ptr), result.clone());
-                result
+    impl LayoutReducer {
+        fn new() -> Self {
+            LayoutReducer {
+                memo: col::BTreeMap::new(),
+            }
+        }
+
+        fn reduce(
+            &mut self,
+            layout: &LayoutRef,
+            trailer: Option<&ReducedLayoutRef>,
+        ) -> ReducedLayoutRef {
+            let layout_ptr = &**layout;
+            let trailer_ptr = trailer.map(|t| &**t as *const ReducedLayout);
+            match self.memo.get(&(layout_ptr, trailer_ptr)) {
+                Some(v) => v.clone(),
+                None => {
+                    let result = self.reduce_real(layout, trailer);
+                    self.memo.insert((layout_ptr, trailer_ptr), result.clone());
+                    result
+                }
+            }
+        }
+
+        fn reduce_real(
+            &mut self,
+            layout: &LayoutRef,
+            trailer: Option<&ReducedLayoutRef>,
+        ) -> ReducedLayoutRef {
+            match layout.contents() {
+                LayoutContents::Text(text) => match trailer {
+                    Some(trailer_val) => ReducedLayoutRef::new(ReducedLayout::Horiz(
+                        text.clone(),
+                        trailer_val.clone(),
+                    )),
+                    None => ReducedLayoutRef::new(ReducedLayout::Text(text.clone())),
+                },
+                LayoutContents::Horiz(left, right) => {
+                    let reduced_right = self.reduce(right, trailer);
+                    self.reduce(left, Some(&reduced_right))
+                }
+                LayoutContents::Vert(top, bottom) => {
+                    let reduced_top = self.reduce(top, None);
+                    let reduced_bottom = self.reduce(bottom, trailer);
+                    ReducedLayoutRef::new(ReducedLayout::Vert(reduced_top, reduced_bottom))
+                }
+                LayoutContents::Choice(left, right) => {
+                    let reduced_left = self.reduce(left, trailer);
+                    let reduced_right = self.reduce(right, trailer);
+                    ReducedLayoutRef::new(ReducedLayout::Choice(reduced_left, reduced_right))
+                }
             }
         }
     }
 
-    fn reduce_real(&mut self, layout: &LayoutRef, trailer: Option<&ReducedLayoutRef>) -> ReducedLayoutRef {
-        match layout.contents() {
-            LayoutContents::Text(text) => match trailer {
-                Some(trailer_val) => ReducedLayoutRef::new(ReducedLayout::Horiz(text.clone(), trailer_val.clone())),
-                None => ReducedLayoutRef::new(ReducedLayout::Text(text.clone())),
-            }
-            LayoutContents::Horiz(left, right) => {
-                let reduced_right = self.reduce(right, trailer);
-                self.reduce(left, Some(&reduced_right))
-            }
-            LayoutContents::Vert(top, bottom) => {
-                let reduced_top = self.reduce(top, None);
-                let reduced_bottom = self.reduce(bottom, trailer);
-                ReducedLayoutRef::new(ReducedLayout::Vert(reduced_top, reduced_bottom))
-            }
-            LayoutContents::Choice(left, right) => {
-                let reduced_left = self.reduce(left, trailer);
-                let reduced_right = self.reduce(right, trailer);
-                ReducedLayoutRef::new(ReducedLayout::Choice(reduced_left, reduced_right))
-            }
-        }
+    pub(super) fn reduce_layout(layout: &LayoutRef) -> ReducedLayoutRef {
+        let mut reducer = LayoutReducer::new();
+        reducer.reduce(layout, None)
     }
-}
-
-pub(super) fn reduce_layout(layout: &LayoutRef) -> ReducedLayoutRef {
-    let mut reducer = LayoutReducer::new();
-    reducer.reduce(layout, None)
-}
 
 }
 
@@ -219,47 +238,52 @@ enum SearchDirection {
     GreaterEq,
 }
 
-fn search_map<'a, T, K, V>(map: &'a col::BTreeMap<K, V>, search_key: &T, direction: SearchDirection) -> Option<(&'a K, &'a V)>
-where K: std::borrow::Borrow<T> + cmp::Ord, T: cmp::Ord {
-        match direction {
-            SearchDirection::Less => {
-                let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Excluded(search_key)));
-                range.next_back()
-            }
-            SearchDirection::LessEq => {
-                let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Included(search_key)));
-                range.next_back()
-            }
-            SearchDirection::Greater => {
-                let mut range = map.range((ops::Bound::Excluded(search_key), ops::Bound::Unbounded));
-                range.next()
-            }
-            SearchDirection::GreaterEq => {
-                let mut range = map.range((ops::Bound::Included(search_key), ops::Bound::Unbounded));
-                range.next()
-            }
+fn search_map<'a, T, K, V>(
+    map: &'a col::BTreeMap<K, V>,
+    search_key: &T,
+    direction: SearchDirection,
+) -> Option<(&'a K, &'a V)>
+where
+    K: std::borrow::Borrow<T> + cmp::Ord,
+    T: cmp::Ord,
+{
+    match direction {
+        SearchDirection::Less => {
+            let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Excluded(search_key)));
+            range.next_back()
         }
+        SearchDirection::LessEq => {
+            let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Included(search_key)));
+            range.next_back()
+        }
+        SearchDirection::Greater => {
+            let mut range = map.range((ops::Bound::Excluded(search_key), ops::Bound::Unbounded));
+            range.next()
+        }
+        SearchDirection::GreaterEq => {
+            let mut range = map.range((ops::Bound::Included(search_key), ops::Bound::Unbounded));
+            range.next()
+        }
+    }
 }
 
 struct KnotSet {
-    knots: col::BTreeMap<KnotColumn, KnotData>
+    knots: col::BTreeMap<KnotColumn, KnotData>,
 }
 
 impl KnotSet {
     fn cost_at(&self, col: KnotColumn) -> f32 {
         let _prev_knot = search_map(&self.knots, &col, SearchDirection::LessEq)
             .expect("There should always be a knot at 0");
-            unimplemented!()
+        unimplemented!()
     }
 
     fn left_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
-        search_map(&self.knots, &col, SearchDirection::Less)
-            .map(|(k, v)| (*k, v))
+        search_map(&self.knots, &col, SearchDirection::Less).map(|(k, v)| (*k, v))
     }
 
     fn right_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
-        search_map(&self.knots, &col, SearchDirection::GreaterEq)
-            .map(|(k, v)| (*k, v))
+        search_map(&self.knots, &col, SearchDirection::GreaterEq).map(|(k, v)| (*k, v))
     }
 }
 
@@ -301,9 +325,7 @@ impl KnotSetBuilder {
             };
             knots.insert(KnotColumn(0), rise_data);
         }
-        KnotSet {
-            knots: knots,
-        }
+        KnotSet { knots: knots }
     }
 
     pub fn new_vert(&self, _top: KnotSet, _bottom: KnotSet) -> KnotSet {
