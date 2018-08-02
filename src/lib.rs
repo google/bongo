@@ -235,7 +235,7 @@ where K: std::borrow::Borrow<T> + cmp::Ord, T: cmp::Ord {
                 range.next()
             }
             SearchDirection::GreaterEq => {
-                let mut range = map.range((ops::Bound::Excluded(search_key), ops::Bound::Unbounded));
+                let mut range = map.range((ops::Bound::Included(search_key), ops::Bound::Unbounded));
                 range.next()
             }
         }
@@ -247,17 +247,19 @@ struct KnotSet {
 
 impl KnotSet {
     fn cost_at(&self, col: KnotColumn) -> f32 {
-        unimplemented!()
+        let _prev_knot = search_map(&self.knots, &col, SearchDirection::LessEq)
+            .expect("There should always be a knot at 0");
+            unimplemented!()
     }
 
     fn left_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
-        let mut range = self.knots.range((ops::Bound::Unbounded, ops::Bound::Excluded(col)));
-        range.next_back().map(|(k, v)| (*k, v))
+        search_map(&self.knots, &col, SearchDirection::Less)
+            .map(|(k, v)| (*k, v))
     }
 
     fn right_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
-        let mut range = self.knots.range((ops::Bound::Included(col), ops::Bound::Unbounded));
-        range.next().map(|(k, v)| (*k, v))
+        search_map(&self.knots, &col, SearchDirection::GreaterEq)
+            .map(|(k, v)| (*k, v))
     }
 }
 
@@ -304,15 +306,15 @@ impl KnotSetBuilder {
         }
     }
 
-    pub fn new_vert(&self, top: KnotSet, bottom: KnotSet) -> KnotSet {
+    pub fn new_vert(&self, _top: KnotSet, _bottom: KnotSet) -> KnotSet {
         unimplemented!()
     }
 
-    pub fn new_horiz(&self, left: KnotSet, right: KnotSet) -> KnotSet {
+    pub fn new_horiz(&self, _left: KnotSet, _right: KnotSet) -> KnotSet {
         unimplemented!()
     }
 
-    pub fn new_choice(&self, choice1: KnotSet, choice2: KnotSet) -> KnotSet {
+    pub fn new_choice(&self, _choice1: KnotSet, _choice2: KnotSet) -> KnotSet {
         unimplemented!()
     }
 }
