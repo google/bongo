@@ -272,10 +272,38 @@ struct KnotSet {
 }
 
 impl KnotSet {
-    fn cost_at(&self, col: KnotColumn) -> f32 {
-        let _prev_knot = search_map(&self.knots, &col, SearchDirection::LessEq)
+    fn new_knot_set(
+        knot_cols: &col::BTreeSet<KnotColumn>,
+        func: impl Fn(KnotColumn) -> KnotData,
+    ) -> KnotSet {
+        let mut new_knots = col::BTreeMap::new();
+        for &col in knot_cols {
+            new_knots.insert(col, func(col));
+        }
+        KnotSet { knots: new_knots }
+    }
+
+    fn knot_data_at(&self, col: KnotColumn) -> KnotData {
+        let (knot_col, knot_value) = search_map(&self.knots, &col, SearchDirection::LessEq)
             .expect("There should always be a knot at 0");
-        unimplemented!()
+        let column_distance = col.0 - knot_col.0;
+        KnotData {
+            resolved_layout: knot_value.resolved_layout.clone(),
+            span: knot_value.span,
+            intercept: knot_value.intercept + knot_value.rise * (column_distance as f32),
+            rise: knot_value.rise,
+        }
+    }
+
+    fn knot_values(&self) -> col::BTreeSet<KnotColumn> {
+        self.knots.keys().cloned().collect()
+    }
+
+    fn knot_values_between(&self, begin: KnotColumn, end: KnotColumn) -> col::BTreeSet<KnotColumn> {
+        self.knots
+            .range((ops::Bound::Included(begin), ops::Bound::Excluded(end)))
+            .map(|(k, _)| *k)
+            .collect()
     }
 
     fn left_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
@@ -328,8 +356,26 @@ impl KnotSetBuilder {
         KnotSet { knots: knots }
     }
 
-    pub fn new_vert(&self, _top: KnotSet, _bottom: KnotSet) -> KnotSet {
-        unimplemented!()
+    pub fn new_vert(&self, top: KnotSet, bottom: KnotSet) -> KnotSet {
+        let new_knot_values = top
+            .knot_values()
+            .union(&bottom.knot_values())
+            .cloned()
+            .collect();
+
+        KnotSet::new_knot_set(&new_knot_values, |col| {
+            let top_data = top.knot_data_at(col);
+            let bottom_data = bottom.knot_data_at(col);
+            KnotData {
+                resolved_layout: ResolvedLayoutRef(rc::Rc::new(ResolvedLayout::Vert(
+                    top_data.resolved_layout.clone(),
+                    bottom_data.resolved_layout.clone(),
+                ))),
+                span: bottom_data.span,
+                intercept: top_data.intercept + bottom_data.intercept + self.newline_cost,
+                rise: top_data.rise + bottom_data.rise,
+            }
+        })
     }
 
     pub fn new_horiz(&self, _left: KnotSet, _right: KnotSet) -> KnotSet {
