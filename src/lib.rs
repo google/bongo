@@ -216,6 +216,7 @@ struct ResolvedLayoutRef(std::rc::Rc<ResolvedLayout>);
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 struct KnotColumn(u16);
 
+#[derive(Clone, Debug)]
 struct KnotData {
     // The layout as resolved.
     resolved_layout: ResolvedLayoutRef,
@@ -313,6 +314,43 @@ impl KnotSet {
     fn right_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
         search_map(&self.knots, &col, SearchDirection::GreaterEq).map(|(k, v)| (*k, v))
     }
+
+    fn intervals(&self) -> Vec<KnotInterval> {
+        let mut knot_iter = self.knots.iter();
+        let mut curr_col;
+        let mut curr_data;
+        let (first_col, first_data) = knot_iter.next().expect("KnotSets should have at least one element.");
+        curr_col = *first_col;
+        curr_data = first_data.clone();
+        let mut result = Vec::with_capacity(self.knots.len());
+
+        for (col, data) in knot_iter {
+            result.push(KnotInterval {
+                start: curr_col,
+                end: Some(*col),
+                data: curr_data,
+            });
+            curr_col = *col;
+            curr_data = data.clone();
+        }
+
+        result.push(KnotInterval {
+            start: curr_col,
+            end: None,
+            data: curr_data,
+        });
+        result
+    }
+}
+
+struct KnotInterval {
+    // The inclusive starting column of a knot. Minimum 0.
+    start: KnotColumn,
+
+    // The exclusive ending column of a knot, or None if unbounded.
+    end: Option<KnotColumn>,
+
+    data: KnotData,
 }
 
 struct KnotSetBuilder {
@@ -384,13 +422,5 @@ impl KnotSetBuilder {
 
     pub fn new_choice(&self, _choice1: KnotSet, _choice2: KnotSet) -> KnotSet {
         unimplemented!()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }
