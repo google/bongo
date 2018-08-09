@@ -6,202 +6,73 @@ use std::ops;
 use std::rc;
 
 #[derive(Clone, Debug)]
-struct LayoutRef(rc::Rc<LayoutContents>);
+pub struct Layout(rc::Rc<LayoutContents>);
 
-impl LayoutRef {
+impl Layout {
+    fn with_contents(contents: LayoutContents) -> Layout {
+        Layout(rc::Rc::new(contents))
+    }
+
     fn contents(&self) -> &LayoutContents {
         &*self.0
     }
-}
 
-impl ops::Deref for LayoutRef {
-    type Target = LayoutContents;
-    fn deref(&self) -> &LayoutContents {
-        self.contents()
+    pub fn text(lit_text: String) -> Layout {
+        Layout::with_contents(LayoutContents::Text(lit_text))
     }
-}
 
-impl AsRef<LayoutContents> for LayoutRef {
-    fn as_ref(&self) -> &LayoutContents {
-        self.contents()
+    pub fn choice(first: &Layout, second: &Layout) -> Layout {
+        // We should canonicalize this so that the choices are always in the same order.
+        Layout::with_contents(LayoutContents::Choice(first.clone(), second.clone()))
+    }
+
+    pub fn stack(top: &Layout, bottom: &Layout) -> Layout {
+        Layout::with_contents(LayoutContents::Stack(top.clone(), bottom.clone()))
+    }
+
+    pub fn juxtapose(left: &Layout, right: &Layout) -> Layout {
+        let mut builder = JuxtaposeBuilder::new(right);
+        builder.juxtapose(left)
     }
 }
 
 #[derive(Debug)]
 enum LayoutContents {
     Text(String),
-    Horiz(LayoutRef, LayoutRef),
-    Vert(LayoutRef, LayoutRef),
-    Choice(LayoutRef, LayoutRef),
+    Choice(Layout, Layout),
+    Stack(Layout, Layout),
+    Juxtapose(String, Layout),
 }
 
-trait OrdAs {
-    type AsType: Eq + PartialEq + Ord + PartialOrd;
-    fn ord_as(&self) -> Self::AsType;
+struct JuxtaposeBuilder {
+    right: Layout,
+    memo: col::BTreeMap<*const LayoutContents, Layout>,
 }
 
-struct OrdAsKey<T>(T);
-
-impl<T> ops::Deref for OrdAsKey<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T> ops::DerefMut for OrdAsKey<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.0
-    }
-}
-
-impl<T: OrdAs> Ord for OrdAsKey<T> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.0.ord_as().cmp(&other.0.ord_as())
-    }
-}
-
-impl<T: OrdAs> PartialOrd for OrdAsKey<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<T: OrdAs> Eq for OrdAsKey<T> {}
-
-impl<T: OrdAs> PartialEq for OrdAsKey<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.ord_as().eq(&other.0.ord_as())
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
-struct RefMapKey<'a, K: 'a>(&'a K);
-
-impl<'a, K: 'a> OrdAs for RefMapKey<'a, K> {
-    type AsType = *const K;
-    fn ord_as(&self) -> *const K {
-        self.0
-    }
-}
-
-struct RefMap<'a, K: 'a, V> {
-    map: col::BTreeMap<OrdAsKey<RefMapKey<'a, K>>, V>,
-}
-
-impl<'a, K: 'a, V> RefMap<'a, K, V> {
-    fn insert(&mut self, key: &'a (impl AsRef<K>), value: V) -> Option<V> {
-        self.map.insert(OrdAsKey(RefMapKey(key.as_ref())), value)
+impl JuxtaposeBuilder {
+    fn new(right: &Layout) -> Self {
+        JuxtaposeBuilder { right: right.clone(), memo: col::BTreeMap::new() }
     }
 
-    fn iter<'b: 'a>(&'b self) -> impl Iterator<Item = (&'a K, &'b V)> {
-        self.map.iter().map(|(k, v)| ((k.0).0, v))
-    }
-}
-
-// ReducedLayout
-
-#[derive(Debug)]
-enum ReducedLayout {
-    Text(String),
-    Horiz(String, ReducedLayoutRef),
-    Vert(ReducedLayoutRef, ReducedLayoutRef),
-    Choice(ReducedLayoutRef, ReducedLayoutRef),
-}
-
-#[derive(Clone, Debug)]
-struct ReducedLayoutRef(rc::Rc<ReducedLayout>);
-
-impl ReducedLayoutRef {
-    fn new(layout: ReducedLayout) -> Self {
-        ReducedLayoutRef(rc::Rc::new(layout))
-    }
-}
-
-impl ops::Deref for ReducedLayoutRef {
-    type Target = ReducedLayout;
-    fn deref(&self) -> &ReducedLayout {
-        &*self.0
-    }
-}
-
-mod layout_reducer {
-
-    use super::LayoutContents;
-    use super::LayoutRef;
-    use super::ReducedLayout;
-    use super::ReducedLayoutRef;
-
-    use std::collections as col;
-
-    struct LayoutReducer {
-        memo:
-            col::BTreeMap<(*const LayoutContents, Option<*const ReducedLayout>), ReducedLayoutRef>,
-    }
-
-    impl LayoutReducer {
-        fn new() -> Self {
-            LayoutReducer {
-                memo: col::BTreeMap::new(),
-            }
+    fn juxtapose(&mut self, left: &Layout) -> Layout {
+        if let Some(v) = self.memo.get(&(left.contents() as *const LayoutContents)) {
+            return v.clone();
         }
 
-        fn reduce(
-            &mut self,
-            layout: &LayoutRef,
-            trailer: Option<&ReducedLayoutRef>,
-        ) -> ReducedLayoutRef {
-            let layout_ptr = &**layout;
-            let trailer_ptr = trailer.map(|t| &**t as *const ReducedLayout);
-            match self.memo.get(&(layout_ptr, trailer_ptr)) {
-                Some(v) => v.clone(),
-                None => {
-                    let result = self.reduce_real(layout, trailer);
-                    self.memo.insert((layout_ptr, trailer_ptr), result.clone());
-                    result
-                }
-            }
-        }
+        let new_layout = match left.contents() {
+            LayoutContents::Text(t) => Layout::with_contents(LayoutContents::Juxtapose(t.clone(), self.right.clone())),
+            LayoutContents::Choice(first, second) =>
+                Layout::with_contents(LayoutContents::Choice(self.juxtapose(first), self.juxtapose(second))),
+            LayoutContents::Stack(top, bottom) =>
+                Layout::with_contents(LayoutContents::Stack(top.clone(), self.juxtapose(bottom))),
+            LayoutContents::Juxtapose(text, jux_right) =>
+                Layout::with_contents(LayoutContents::Juxtapose(text.clone(), self.juxtapose(jux_right))),
+        };
 
-        fn reduce_real(
-            &mut self,
-            layout: &LayoutRef,
-            trailer: Option<&ReducedLayoutRef>,
-        ) -> ReducedLayoutRef {
-            match layout.contents() {
-                LayoutContents::Text(text) => match trailer {
-                    Some(trailer_val) => ReducedLayoutRef::new(ReducedLayout::Horiz(
-                        text.clone(),
-                        trailer_val.clone(),
-                    )),
-                    None => ReducedLayoutRef::new(ReducedLayout::Text(text.clone())),
-                },
-                LayoutContents::Horiz(left, right) => {
-                    let reduced_right = self.reduce(right, trailer);
-                    self.reduce(left, Some(&reduced_right))
-                }
-                LayoutContents::Vert(top, bottom) => {
-                    let reduced_top = self.reduce(top, None);
-                    let reduced_bottom = self.reduce(bottom, trailer);
-                    ReducedLayoutRef::new(ReducedLayout::Vert(reduced_top, reduced_bottom))
-                }
-                LayoutContents::Choice(left, right) => {
-                    let reduced_left = self.reduce(left, trailer);
-                    let reduced_right = self.reduce(right, trailer);
-                    ReducedLayoutRef::new(ReducedLayout::Choice(reduced_left, reduced_right))
-                }
-            }
-        }
+        self.memo.insert(left.contents() as *const LayoutContents, new_layout.clone());
+        new_layout
     }
-
-    pub(super) fn reduce_layout(layout: &LayoutRef) -> ReducedLayoutRef {
-        let mut reducer = LayoutReducer::new();
-        reducer.reduce(layout, None)
-    }
-
 }
-
-use layout_reducer::reduce_layout;
 
 #[derive(Clone, Debug)]
 enum ResolvedLayout {
