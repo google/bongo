@@ -112,8 +112,151 @@ impl ResolvedLayoutRef {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-struct KnotColumn(u16);
+mod knot_column {
+    use std::ops;
+
+    #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+    pub struct KnotColumn(u16);
+
+    impl KnotColumn {
+        pub fn new(col: u16) -> KnotColumn {
+            KnotColumn(col)
+        }
+        pub fn col(self) -> u16 {
+            self.0
+        }
+    }
+
+    impl ops::Add for KnotColumn {
+        type Output = KnotColumn;
+
+        fn add(self, other: Self) -> KnotColumn {
+            KnotColumn(self.0.checked_add(other.0).expect("Must not overflow"))
+        }
+    }
+
+    impl ops::Sub for KnotColumn {
+        type Output = KnotColumn;
+
+        fn sub(self, other: Self) -> KnotColumn {
+            KnotColumn(self.0.checked_sub(other.0).expect("Must not overflow"))
+        }
+    }
+
+}
+
+use knot_column::KnotColumn;
+
+mod linear_value {
+    use std::ops;
+
+    #[derive(Copy, Clone, Debug)]
+    pub struct LinearValue {
+        intercept: f32,
+        rise: f32,
+    }
+
+    pub enum BinaryResult {
+        Left,
+        Right,
+    }
+
+    impl LinearValue {
+        pub fn new(intercept: f32, rise: f32) -> LinearValue {
+            LinearValue { intercept, rise }
+        }
+
+        pub fn new_flat(intercept: f32) -> LinearValue {
+            LinearValue { intercept, rise: 0.0, }
+        }
+
+        pub fn identity() -> LinearValue {
+            LinearValue { intercept: 0.0, rise: 0.0, }
+        }
+
+        pub fn value_at(self, offset: u16) -> f32 {
+            self.intercept + self.rise * (offset as f32)
+        }
+
+        pub fn advance(self, steps: u16) -> LinearValue {
+            LinearValue {
+                intercept: self.value_at(steps),
+                ..self
+            }
+        }
+
+        // Finds the next time the two lines cross in the positive direction.
+        // Returns None if the lines do not intersect, or the intersection point is
+        // out of range.
+        pub fn forward_intersection(self, other: LinearValue) -> Option<u16> {
+            let numerator = other.intercept - self.intercept;
+            let denominator = self.intercept - other.intercept;
+
+            if denominator == 0.0 {
+                if numerator == 0.0 {
+                    // The lines are the same. Thus they intersect everywhere, including
+                    // at 0. That's the next value, so we use that.
+                    Some(0)
+                } else {
+                    // The lines are parallel. It intersects nowhere.
+                    None
+                }
+            } else {
+                let intersection = numerator / denominator;
+                if intersection.is_infinite() {
+                    return None;
+                }
+
+                if intersection < 0.0 {
+                    return None;
+                }
+
+                if intersection > std::u16::MAX as f32 {
+                    return None;
+                }
+                Some(intersection.ceil() as u16)
+            }
+        }
+
+        pub fn max_initial_value(self, other: LinearValue) -> BinaryResult {
+            use std::cmp::Ordering::*;
+            use self::BinaryResult::*;
+            match self.intercept.partial_cmp(&other.intercept).expect("Intercept should never be edge values.") {
+                Less => Right,
+                Greater => Left,
+                Eq => if self.rise > other.rise {
+                    Left
+                } else {
+                    Right
+                }
+            }
+        }
+    }
+
+    impl ops::Add for LinearValue {
+        type Output = LinearValue;
+
+        fn add(self, other: Self) -> LinearValue {
+            LinearValue {
+                intercept: self.intercept + other.intercept,
+                rise: self.rise + other.rise,
+            }
+        }
+    }
+
+    impl ops::Sub for LinearValue {
+        type Output = LinearValue;
+
+        fn sub(self, other: Self) -> LinearValue {
+            LinearValue {
+                intercept: self.intercept - other.intercept,
+                rise: self.rise - other.rise,
+            }
+        }
+    }
+}
+
+use linear_value::{LinearValue, BinaryResult};
 
 #[derive(Clone, Debug)]
 struct KnotData {
@@ -124,10 +267,7 @@ struct KnotData {
     span: u16,
 
     /// The cost value at knot start
-    intercept: f32,
-
-    /// The cost increment per column after knot start
-    rise: f32,
+    value: LinearValue,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -184,14 +324,13 @@ impl KnotSet {
     }
 
     fn knot_data_at(&self, col: KnotColumn) -> KnotData {
-        let (knot_col, knot_value) = search_map(&self.knots, &col, SearchDirection::LessEq)
+        let (&knot_col, knot_value) = search_map(&self.knots, &col, SearchDirection::LessEq)
             .expect("There should always be a knot at 0");
-        let column_distance = col.0 - knot_col.0;
+        let column_distance = (col - knot_col).col();
         KnotData {
             resolved_layout: knot_value.resolved_layout.clone(),
             span: knot_value.span,
-            intercept: knot_value.intercept + knot_value.rise * (column_distance as f32),
-            rise: knot_value.rise,
+            value: knot_value.value.advance(column_distance),
         }
     }
 
@@ -291,27 +430,24 @@ impl KnotSetBuilder {
             let flat_data = KnotData {
                 resolved_layout: layout.clone(),
                 span: text_len,
-                intercept: 0.0,
-                rise: 0.0,
+                value: LinearValue::new(0.0, 0.0),
             };
-            knots.insert(KnotColumn(0), flat_data);
+            knots.insert(KnotColumn::new(0), flat_data);
 
             let rise_data = KnotData {
                 resolved_layout: layout,
                 span: text_len,
-                intercept: 0.0,
-                rise: self.overflow_cost,
+                value: LinearValue::new(0.0, self.overflow_cost),
             };
 
-            knots.insert(KnotColumn(self.margin - text_len), rise_data);
+            knots.insert(KnotColumn::new(self.margin - text_len), rise_data);
         } else {
             let rise_data = KnotData {
                 resolved_layout: layout,
                 span: text_len,
-                intercept: self.overflow_cost * ((text_len - self.margin) as f32),
-                rise: self.overflow_cost,
+                value: LinearValue::new(self.overflow_cost * ((text_len - self.margin) as f32), self.overflow_cost),
             };
-            knots.insert(KnotColumn(0), rise_data);
+            knots.insert(KnotColumn::new(0), rise_data);
         }
         KnotSet { knots: knots }
     }
@@ -332,8 +468,7 @@ impl KnotSetBuilder {
                     bottom_data.resolved_layout.clone(),
                 ),
                 span: bottom_data.span,
-                intercept: top_data.intercept + bottom_data.intercept + self.newline_cost,
-                rise: top_data.rise + bottom_data.rise,
+                value: top_data.value + bottom_data.value + LinearValue::new_flat(self.newline_cost),
             }
         })
     }
@@ -343,9 +478,9 @@ impl KnotSetBuilder {
         let left_width = left.len() as u16;
 
         let shifted_left_knot_values = right
-            .knot_values_between(KnotColumn(left_width), None)
+            .knot_values_between(KnotColumn::new(left_width), None)
             .into_iter()
-            .map(|KnotColumn(col)| KnotColumn(col - left_width))
+            .map(|col| col - KnotColumn::new(left_width))
             .collect();
 
         let text_knot_set = self.new_text(left);
@@ -356,18 +491,15 @@ impl KnotSetBuilder {
             .collect();
 
         KnotSet::new_knot_set(&new_knot_values, |col| {
-            let right_knot_col = KnotColumn(col.0 + left_width);
+            let right_knot_col = col + KnotColumn::new(left_width);
             let left_data = text_knot_set.knot_data_at(col);
             let right_data = right.knot_data_at(right_knot_col);
 
-            let sub_intercept_factor;
-            let sub_rise_factor;
-            if col.0 > self.margin {
-                sub_intercept_factor = (col.0 - self.margin) as f32 * self.overflow_cost;
-                sub_rise_factor = self.overflow_cost;
+            let sub_factor;
+            if col > KnotColumn::new(self.margin) {
+                sub_factor = LinearValue::new(0.0, self.overflow_cost).advance((col - KnotColumn::new(self.margin)).col());
             } else {
-                sub_intercept_factor = 0.0;
-                sub_rise_factor = 0.0;
+                sub_factor = LinearValue::identity();
             }
             KnotData {
                 resolved_layout: ResolvedLayoutRef::new_horiz(
@@ -375,8 +507,7 @@ impl KnotSetBuilder {
                     left_data.resolved_layout.clone(),
                 ),
                 span: left_data.span + right_data.span,
-                intercept: left_data.intercept + right_data.intercept - sub_intercept_factor,
-                rise: left_data.rise + right_data.rise - sub_rise_factor,
+                value: left_data.value + right_data.value - sub_factor,
             }
         })
     }
@@ -394,23 +525,32 @@ impl KnotSetBuilder {
             let choice1_data = choice1.knot_data_at(start);
             let choice2_data = choice2.knot_data_at(start);
 
-            let chi_k = (choice2_data.intercept - choice1_data.intercept)
-                / (choice1_data.rise - choice2_data.rise);
+            let intersect = choice1_data.value.forward_intersection(choice2_data.value);
 
-            let intersect_delta = chi_k.ceil() as u16;
+            if let Some(intersect) = intersect {
+                let intersect_delta = KnotColumn::new(intersect);
 
-            let in_range = match end_opt {
-                Some(k) => start.0 + intersect_delta < k.0,
-                None => false,
-            };
+                let in_range = match end_opt {
+                    Some(k) => start + intersect_delta < k,
+                    None => false,
+                };
 
-            if in_range {
-                extra_knots.insert(KnotColumn(start.0 + intersect_delta));
+                if in_range {
+                    extra_knots.insert(start + intersect_delta);
+                }
             }
         }
 
         let all_knots: col::BTreeSet<_> = base_knots.union(&extra_knots).cloned().collect();
 
-        unimplemented!()
+        KnotSet::new_knot_set(&all_knots, |col| {
+            let choice1_data = choice1.knot_data_at(col);
+            let choice2_data = choice2.knot_data_at(col);
+
+            match choice1_data.value.max_initial_value(choice2_data.value) {
+                BinaryResult::Left => choice1_data,
+                BinaryResult::Right => choice2_data,
+            }
+        })
     }
 }
