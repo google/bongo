@@ -5,6 +5,9 @@ use std::collections as col;
 use std::ops;
 use std::rc;
 
+const OVERFLOW_COST: f32 = 100.0;
+const NEWLINE_COST: f32 = 1.0;
+
 #[derive(Clone, Debug)]
 pub struct Layout(rc::Rc<LayoutContents>);
 
@@ -33,6 +36,19 @@ impl Layout {
     pub fn juxtapose(left: &Layout, right: &Layout) -> Layout {
         let mut builder = JuxtaposeBuilder::new(right);
         builder.juxtapose(left)
+    }
+
+    pub fn layout(&self, margin: u16) -> String {
+        let builder = KnotSetBuilder {
+            margin: margin,
+            overflow_cost: OVERFLOW_COST,
+            newline_cost: NEWLINE_COST,
+            memo: std::cell::RefCell::new(col::BTreeMap::new()),
+        };
+
+        let final_knot_set = builder.get_knot_set(self);
+        let final_layout = final_knot_set.knot_data_at(KnotColumn::new(0)).resolved_layout.clone();
+        return final_layout.to_text(0);
     }
 }
 
@@ -110,6 +126,31 @@ impl ResolvedLayoutRef {
     pub fn new_vert(top: ResolvedLayoutRef, bottom: ResolvedLayoutRef) -> ResolvedLayoutRef {
         ResolvedLayoutRef::new(ResolvedLayout::Vert(top, bottom))
     }
+
+    pub fn to_text(&self, curr_indent: u16) -> String {
+        use self::ResolvedLayout::*;
+        match &*self.0 {
+            Text(text) => text.clone(),
+            Horiz(left_ref, right_ref) => {
+                left_ref.to_text(curr_indent) + &right_ref.to_text(curr_indent + left_ref.size())
+            }
+            Vert(top, bottom) => {
+                top.to_text(curr_indent)
+                    + "\n"
+                    + &(" ".repeat(curr_indent as usize))
+                    + &bottom.to_text(curr_indent)
+            }
+        }
+    }
+
+    pub fn size(&self) -> u16 {
+        use self::ResolvedLayout::*;
+        match &*self.0 {
+            Text(text) => text.len() as u16,
+            Horiz(left, right) => left.size() + right.size(),
+            Vert(top, bottom) => bottom.size(),
+        }
+    }
 }
 
 mod knot_column {
@@ -156,6 +197,7 @@ mod linear_value {
         rise: f32,
     }
 
+    #[derive(Copy, Clone, Debug)]
     pub enum BinaryResult {
         Left,
         Right,
@@ -167,11 +209,17 @@ mod linear_value {
         }
 
         pub fn new_flat(intercept: f32) -> LinearValue {
-            LinearValue { intercept, rise: 0.0, }
+            LinearValue {
+                intercept,
+                rise: 0.0,
+            }
         }
 
         pub fn identity() -> LinearValue {
-            LinearValue { intercept: 0.0, rise: 0.0, }
+            LinearValue {
+                intercept: 0.0,
+                rise: 0.0,
+            }
         }
 
         pub fn value_at(self, offset: u16) -> f32 {
@@ -219,16 +267,20 @@ mod linear_value {
         }
 
         pub fn max_initial_value(self, other: LinearValue) -> BinaryResult {
-            use std::cmp::Ordering::*;
             use self::BinaryResult::*;
-            match self.intercept.partial_cmp(&other.intercept).expect("Intercept should never be edge values.") {
+            use std::cmp::Ordering::*;
+            match self
+                .intercept
+                .partial_cmp(&other.intercept)
+                .expect("Intercept should never be edge values.")
+            {
                 Less => Right,
                 Greater => Left,
                 Eq => if self.rise > other.rise {
                     Left
                 } else {
                     Right
-                }
+                },
             }
         }
     }
@@ -256,7 +308,7 @@ mod linear_value {
     }
 }
 
-use linear_value::{LinearValue, BinaryResult};
+use linear_value::{BinaryResult, LinearValue};
 
 #[derive(Clone, Debug)]
 struct KnotData {
@@ -307,6 +359,7 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
 struct KnotSet {
     knots: col::BTreeMap<KnotColumn, KnotData>,
 }
@@ -418,10 +471,11 @@ struct KnotSetBuilder {
     margin: u16,
     overflow_cost: f32,
     newline_cost: f32,
+    memo: std::cell::RefCell<col::BTreeMap<*const LayoutContents, rc::Rc<KnotSet>>>,
 }
 
 impl KnotSetBuilder {
-    pub fn new_text(&self, text: impl Into<String>) -> KnotSet {
+    pub fn new_text_impl(&self, text: impl Into<String>) -> KnotSet {
         let text_str = text.into();
         let text_len = text_str.len() as u16;
         let layout = ResolvedLayoutRef::new_text(text_str);
@@ -445,14 +499,17 @@ impl KnotSetBuilder {
             let rise_data = KnotData {
                 resolved_layout: layout,
                 span: text_len,
-                value: LinearValue::new(self.overflow_cost * ((text_len - self.margin) as f32), self.overflow_cost),
+                value: LinearValue::new(
+                    self.overflow_cost * ((text_len - self.margin) as f32),
+                    self.overflow_cost,
+                ),
             };
             knots.insert(KnotColumn::new(0), rise_data);
         }
         KnotSet { knots: knots }
     }
 
-    pub fn new_vert(&self, top: KnotSet, bottom: KnotSet) -> KnotSet {
+    pub fn new_vert_impl(&self, top: &KnotSet, bottom: &KnotSet) -> KnotSet {
         let new_knot_values = top
             .knot_values()
             .union(&bottom.knot_values())
@@ -468,22 +525,25 @@ impl KnotSetBuilder {
                     bottom_data.resolved_layout.clone(),
                 ),
                 span: bottom_data.span,
-                value: top_data.value + bottom_data.value + LinearValue::new_flat(self.newline_cost),
+                value: top_data.value
+                    + bottom_data.value
+                    + LinearValue::new_flat(self.newline_cost),
             }
         })
     }
 
-    pub fn new_horiz(&self, left: impl Into<String>, right: KnotSet) -> KnotSet {
+    pub fn new_horiz_impl(&self, left: impl Into<String>, right: &KnotSet) -> KnotSet {
         let left = left.into();
+        println!("left: {:?}, right: {:?}", left, right);
         let left_width = left.len() as u16;
-
         let shifted_left_knot_values = right
             .knot_values_between(KnotColumn::new(left_width), None)
             .into_iter()
             .map(|col| col - KnotColumn::new(left_width))
             .collect();
 
-        let text_knot_set = self.new_text(left);
+        let text_layout = Layout::text(left.into());
+        let text_knot_set = self.get_knot_set(&text_layout);
         let new_knot_values: col::BTreeSet<_> = text_knot_set
             .knot_values()
             .union(&shifted_left_knot_values)
@@ -495,9 +555,12 @@ impl KnotSetBuilder {
             let left_data = text_knot_set.knot_data_at(col);
             let right_data = right.knot_data_at(right_knot_col);
 
+            println!("right_knot_col: {:?}, knot col: {:?}, left_data: {:?}, right_data: {:?}", right_knot_col, col, left_data, right_data);
+
             let sub_factor;
             if col > KnotColumn::new(self.margin) {
-                sub_factor = LinearValue::new(0.0, self.overflow_cost).advance((col - KnotColumn::new(self.margin)).col());
+                sub_factor = LinearValue::new(0.0, self.overflow_cost)
+                    .advance((col - KnotColumn::new(self.margin)).col());
             } else {
                 sub_factor = LinearValue::identity();
             }
@@ -512,7 +575,8 @@ impl KnotSetBuilder {
         })
     }
 
-    pub fn new_choice(&self, choice1: KnotSet, choice2: KnotSet) -> KnotSet {
+    pub fn new_choice_impl(&self, choice1: &KnotSet, choice2: &KnotSet) -> KnotSet {
+        println!("choice1: {:?}, choice2: {:?}", choice1, choice2);
         // Set "L" in the paper
         let base_knots: col::BTreeSet<_> = choice1
             .knot_values()
@@ -548,9 +612,71 @@ impl KnotSetBuilder {
             let choice2_data = choice2.knot_data_at(col);
 
             match choice1_data.value.max_initial_value(choice2_data.value) {
-                BinaryResult::Left => choice1_data,
-                BinaryResult::Right => choice2_data,
+                BinaryResult::Left => choice2_data,
+                BinaryResult::Right => choice1_data,
             }
         })
+    }
+
+    fn get_knot_set(&self, layout: &Layout) -> rc::Rc<KnotSet> {
+        use self::LayoutContents::*;
+        let contents = layout.contents();
+        let memo_key = contents as *const LayoutContents;
+        {
+            let borrow = self.memo.borrow();
+            if let Some(memoized) = borrow.get(&memo_key) {
+                return memoized.clone();
+            }
+        }
+
+        let new_knot_set = match contents {
+            Text(text) => self.new_text_impl(text.clone()),
+            Stack(top, bottom) => {
+                self.new_vert_impl(&*self.get_knot_set(top), &*self.get_knot_set(bottom))
+            }
+            Juxtapose(left, right) => self.new_horiz_impl(left.clone(), &*self.get_knot_set(right)),
+            Choice(left, right) => {
+                self.new_choice_impl(&*self.get_knot_set(left), &*self.get_knot_set(right))
+            }
+        };
+
+        {
+            let mut borrow = self.memo.borrow_mut();
+            borrow.insert(memo_key, rc::Rc::new(new_knot_set));
+            borrow.get(&memo_key).unwrap().clone()
+        }
+    }
+}
+
+macro_rules! pp_stack {
+    () => { Layout::text("".to_owned()) };
+    ($only:expr) => { $only };
+    ($first:expr, $($rest:expr),*) => { Layout::stack($first, pp_stack!($($rest),*)) };
+}
+
+#[cfg(test)]
+mod test {
+    use super::Layout;
+
+    #[test]
+    fn test_simple_set() {
+        let foo = Layout::text("foo".to_owned());
+        let pair = Layout::juxtapose(&foo, &foo);
+        assert_eq!(pair.layout(10), "foofoo");
+    }
+
+    #[test]
+    fn test_simple_stack() {
+        let foo = Layout::text("foo".to_owned());
+        let pair = Layout::stack(&foo, &foo);
+        assert_eq!(pair.layout(10), "foo\nfoo");
+    }
+
+    #[test]
+    fn text_simple_choice() {
+        let foo = Layout::text("foo".to_owned());
+        let pair = Layout::choice(&Layout::juxtapose(&foo, &foo), &Layout::stack(&foo, &foo));
+        assert_eq!(pair.layout(10), "foofoo");
+        assert_eq!(pair.layout(4), "foo\nfoo");
     }
 }
