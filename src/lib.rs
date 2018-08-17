@@ -38,6 +38,16 @@ impl Layout {
         builder.juxtapose(left)
     }
 
+    pub fn choices(items: &[&Layout]) -> Layout {
+        assert!(items.len() > 0);
+        let mut curr_layout = items[0].clone();
+        for i in 1..items.len() {
+            curr_layout = Layout::choice(&curr_layout, &items[i]);
+        }
+
+        curr_layout
+    }
+
     pub fn layout(&self, margin: u16) -> String {
         let builder = KnotSetBuilder {
             margin: margin,
@@ -148,7 +158,7 @@ impl ResolvedLayoutRef {
         match &*self.0 {
             Text(text) => text.len() as u16,
             Horiz(left, right) => left.size() + right.size(),
-            Vert(top, bottom) => bottom.size(),
+            Vert(_, bottom) => bottom.size(),
         }
     }
 }
@@ -534,7 +544,6 @@ impl KnotSetBuilder {
 
     pub fn new_horiz_impl(&self, left: impl Into<String>, right: &KnotSet) -> KnotSet {
         let left = left.into();
-        println!("left: {:?}, right: {:?}", left, right);
         let left_width = left.len() as u16;
         let shifted_left_knot_values = right
             .knot_values_between(KnotColumn::new(left_width), None)
@@ -542,8 +551,7 @@ impl KnotSetBuilder {
             .map(|col| col - KnotColumn::new(left_width))
             .collect();
 
-        let text_layout = Layout::text(left.into());
-        let text_knot_set = self.get_knot_set(&text_layout);
+        let text_knot_set = self.new_text_impl(left);
         let new_knot_values: col::BTreeSet<_> = text_knot_set
             .knot_values()
             .union(&shifted_left_knot_values)
@@ -555,8 +563,6 @@ impl KnotSetBuilder {
             let left_data = text_knot_set.knot_data_at(col);
             let right_data = right.knot_data_at(right_knot_col);
 
-            println!("right_knot_col: {:?}, knot col: {:?}, left_data: {:?}, right_data: {:?}", right_knot_col, col, left_data, right_data);
-
             let sub_factor;
             if col > KnotColumn::new(self.margin) {
                 sub_factor = LinearValue::new(0.0, self.overflow_cost)
@@ -566,8 +572,8 @@ impl KnotSetBuilder {
             }
             KnotData {
                 resolved_layout: ResolvedLayoutRef::new_horiz(
-                    right_data.resolved_layout.clone(),
                     left_data.resolved_layout.clone(),
+                    right_data.resolved_layout.clone(),
                 ),
                 span: left_data.span + right_data.span,
                 value: left_data.value + right_data.value - sub_factor,
@@ -576,7 +582,6 @@ impl KnotSetBuilder {
     }
 
     pub fn new_choice_impl(&self, choice1: &KnotSet, choice2: &KnotSet) -> KnotSet {
-        println!("choice1: {:?}, choice2: {:?}", choice1, choice2);
         // Set "L" in the paper
         let base_knots: col::BTreeSet<_> = choice1
             .knot_values()
@@ -678,5 +683,23 @@ mod test {
         let pair = Layout::choice(&Layout::juxtapose(&foo, &foo), &Layout::stack(&foo, &foo));
         assert_eq!(pair.layout(10), "foofoo");
         assert_eq!(pair.layout(4), "foo\nfoo");
+    }
+
+    #[test]
+    fn text_large_stack() {
+        let foo = Layout::text("foo".to_owned());
+        let bar = Layout::text("bar".to_owned());
+        let foo_stack = Layout::stack(&foo, &bar);
+        let foo_jux = Layout::juxtapose(&foo, &bar);
+        let foo_choice = Layout::choice(&foo_stack, &foo_jux);
+
+        let mut curr_choice = foo_choice.clone();
+        for _ in 0..12 {
+            curr_choice = Layout::juxtapose(&foo_choice, &curr_choice);
+        }
+
+        println!("{}", curr_choice.layout(50));
+
+        assert!(false);
     }
 }
