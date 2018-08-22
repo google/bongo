@@ -1,4 +1,4 @@
-#![feature(rust_2018_preview, nll)]
+#![feature(rust_2018_preview)]
 
 use std::cmp;
 use std::collections as col;
@@ -57,7 +57,9 @@ impl Layout {
         };
 
         let final_knot_set = builder.get_knot_set(self);
+        println!("Final memo size: {}", builder.memo.borrow().len());
         let final_layout = final_knot_set.knot_data_at(KnotColumn::new(0)).resolved_layout.clone();
+        println!("Number of knots in final: {}", final_knot_set.knot_values().len());
         return final_layout.to_text(0);
     }
 }
@@ -415,53 +417,6 @@ impl KnotSet {
             .map(|(k, _)| *k)
             .collect()
     }
-
-    fn left_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
-        search_map(&self.knots, &col, SearchDirection::Less).map(|(k, v)| (*k, v))
-    }
-
-    fn right_knot_data(&self, col: KnotColumn) -> Option<(KnotColumn, &KnotData)> {
-        search_map(&self.knots, &col, SearchDirection::GreaterEq).map(|(k, v)| (*k, v))
-    }
-
-    fn intervals(&self) -> Vec<KnotInterval> {
-        let mut knot_iter = self.knots.iter();
-        let mut curr_col;
-        let mut curr_data;
-        let (first_col, first_data) = knot_iter
-            .next()
-            .expect("KnotSets should have at least one element.");
-        curr_col = *first_col;
-        curr_data = first_data.clone();
-        let mut result = Vec::with_capacity(self.knots.len());
-
-        for (col, data) in knot_iter {
-            result.push(KnotInterval {
-                start: curr_col,
-                end: Some(*col),
-                data: curr_data,
-            });
-            curr_col = *col;
-            curr_data = data.clone();
-        }
-
-        result.push(KnotInterval {
-            start: curr_col,
-            end: None,
-            data: curr_data,
-        });
-        result
-    }
-}
-
-struct KnotInterval {
-    // The inclusive starting column of a knot. Minimum 0.
-    start: KnotColumn,
-
-    // The exclusive ending column of a knot, or None if unbounded.
-    end: Option<KnotColumn>,
-
-    data: KnotData,
 }
 
 fn column_intervals(columns: &col::BTreeSet<KnotColumn>) -> Vec<(KnotColumn, Option<KnotColumn>)> {
@@ -653,6 +608,7 @@ impl KnotSetBuilder {
     }
 }
 
+#[macro_export]
 macro_rules! pp_stack {
     () => { Layout::text("".to_owned()) };
     ($only:expr) => { $only };
@@ -694,11 +650,13 @@ mod test {
         let foo_choice = Layout::choice(&foo_stack, &foo_jux);
 
         let mut curr_choice = foo_choice.clone();
-        for _ in 0..12 {
+        for _ in 0..1000 {
             curr_choice = Layout::juxtapose(&foo_choice, &curr_choice);
         }
 
-        println!("{}", curr_choice.layout(50));
+        println!("Done creating layout.");
+
+        curr_choice.layout(500);
 
         assert!(false);
     }
