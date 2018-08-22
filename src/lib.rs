@@ -288,7 +288,7 @@ mod linear_value {
             {
                 Less => Right,
                 Greater => Left,
-                Eq => if self.rise > other.rise {
+                Equal => if self.rise > other.rise {
                     Left
                 } else {
                     Right
@@ -336,10 +336,7 @@ struct KnotData {
 
 #[derive(Copy, Clone, Debug)]
 enum SearchDirection {
-    Less,
     LessEq,
-    Greater,
-    GreaterEq,
 }
 
 fn search_map<'a, T, K, V>(
@@ -352,21 +349,9 @@ where
     T: cmp::Ord,
 {
     match direction {
-        SearchDirection::Less => {
-            let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Excluded(search_key)));
-            range.next_back()
-        }
         SearchDirection::LessEq => {
             let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Included(search_key)));
             range.next_back()
-        }
-        SearchDirection::Greater => {
-            let mut range = map.range((ops::Bound::Excluded(search_key), ops::Bound::Unbounded));
-            range.next()
-        }
-        SearchDirection::GreaterEq => {
-            let mut range = map.range((ops::Bound::Included(search_key), ops::Bound::Unbounded));
-            range.next()
         }
     }
 }
