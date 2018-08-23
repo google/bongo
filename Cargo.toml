@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Brian Chin <brian.chin@gmail.com>"]
 
 [dependencies]
-unicode_width = "0.1.5"
+unicode-width = "0.1.5"
