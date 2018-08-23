@@ -3,10 +3,10 @@ use std::collections as col;
 use std::ops;
 use std::rc;
 
-use crate::knot_column::KnotColumn;
-use crate::linear_value::{BinaryResult, LinearValue};
-use crate::resolved_layout::ResolvedLayoutRef;
 use crate::{Layout, LayoutContents};
+use knot_column::KnotColumn;
+use linear_value::{BinaryResult, LinearValue};
+use resolved_layout::ResolvedLayoutRef;
 
 #[derive(Clone, Debug)]
 struct KnotData {
