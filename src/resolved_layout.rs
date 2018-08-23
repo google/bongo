@@ -17,8 +17,8 @@ impl ResolvedLayoutRef {
         ResolvedLayoutRef(rc::Rc::new(inner))
     }
 
-    pub fn new_text(text: impl Into<SharedString>) -> ResolvedLayoutRef {
-        ResolvedLayoutRef::new(ResolvedLayout::Text(text.into()))
+    pub fn new_text(text: SharedString) -> ResolvedLayoutRef {
+        ResolvedLayoutRef::new(ResolvedLayout::Text(text))
     }
 
     pub fn new_horiz(left: ResolvedLayoutRef, right: ResolvedLayoutRef) -> ResolvedLayoutRef {
@@ -34,7 +34,7 @@ impl ResolvedLayoutRef {
         match &*self.0 {
             Text(text) => text.to_string(),
             Horiz(left_ref, right_ref) => {
-                left_ref.to_text(curr_indent) + &right_ref.to_text(curr_indent + left_ref.size())
+                left_ref.to_text(curr_indent) + &right_ref.to_text(curr_indent + left_ref.display_width())
             }
             Vert(top, bottom) => {
                 top.to_text(curr_indent)
@@ -45,12 +45,12 @@ impl ResolvedLayoutRef {
         }
     }
 
-    pub fn size(&self) -> u16 {
+    pub fn display_width(&self) -> u16 {
         use self::ResolvedLayout::*;
         match &*self.0 {
-            Text(text) => text.len() as u16,
-            Horiz(left, right) => left.size() + right.size(),
-            Vert(_, bottom) => bottom.size(),
+            Text(text) => text.display_width(),
+            Horiz(left, right) => left.display_width() + right.display_width(),
+            Vert(_, bottom) => bottom.display_width(),
         }
     }
 }

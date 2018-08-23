@@ -1,5 +1,7 @@
 #![feature(rust_2018_preview, uniform_paths)]
 
+extern crate unicode_width;
+
 mod knot_column;
 mod knot_set;
 mod linear_value;

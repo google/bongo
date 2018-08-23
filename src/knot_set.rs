@@ -7,6 +7,7 @@ use crate::{Layout, LayoutContents};
 use knot_column::KnotColumn;
 use linear_value::{BinaryResult, LinearValue};
 use resolved_layout::ResolvedLayoutRef;
+use shared_string::SharedString;
 
 #[derive(Clone, Debug)]
 struct KnotData {
@@ -117,10 +118,9 @@ pub struct KnotSetBuilder {
 }
 
 impl KnotSetBuilder {
-    fn new_text_impl(&self, text: impl Into<String>) -> KnotSet {
-        let text_str = text.into();
-        let text_len = text_str.len() as u16;
-        let layout = ResolvedLayoutRef::new_text(text_str);
+    fn new_text_impl(&self, text: SharedString) -> KnotSet {
+        let text_len = text.display_width();
+        let layout = ResolvedLayoutRef::new_text(text);
         let mut knots = col::BTreeMap::new();
         if text_len < self.margin {
             let flat_data = KnotData {
@@ -174,9 +174,9 @@ impl KnotSetBuilder {
         })
     }
 
-    fn new_horiz_impl(&self, left: impl Into<String>, right: &KnotSet) -> KnotSet {
+    fn new_horiz_impl(&self, left: impl Into<SharedString>, right: &KnotSet) -> KnotSet {
         let left = left.into();
-        let left_width = left.len() as u16;
+        let left_width = left.display_width();
         let shifted_left_knot_values = right
             .knot_values_between(KnotColumn::new(left_width), None)
             .into_iter()

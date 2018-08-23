@@ -2,12 +2,18 @@ use std::fmt;
 use std::ops;
 use std::rc;
 
+use unicode_width::UnicodeWidthStr;
+
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SharedString(rc::Rc<String>);
 
 impl SharedString {
     pub fn new(s: impl Into<String>) -> Self {
         SharedString(rc::Rc::new(s.into()))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &*self.0
     }
 
     pub fn to_string(&self) -> String {
@@ -20,6 +26,10 @@ impl SharedString {
             Ok(s) => s,
             Err(str_ref) => (&*str_ref).clone(),
         }
+    }
+
+    pub fn display_width(&self) -> u16 {
+        UnicodeWidthStr::width_cjk(self.as_str()) as u16
     }
 }
 
