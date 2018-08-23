@@ -1,12 +1,12 @@
-use std::collections as col;
 use std::cmp;
+use std::collections as col;
 use std::ops;
 use std::rc;
 
-use crate::{Layout, LayoutContents};
 use crate::knot_column::KnotColumn;
+use crate::linear_value::{BinaryResult, LinearValue};
 use crate::resolved_layout::ResolvedLayoutRef;
-use crate::linear_value::{LinearValue, BinaryResult};
+use crate::{Layout, LayoutContents};
 
 #[derive(Clone, Debug)]
 struct KnotData {
@@ -60,7 +60,9 @@ impl KnotSet {
     }
 
     pub fn get_primary_layout(&self) -> ResolvedLayoutRef {
-        self.knot_data_at(KnotColumn::new(0)).resolved_layout.clone()
+        self.knot_data_at(KnotColumn::new(0))
+            .resolved_layout
+            .clone()
     }
 
     fn knot_data_at(&self, col: KnotColumn) -> KnotData {
@@ -283,14 +285,19 @@ impl KnotSetBuilder {
     }
 }
 
-pub fn do_layout(layout: &Layout, overflow_cost: f32, newline_cost: f32, margin: u16) -> ResolvedLayoutRef {
-        let builder = KnotSetBuilder {
-            margin: margin,
-            overflow_cost: overflow_cost,
-            newline_cost: newline_cost,
-            memo: std::cell::RefCell::new(col::BTreeMap::new()),
-        };
+pub fn do_layout(
+    layout: &Layout,
+    overflow_cost: f32,
+    newline_cost: f32,
+    margin: u16,
+) -> ResolvedLayoutRef {
+    let builder = KnotSetBuilder {
+        margin: margin,
+        overflow_cost: overflow_cost,
+        newline_cost: newline_cost,
+        memo: std::cell::RefCell::new(col::BTreeMap::new()),
+    };
 
-        let final_knot_set = builder.get_knot_set(layout);
-        final_knot_set.get_primary_layout()
+    let final_knot_set = builder.get_knot_set(layout);
+    final_knot_set.get_primary_layout()
 }

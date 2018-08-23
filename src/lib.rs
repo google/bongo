@@ -1,14 +1,14 @@
 #![feature(rust_2018_preview, uniform_paths)]
 
-mod shared_string;
-mod resolved_layout;
 mod knot_column;
-mod linear_value;
 mod knot_set;
+mod linear_value;
+mod resolved_layout;
+mod shared_string;
 
 use std::collections as col;
-use std::rc;
 use std::fmt;
+use std::rc;
 
 use shared_string::SharedString;
 
@@ -165,7 +165,8 @@ mod test {
     fn text_simple_choice() {
         let foo = Layout::text("foo");
         let pair = Layout::choices(&[
-            &Layout::juxtapose(&[&foo, &foo]), &Layout::stack(&[&foo, &foo]),
+            &Layout::juxtapose(&[&foo, &foo]),
+            &Layout::stack(&[&foo, &foo]),
         ]);
         assert_eq!(pair.layout(10), "foofoo");
         assert_eq!(pair.layout(4), "foo\nfoo");

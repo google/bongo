@@ -1,6 +1,6 @@
-use std::rc;
-use std::ops;
 use std::fmt;
+use std::ops;
+use std::rc;
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
 pub struct SharedString(rc::Rc<String>);
@@ -8,6 +8,18 @@ pub struct SharedString(rc::Rc<String>);
 impl SharedString {
     pub fn new(s: impl Into<String>) -> Self {
         SharedString(rc::Rc::new(s.into()))
+    }
+
+    pub fn to_string(&self) -> String {
+        (&*self.0).clone()
+    }
+
+    pub fn into_string(self) -> String {
+        let SharedString(str_ref) = self;
+        match rc::Rc::try_unwrap(str_ref) {
+            Ok(s) => s,
+            Err(str_ref) => (&*str_ref).clone(),
+        }
     }
 }
 
@@ -19,16 +31,14 @@ impl fmt::Debug for SharedString {
 
 impl ops::Deref for SharedString {
     type Target = str;
-    fn deref(&self) -> &str { &*self.0 }
+    fn deref(&self) -> &str {
+        &*self.0
+    }
 }
 
 impl From<SharedString> for String {
     fn from(other: SharedString) -> Self {
-        let SharedString(str_ref) = other;
-        match rc::Rc::try_unwrap(str_ref) {
-            Ok(s) => s,
-            Err(str_ref) => (&*str_ref).clone(),
-        }
+        other.into_string()
     }
 }
 

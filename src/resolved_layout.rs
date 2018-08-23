@@ -1,8 +1,10 @@
 use std::rc;
 
+use shared_string::SharedString;
+
 #[derive(Clone, Debug)]
 enum ResolvedLayout {
-    Text(String),
+    Text(SharedString),
     Horiz(ResolvedLayoutRef, ResolvedLayoutRef),
     Vert(ResolvedLayoutRef, ResolvedLayoutRef),
 }
@@ -15,7 +17,7 @@ impl ResolvedLayoutRef {
         ResolvedLayoutRef(rc::Rc::new(inner))
     }
 
-    pub fn new_text(text: impl Into<String>) -> ResolvedLayoutRef {
+    pub fn new_text(text: impl Into<SharedString>) -> ResolvedLayoutRef {
         ResolvedLayoutRef::new(ResolvedLayout::Text(text.into()))
     }
 
@@ -30,7 +32,7 @@ impl ResolvedLayoutRef {
     pub fn to_text(&self, curr_indent: u16) -> String {
         use self::ResolvedLayout::*;
         match &*self.0 {
-            Text(text) => text.clone(),
+            Text(text) => text.to_string(),
             Horiz(left_ref, right_ref) => {
                 left_ref.to_text(curr_indent) + &right_ref.to_text(curr_indent + left_ref.size())
             }
