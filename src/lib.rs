@@ -168,7 +168,7 @@ impl NodeCounter {
           self.visit_node(top);
           self.visit_node(bottom);
         }
-        Juxtapose(left, right) => {
+        Juxtapose(_left, right) => {
           self.visit_node(right);
         }
       }
