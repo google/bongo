@@ -1,4 +1,7 @@
 #![feature(rust_2018_preview, uniform_paths)]
+//! Simple efficient composable primitives for pretty printing.
+//!
+//! The implementation is derived from
 
 extern crate unicode_width;
 
@@ -17,6 +20,30 @@ use shared_string::SharedString;
 const OVERFLOW_COST: f32 = 100.0;
 const NEWLINE_COST: f32 = 1.0;
 
+/// The primary representation of pretty-printed text. Logically, it represents a set of
+/// possible permissible layouts of text.
+///
+/// Layouts are constructed with four different primitives:
+///
+/// 1. Text
+///
+///    A literal string which is laid out as written. Its length is obtained using the
+///    `unicode-width` package.
+///
+/// 2. Stack
+///
+///    Vertically stacks two layouts. The left margins of the two layouts will be
+///    aligned.
+///
+/// 3. Juxtapose
+///
+///    Horizontally juxtapose two layouts. The left margin of the second layout
+///    will be aligned with the end of the first layout's last line.
+///
+/// 4. Choice
+///
+///    Creates a choice between two or more layouts. The choice is made at layout
+///    time based on the cost of each possible layout. See the `layout` method.
 #[derive(Clone)]
 pub struct Layout(rc::Rc<LayoutContents>);
 
@@ -29,6 +56,7 @@ impl Layout {
     &*self.0
   }
 
+  /// Create a text layout value. This is a literal string with no layout variance.
   pub fn text(lit_text: impl Into<String>) -> Layout {
     Layout::with_contents(LayoutContents::Text(lit_text.into().into()))
   }
@@ -42,12 +70,17 @@ impl Layout {
     Layout::with_contents(LayoutContents::Stack(top.clone(), bottom.clone()))
   }
 
+  /// Create a layout that is the juxtaposition of two other layouts.
+  ///
+  /// This lays out the latter layout immediately to the right of the last line
+  /// of the left layout.
   pub fn juxtapose_pair(left: &Layout, right: &Layout) -> Layout {
     let mut builder = JuxtaposeBuilder::new(right);
     builder.juxtapose(left)
   }
 
-  pub fn choices<'a>(items: &impl AsRef<[&'a Layout]>) -> Layout {
+  /// Creates a layout that is the lowest-cost choice of layouts provided.
+  pub fn choices<'a>(items: impl AsRef<[&'a Layout]>) -> Layout {
     let items = items.as_ref();
     assert!(items.len() > 0);
     let mut curr_layout = items[0].clone();
@@ -58,7 +91,9 @@ impl Layout {
     curr_layout
   }
 
-  pub fn stack<'a>(items: &impl AsRef<[&'a Layout]>) -> Layout {
+  /// Create a stack of the layouts, where each of the layouts are
+  /// vertically stacked on top of each other in the order provided.
+  pub fn stack<'a>(items: impl AsRef<[&'a Layout]>) -> Layout {
     let items = items.as_ref();
     assert!(items.len() > 0);
     let mut curr_layout = items[0].clone();
@@ -68,7 +103,9 @@ impl Layout {
     curr_layout
   }
 
-  pub fn juxtapose<'a>(items: &impl AsRef<[&'a Layout]>) -> Layout {
+  /// Creates a juxtoposition of layouts, with each layout immediately
+  /// following the last line of the previous layout.
+  pub fn juxtapose<'a>(items: impl AsRef<[&'a Layout]>) -> Layout {
     let items = items.as_ref();
     assert!(items.len() > 0);
     let mut curr_layout = items[0].clone();
@@ -78,11 +115,23 @@ impl Layout {
     curr_layout
   }
 
+  /// Lays out the contents of this layout for a text buffer of width margin.
   pub fn layout(&self, margin: u16) -> String {
-    let final_layout = knot_set::do_layout(self, OVERFLOW_COST, NEWLINE_COST, margin);
+    self.layout_with_costs(margin, OVERFLOW_COST, NEWLINE_COST)
+  }
+
+  /// Lays out the contents of this layout for a text buffer of width margin, and with
+  /// newline costs and overflow costs as provided.
+  ///
+  /// For each character over the margin width, the overflow cost is incurred. For each
+  /// newline in the result, the newline cost is incurred. The layout chosen is that with
+  /// the smallest overall cost.
+  pub fn layout_with_costs(&self, margin: u16, overflow_cost: f32, newline_cost: f32) -> String {
+    let final_layout = knot_set::do_layout(self, overflow_cost, newline_cost, margin);
     return final_layout.to_text(0);
   }
 
+  #[doc(hidden)]
   pub fn debug_num_nodes(&self) -> usize {
     let mut counter = NodeCounter::new();
     counter.visit_node(self);
@@ -224,7 +273,5 @@ mod test {
     println!("Num nodes: {}", choice.debug_num_nodes());
 
     choice.layout(500);
-
-    assert!(false);
   }
 }
