@@ -1,8 +1,10 @@
 #![feature(rust_2018_preview, uniform_paths)]
 //! Simple efficient composable primitives for pretty printing.
 //!
-//! The implementation is derived from the paper ["A New Approach to Optimal Code Formatting"](https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/44667.pdf)
+//! The implementation is derived from the paper ["A New Approach to Optimal Code Formatting"][pp-paper]
 //! by Phillip M. Yelland.
+//!
+//! [pp-paper]: https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/44667.pdf
 
 extern crate unicode_width;
 
