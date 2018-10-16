@@ -14,6 +14,7 @@ mod linear_value;
 mod resolved_layout;
 mod shared_string;
 
+use std::borrow::Borrow;
 use std::collections as col;
 use std::fmt;
 use std::rc;
@@ -83,12 +84,16 @@ impl Layout {
   }
 
   /// Creates a layout that is the lowest-cost choice of layouts provided.
-  pub fn choices<'a>(items: impl AsRef<[&'a Layout]>) -> Layout {
+  pub fn choices<S, T>(items: S) -> Layout
+  where
+    S: AsRef<[T]>,
+    T: Borrow<Layout>,
+  {
     let items = items.as_ref();
     assert!(items.len() > 0);
-    let mut curr_layout = items[0].clone();
+    let mut curr_layout = items[0].borrow().clone();
     for item in &items[1..] {
-      curr_layout = Layout::choice_pair(&curr_layout, item);
+      curr_layout = Layout::choice_pair(&curr_layout, item.borrow());
     }
 
     curr_layout
@@ -96,24 +101,32 @@ impl Layout {
 
   /// Create a stack of the layouts, where each of the layouts are
   /// vertically stacked on top of each other in the order provided.
-  pub fn stack<'a>(items: impl AsRef<[&'a Layout]>) -> Layout {
+  pub fn stack<'a, S, T>(items: S) -> Layout
+  where
+    S: AsRef<[T]>,
+    T: Borrow<Layout>,
+  {
     let items = items.as_ref();
     assert!(items.len() > 0);
-    let mut curr_layout = items[0].clone();
+    let mut curr_layout = items[0].borrow().clone();
     for item in &items[1..] {
-      curr_layout = Layout::stack_pair(&curr_layout, item);
+      curr_layout = Layout::stack_pair(&curr_layout, item.borrow());
     }
     curr_layout
   }
 
   /// Creates a juxtoposition of layouts, with each layout immediately
   /// following the last line of the previous layout.
-  pub fn juxtapose<'a>(items: impl AsRef<[&'a Layout]>) -> Layout {
+  pub fn juxtapose<S, T>(items: S) -> Layout
+  where
+    S: AsRef<[T]>,
+    T: Borrow<Layout>,
+  {
     let items = items.as_ref();
     assert!(items.len() > 0);
-    let mut curr_layout = items[0].clone();
+    let mut curr_layout = items[0].borrow().clone();
     for item in &items[1..] {
-      curr_layout = Layout::juxtapose_pair(&curr_layout, item);
+      curr_layout = Layout::juxtapose_pair(&curr_layout, item.borrow());
     }
     curr_layout
   }
@@ -139,6 +152,49 @@ impl Layout {
     let mut counter = NodeCounter::new();
     counter.visit_node(self);
     counter.get_count()
+  }
+
+  fn wrap_inner<T: Borrow<Layout>>(layouts: &[T]) -> (Layout, Vec<(Layout, Option<Layout>)>) {
+    if layouts.len() == 1 {
+      let singleton = layouts[0].borrow();
+      (
+        singleton.borrow().clone(),
+        vec![(singleton.borrow().clone(), None)],
+      )
+    } else {
+      let first = layouts[0].borrow();
+      let rest = &layouts[1..];
+      let (block, line_blocks) = Layout::wrap_inner(rest);
+
+      let mut new_line_pairs: Vec<_> = line_blocks
+        .into_iter()
+        .map(|(l, b)| {
+          (
+            Layout::juxtapose(&[first.borrow(), &Layout::text(" "), &l]),
+            b,
+          )
+        }).collect();
+      new_line_pairs.push((first.borrow().clone(), Some(block)));
+
+      let new_choices: Vec<_> = new_line_pairs
+        .iter()
+        .map(|(k, v)| match v {
+          Some(b) => Layout::stack_pair(k, b),
+          None => k.clone(),
+        }).collect();
+
+      (Layout::choices(&new_choices), new_line_pairs)
+    }
+  }
+
+  pub fn wrap<S, T>(layouts: S) -> Layout
+  where
+    S: AsRef<[T]>,
+    T: Borrow<Layout>,
+  {
+    let slice = layouts.as_ref();
+    let (result, _) = Layout::wrap_inner(slice);
+    result
   }
 }
 
@@ -251,7 +307,7 @@ mod test {
   }
 
   #[test]
-  fn text_simple_choice() {
+  fn test_simple_choice() {
     let foo = Layout::text("foo");
     let pair = Layout::choices(&[
       &Layout::juxtapose(&[&foo, &foo]),
@@ -262,8 +318,26 @@ mod test {
   }
 
   #[test]
-  #[ignore]
-  fn text_large_stack() {
+  fn test_wrap() {
+    let lorem = &"Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+    Nullam suscipit dolor sed dolor facilisis ultrices ut id nisl. Nam
+    malesuada malesuada dolor, eget dapibus nibh euismod at. Vestibulum
+    aliquam aliquam mi at tincidunt. Sed imperdiet eget purus in egestas.
+    Suspendisse id odio in augue cursus tempor. Duis imperdiet imperdiet eros
+    et lobortis. Vestibulum vestibulum condimentum dui, sit amet fringilla libero
+    commodo at. Sed aliquam mauris vitae egestas convallis. Integer sed est vitae
+    nibh pellentesque sodales. Suspendisse sit amet dignissim arcu. Quisque hendrerit
+    pellentesque egestas. Nulla at elementum est. Maecenas lectus turpis, placerat
+    vitae est sit amet, mattis pharetra orci. Praesent.";
+    let words: Vec<_> = lorem.split_whitespace().map(|k| Layout::text(k)).collect();
+    let layout = Layout::wrap(words);
+    println!("{}", layout.debug_num_nodes());
+    assert_eq!(layout.layout(80).chars().filter(|c| c == &'\n').count(), 9);
+    assert_eq!(layout.layout(100).chars().filter(|c| c == &'\n').count(), 7);
+  }
+
+  #[test]
+  fn test_large_stack() {
     let foo = Layout::text("foo");
     let bar = Layout::text("bar");
     let foo_stack = Layout::stack(&[&foo, &bar]);
