@@ -1,0 +1,7 @@
+[package]
+name = "codefmt"
+version = "0.1.0"
+authors = ["Brian Chin <brian.chin@gmail.com>"]
+
+[dependencies]
+unicode-width = "0.1.5"

@@ -1,7 +1,6 @@
-[package]
-name = "pprint-rs"
-version = "0.1.0"
-authors = ["Brian Chin <brian.chin@gmail.com>"]
+[workspace]
 
-[dependencies]
-unicode-width = "0.1.5"
+members = [
+    "bongo",
+    "codefmt",
+]
