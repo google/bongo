@@ -107,6 +107,9 @@ impl Layout {
     T: Borrow<Layout>,
   {
     let items = items.as_ref();
+    if items.len() == 0 {
+      return Layout::text("");
+    }
     assert!(items.len() > 0);
     let mut curr_layout = items[0].borrow().clone();
     for item in &items[1..] {
@@ -155,7 +158,9 @@ impl Layout {
   }
 
   fn wrap_inner<T: Borrow<Layout>>(layouts: &[T]) -> (Layout, Vec<(Layout, Option<Layout>)>) {
-    if layouts.len() == 1 {
+    if layouts.len() == 0 {
+      (Layout::text(""), vec![])
+    } else if layouts.len() == 1 {
       let singleton = layouts[0].borrow();
       (
         singleton.borrow().clone(),
