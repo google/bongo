@@ -1,4 +1,3 @@
 pub trait LayoutDisplay {
-    fn disp(&self) -> codefmt::Layout;
+  fn disp(&self) -> codefmt::Layout;
 }
-

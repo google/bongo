@@ -178,7 +178,8 @@ impl Layout {
             Layout::juxtapose(&[first.borrow(), &Layout::text(" "), &l]),
             b,
           )
-        }).collect();
+        })
+        .collect();
       new_line_pairs.push((first.borrow().clone(), Some(block)));
 
       let new_choices: Vec<_> = new_line_pairs
@@ -186,7 +187,8 @@ impl Layout {
         .map(|(k, v)| match v {
           Some(b) => Layout::stack_pair(k, b),
           None => k.clone(),
-        }).collect();
+        })
+        .collect();
 
       (Layout::choices(&new_choices), new_line_pairs)
     }

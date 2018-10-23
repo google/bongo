@@ -85,11 +85,13 @@ impl LinearValue {
     {
       Less => Right,
       Greater => Left,
-      Equal => if self.rise > other.rise {
-        Left
-      } else {
-        Right
-      },
+      Equal => {
+        if self.rise > other.rise {
+          Left
+        } else {
+          Right
+        }
+      }
     }
   }
 }
