@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![feature(rust_2018_preview)]
-
 extern crate codefmt;
 
 mod pdisplay;
 
 use codefmt::Layout;
-use pdisplay::LayoutDisplay;
+use crate::pdisplay::LayoutDisplay;
 use std::collections::BTreeSet;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]

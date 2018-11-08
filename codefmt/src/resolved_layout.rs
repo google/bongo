@@ -14,7 +14,7 @@
 
 use std::rc;
 
-use shared_string::SharedString;
+use crate::shared_string::SharedString;
 
 #[derive(Clone, Debug)]
 enum ResolvedLayout {
