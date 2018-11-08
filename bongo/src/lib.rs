@@ -140,7 +140,7 @@ impl From<NonTerminal> for ProductionElement {
 }
 
 #[derive(Clone)]
-struct Production {
+pub struct Production {
   action_name: Name,
   elements: Vec<ProductionElement>,
 }
@@ -162,7 +162,7 @@ impl LayoutDisplay for Production {
 }
 
 #[derive(Clone)]
-struct ProductionSet(Vec<Production>);
+pub struct ProductionSet(Vec<Production>);
 
 impl ProductionSet {
   pub fn new(prods: Vec<Production>) -> Self {
@@ -178,7 +178,7 @@ impl LayoutDisplay for ProductionSet {
 }
 
 #[derive(Clone)]
-struct Grammar {
+pub struct Grammar {
   start_symbol: NonTerminal,
   rule_set: std::collections::BTreeMap<NonTerminal, ProductionSet>,
   nullable_cache: std::cell::RefCell<Option<BTreeSet<NonTerminal>>>,
