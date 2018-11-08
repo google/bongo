@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![feature(rust_2018_preview, uniform_paths)]
+#![feature(uniform_paths)]
 //! Simple efficient composable primitives for pretty printing.
 //!
-//! The implementation is derived from the paper ["A New Approach to Optimal Code Formatting"][pp-paper]
-//! by Phillip M. Yelland.
+//! The implementation is derived from the paper ["A New Approach to Optimal
+//! Code Formatting"][pp-paper] by Phillip M. Yelland.
 //!
 //! [pp-paper]: https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/44667.pdf
 
@@ -38,20 +38,20 @@ use shared_string::SharedString;
 const OVERFLOW_COST: f32 = 100.0;
 const NEWLINE_COST: f32 = 1.0;
 
-/// The primary representation of pretty-printed text. Logically, it represents a set of
-/// possible permissible layouts of text.
+/// The primary representation of pretty-printed text. Logically, it represents
+/// a set of possible permissible layouts of text.
 ///
 /// Layouts are constructed with four different primitives:
 ///
 /// 1. Text
 ///
-///    A literal string which is laid out as written. Its length is obtained using the
-///    `unicode-width` package.
+///    A literal string which is laid out as written. Its length is obtained
+/// using the    `unicode-width` package.
 ///
 /// 2. Stack
 ///
-///    Vertically stacks two layouts. The left margins of the two layouts will be
-///    aligned.
+///    Vertically stacks two layouts. The left margins of the two layouts will
+/// be    aligned.
 ///
 /// 3. Juxtapose
 ///
@@ -60,8 +60,9 @@ const NEWLINE_COST: f32 = 1.0;
 ///
 /// 4. Choice
 ///
-///    Creates a choice between two or more layouts. The choice is made at layout
-///    time based on the cost of each possible layout. See the `layout` method.
+///    Creates a choice between two or more layouts. The choice is made at
+/// layout    time based on the cost of each possible layout. See the `layout`
+/// method.
 #[derive(Clone)]
 pub struct Layout(rc::Rc<LayoutContents>);
 
@@ -74,13 +75,15 @@ impl Layout {
     &*self.0
   }
 
-  /// Create a text layout value. This is a literal string with no layout variance.
+  /// Create a text layout value. This is a literal string with no layout
+  /// variance.
   pub fn text(lit_text: impl Into<String>) -> Layout {
     Layout::with_contents(LayoutContents::Text(lit_text.into().into()))
   }
 
   fn choice_pair(first: &Layout, second: &Layout) -> Layout {
-    // We should canonicalize this so that the choices are always in the same order.
+    // We should canonicalize this so that the choices are always in the same
+    // order.
     Layout::with_contents(LayoutContents::Choice(first.clone(), second.clone()))
   }
 
@@ -153,14 +156,20 @@ impl Layout {
     self.layout_with_costs(margin, OVERFLOW_COST, NEWLINE_COST)
   }
 
-  /// Lays out the contents of this layout for a text buffer of width margin, and with
-  /// newline costs and overflow costs as provided.
+  /// Lays out the contents of this layout for a text buffer of width margin,
+  /// and with newline costs and overflow costs as provided.
   ///
-  /// For each character over the margin width, the overflow cost is incurred. For each
-  /// newline in the result, the newline cost is incurred. The layout chosen is that with
-  /// the smallest overall cost.
-  pub fn layout_with_costs(&self, margin: u16, overflow_cost: f32, newline_cost: f32) -> String {
-    let final_layout = knot_set::do_layout(self, overflow_cost, newline_cost, margin);
+  /// For each character over the margin width, the overflow cost is incurred.
+  /// For each newline in the result, the newline cost is incurred. The layout
+  /// chosen is that with the smallest overall cost.
+  pub fn layout_with_costs(
+    &self,
+    margin: u16,
+    overflow_cost: f32,
+    newline_cost: f32,
+  ) -> String {
+    let final_layout =
+      knot_set::do_layout(self, overflow_cost, newline_cost, margin);
     return final_layout.to_text(0);
   }
 
@@ -171,7 +180,9 @@ impl Layout {
     counter.get_count()
   }
 
-  fn wrap_inner<T: Borrow<Layout>>(layouts: &[T]) -> (Layout, Vec<(Layout, Option<Layout>)>) {
+  fn wrap_inner<T: Borrow<Layout>>(
+    layouts: &[T],
+  ) -> (Layout, Vec<(Layout, Option<Layout>)>) {
     if layouts.len() == 0 {
       (Layout::text(""), vec![])
     } else if layouts.len() == 1 {
@@ -247,21 +258,21 @@ impl JuxtaposeBuilder {
   }
 
   fn juxtapose(&mut self, left: &Layout) -> Layout {
-    if let Some(v) = self.memo.get(&(left.contents() as *const LayoutContents)) {
+    if let Some(v) = self.memo.get(&(left.contents() as *const LayoutContents))
+    {
       return v.clone();
     }
 
     let new_layout = match left.contents() {
-      LayoutContents::Text(t) => {
-        Layout::with_contents(LayoutContents::Juxtapose(t.clone(), self.right.clone()))
-      }
-      LayoutContents::Choice(first, second) => Layout::with_contents(LayoutContents::Choice(
-        self.juxtapose(first),
-        self.juxtapose(second),
-      )),
-      LayoutContents::Stack(top, bottom) => {
-        Layout::with_contents(LayoutContents::Stack(top.clone(), self.juxtapose(bottom)))
-      }
+      LayoutContents::Text(t) => Layout::with_contents(
+        LayoutContents::Juxtapose(t.clone(), self.right.clone()),
+      ),
+      LayoutContents::Choice(first, second) => Layout::with_contents(
+        LayoutContents::Choice(self.juxtapose(first), self.juxtapose(second)),
+      ),
+      LayoutContents::Stack(top, bottom) => Layout::with_contents(
+        LayoutContents::Stack(top.clone(), self.juxtapose(bottom)),
+      ),
       LayoutContents::Juxtapose(text, jux_right) => Layout::with_contents(
         LayoutContents::Juxtapose(text.clone(), self.juxtapose(jux_right)),
       ),
@@ -350,7 +361,8 @@ mod test {
     nibh pellentesque sodales. Suspendisse sit amet dignissim arcu. Quisque hendrerit
     pellentesque egestas. Nulla at elementum est. Maecenas lectus turpis, placerat
     vitae est sit amet, mattis pharetra orci. Praesent.";
-    let words: Vec<_> = lorem.split_whitespace().map(|k| Layout::text(k)).collect();
+    let words: Vec<_> =
+      lorem.split_whitespace().map(|k| Layout::text(k)).collect();
     let layout = Layout::wrap(words);
     println!("{}", layout.debug_num_nodes());
     assert_eq!(layout.layout(80).chars().filter(|c| c == &'\n').count(), 9);

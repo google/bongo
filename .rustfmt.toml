@@ -1,2 +1,4 @@
 tab_spaces = 2
+max_width = 80
+wrap_comments = true
 edition = "2018"

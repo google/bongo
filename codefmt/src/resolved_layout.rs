@@ -35,11 +35,17 @@ impl ResolvedLayoutRef {
     ResolvedLayoutRef::new(ResolvedLayout::Text(text))
   }
 
-  pub fn new_horiz(left: ResolvedLayoutRef, right: ResolvedLayoutRef) -> ResolvedLayoutRef {
+  pub fn new_horiz(
+    left: ResolvedLayoutRef,
+    right: ResolvedLayoutRef,
+  ) -> ResolvedLayoutRef {
     ResolvedLayoutRef::new(ResolvedLayout::Horiz(left, right))
   }
 
-  pub fn new_vert(top: ResolvedLayoutRef, bottom: ResolvedLayoutRef) -> ResolvedLayoutRef {
+  pub fn new_vert(
+    top: ResolvedLayoutRef,
+    bottom: ResolvedLayoutRef,
+  ) -> ResolvedLayoutRef {
     ResolvedLayoutRef::new(ResolvedLayout::Vert(top, bottom))
   }
 
@@ -48,7 +54,8 @@ impl ResolvedLayoutRef {
     match &*self.0 {
       Text(text) => text.to_string(),
       Horiz(left_ref, right_ref) => {
-        left_ref.to_text(curr_indent) + &right_ref.to_text(curr_indent + left_ref.display_width())
+        left_ref.to_text(curr_indent)
+          + &right_ref.to_text(curr_indent + left_ref.display_width())
       }
       Vert(top, bottom) => {
         top.to_text(curr_indent)

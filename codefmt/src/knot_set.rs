@@ -17,11 +17,11 @@ use std::collections as col;
 use std::ops;
 use std::rc;
 
-use crate::{Layout, LayoutContents};
 use crate::knot_column::KnotColumn;
 use crate::linear_value::{BinaryResult, LinearValue};
 use crate::resolved_layout::ResolvedLayoutRef;
 use crate::shared_string::SharedString;
+use crate::{Layout, LayoutContents};
 
 #[derive(Clone, Debug)]
 struct KnotData {
@@ -51,7 +51,8 @@ where
 {
   match direction {
     SearchDirection::LessEq => {
-      let mut range = map.range((ops::Bound::Unbounded, ops::Bound::Included(search_key)));
+      let mut range =
+        map.range((ops::Bound::Unbounded, ops::Bound::Included(search_key)));
       range.next_back()
     }
   }
@@ -82,8 +83,9 @@ impl KnotSet {
   }
 
   fn knot_data_at(&self, col: KnotColumn) -> KnotData {
-    let (&knot_col, knot_value) = search_map(&self.knots, &col, SearchDirection::LessEq)
-      .expect("There should always be a knot at 0");
+    let (&knot_col, knot_value) =
+      search_map(&self.knots, &col, SearchDirection::LessEq)
+        .expect("There should always be a knot at 0");
     let column_distance = (col - knot_col).col();
     KnotData {
       resolved_layout: knot_value.resolved_layout.clone(),
@@ -113,7 +115,9 @@ impl KnotSet {
   }
 }
 
-fn column_intervals(columns: &col::BTreeSet<KnotColumn>) -> Vec<(KnotColumn, Option<KnotColumn>)> {
+fn column_intervals(
+  columns: &col::BTreeSet<KnotColumn>,
+) -> Vec<(KnotColumn, Option<KnotColumn>)> {
   let mut iter = columns.iter();
   let first = iter.next().expect("Always at least a knot at 0");
   let mut curr_start = *first;
@@ -130,7 +134,8 @@ pub struct KnotSetBuilder {
   margin: u16,
   overflow_cost: f32,
   newline_cost: f32,
-  memo: std::cell::RefCell<col::BTreeMap<*const LayoutContents, rc::Rc<KnotSet>>>,
+  memo:
+    std::cell::RefCell<col::BTreeMap<*const LayoutContents, rc::Rc<KnotSet>>>,
 }
 
 impl KnotSetBuilder {
@@ -183,12 +188,18 @@ impl KnotSetBuilder {
           bottom_data.resolved_layout.clone(),
         ),
         span: bottom_data.span,
-        value: top_data.value + bottom_data.value + LinearValue::new_flat(self.newline_cost),
+        value: top_data.value
+          + bottom_data.value
+          + LinearValue::new_flat(self.newline_cost),
       }
     })
   }
 
-  fn new_horiz_impl(&self, left: impl Into<SharedString>, right: &KnotSet) -> KnotSet {
+  fn new_horiz_impl(
+    &self,
+    left: impl Into<SharedString>,
+    right: &KnotSet,
+  ) -> KnotSet {
     let left = left.into();
     let left_width = left.display_width();
     let shifted_left_knot_values = right
@@ -240,7 +251,8 @@ impl KnotSetBuilder {
       let choice1_data = choice1.knot_data_at(start);
       let choice2_data = choice2.knot_data_at(start);
 
-      let intersect = choice1_data.value.forward_intersection(choice2_data.value);
+      let intersect =
+        choice1_data.value.forward_intersection(choice2_data.value);
 
       if let Some(intersect) = intersect {
         let intersect_delta = KnotColumn::new(intersect);
@@ -256,7 +268,8 @@ impl KnotSetBuilder {
       }
     }
 
-    let all_knots: col::BTreeSet<_> = base_knots.union(&extra_knots).cloned().collect();
+    let all_knots: col::BTreeSet<_> =
+      base_knots.union(&extra_knots).cloned().collect();
 
     KnotSet::new_knot_set(&all_knots, |col| {
       let choice1_data = choice1.knot_data_at(col);
@@ -282,13 +295,13 @@ impl KnotSetBuilder {
 
     let new_knot_set = match contents {
       Text(text) => self.new_text_impl(text.clone()),
-      Stack(top, bottom) => {
-        self.new_vert_impl(&*self.get_knot_set(top), &*self.get_knot_set(bottom))
+      Stack(top, bottom) => self
+        .new_vert_impl(&*self.get_knot_set(top), &*self.get_knot_set(bottom)),
+      Juxtapose(left, right) => {
+        self.new_horiz_impl(left.clone(), &*self.get_knot_set(right))
       }
-      Juxtapose(left, right) => self.new_horiz_impl(left.clone(), &*self.get_knot_set(right)),
-      Choice(left, right) => {
-        self.new_choice_impl(&*self.get_knot_set(left), &*self.get_knot_set(right))
-      }
+      Choice(left, right) => self
+        .new_choice_impl(&*self.get_knot_set(left), &*self.get_knot_set(right)),
     };
 
     {

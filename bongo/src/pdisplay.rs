@@ -12,6 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use codefmt::Layout;
+
 pub trait LayoutDisplay {
-  fn disp(&self) -> codefmt::Layout;
+  fn disp(&self) -> Layout;
+}
+
+pub fn join_layout(
+  iter: impl IntoIterator<Item = Layout>,
+  sep: Layout,
+) -> Layout {
+  let mut layouts = Vec::new();
+  let mut first = true;
+  for layout in iter {
+    if first {
+      first = false;
+    } else {
+      layouts.push(sep.clone());
+    }
+    layouts.push(layout);
+  }
+  Layout::juxtapose(layouts)
 }
