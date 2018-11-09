@@ -13,7 +13,6 @@
 // limitations under the License.
 
 mod pdisplay;
-mod states;
 
 use codefmt::Layout;
 use crate::pdisplay::LayoutDisplay;
@@ -307,7 +306,7 @@ fn is_nullable_fp(
 /// to which the production belongs, and an index into the production, which is
 /// the current location of the parse state. For example:
 ///
-/// ```
+/// ```text
 /// A => a <b> . c
 /// ```
 ///
@@ -361,11 +360,12 @@ impl ProductionState {
 impl LayoutDisplay for ProductionState {
   fn disp(&self) -> Layout {
     let mut layouts = Vec::new();
-    for elem in &self.prod.elements[..self.index] {
+    let (first_slice, second_slice) = self.prod.elements.split_at(self.index);
+    for elem in first_slice {
       layouts.push(elem.disp());
     }
     layouts.push(codefmt::Layout::text("."));
-    for elem in &self.prod.elements[self.index..] {
+    for elem in second_slice {
       layouts.push(elem.disp())
     }
     let body = pdisplay::join_layout(layouts, codefmt::Layout::text(" "));
