@@ -14,7 +14,8 @@
 
 use codefmt::Layout;
 use crate::pdisplay::LayoutDisplay;
-use std::collections::BTreeMap;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A refcounted name type, used to avoid duplicating common string values
 /// throughout an AST.
@@ -193,22 +194,45 @@ impl LayoutDisplay for Production {
   }
 }
 
-#[derive(Clone)]
-pub struct ProductionSet(Vec<Production>);
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Rule {
+  head: NonTerminal,
+  prods: Vec<Production>,
+}
 
-impl ProductionSet {
-  pub fn new(prods: Vec<Production>) -> Self {
-    ProductionSet(prods)
+impl Rule {
+  pub fn new(head: NonTerminal, prods: Vec<Production>) -> Self {
+    Rule { head, prods }
+  }
+
+  pub fn head(&self) -> &NonTerminal {
+    &self.head
   }
 
   pub fn prods(&self) -> &Vec<Production> {
-    &self.0
+    &self.prods
   }
 }
 
-impl LayoutDisplay for ProductionSet {
+impl PartialOrd for Rule {
+  fn partial_cmp(&self, other: &Rule) -> Option<Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl Ord for Rule {
+  fn cmp(&self, other: &Rule) -> Ordering {
+    self
+      .head
+      .cmp(&other.head)
+      .then_with(|| self.prods.cmp(&other.prods))
+  }
+}
+
+impl LayoutDisplay for Rule {
   fn disp(&self) -> Layout {
-    let prod_layouts: Vec<_> = self.0.iter().map(|prod| prod.disp()).collect();
+    let prod_layouts: Vec<_> =
+      self.prods.iter().map(|prod| prod.disp()).collect();
     Layout::stack(prod_layouts)
   }
 }
@@ -216,22 +240,23 @@ impl LayoutDisplay for ProductionSet {
 #[derive(Clone)]
 pub struct Grammar {
   start_symbol: NonTerminal,
-  rule_set: BTreeMap<NonTerminal, ProductionSet>,
+  rule_set: BTreeMap<NonTerminal, Rule>,
 }
 
 impl Grammar {
-  pub fn new(
-    start: NonTerminal,
-    rule_set: BTreeMap<NonTerminal, ProductionSet>,
-  ) -> Self {
+  pub fn new(start: NonTerminal, rule_set: impl IntoIterator<Item = Rule>) -> Self {
     Grammar {
       start_symbol: start,
-      rule_set: rule_set,
+      rule_set: rule_set.into_iter().map(|r| (r.head().clone(), r)).collect(),
     }
   }
 
-  pub fn rule_set(&self) -> &BTreeMap<NonTerminal, ProductionSet> {
+  pub fn rule_set(&self) -> &BTreeMap<NonTerminal, Rule> {
     &self.rule_set
+  }
+
+  pub fn get_rule(&self, nt: &NonTerminal) -> Option<&Rule> {
+    self.rule_set.get(nt)
   }
 }
 

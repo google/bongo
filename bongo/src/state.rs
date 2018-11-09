@@ -30,12 +30,21 @@ use crate::pdisplay::{self, LayoutDisplay};
 /// current location is just before the final c.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 struct ProductionState {
+  /// The head nonterminal this production belongs to.
   head: NonTerminal,
+
+  /// The production this state is part of.
   prod: Production,
+
+  /// The index of this production state. Must be in the range [0,
+  /// self.prod.prod_elements().len()].
   index: usize,
 }
 
 impl ProductionState {
+  /// Create a ProductionState from a given NonTerminal and Production.
+  ///
+  /// This state's index will be at the start of the production.
   pub fn from_start(head: NonTerminal, prod: Production) -> Self {
     ProductionState {
       head,
@@ -44,16 +53,24 @@ impl ProductionState {
     }
   }
 
+  /// Returns the next element after the current index. If it is at the
+  /// end, then it reuturns `None`.
   pub fn next(&self) -> Option<&Element> {
     self.prod.element_at(self.index)
   }
 
+  // Unconditionally creates a new production state that is the
+  // increment of this production state. If `index` >= length, then this will
+  // create a production state.
   fn advance_forced(&self) -> ProductionState {
     let mut result = self.clone();
     result.index += 1;
     result
   }
 
+  /// Return another `ProductionState` with the same head and production as
+  /// `self`, but with the index advanced. If the index is already at the
+  /// end of the production, returns `None`.
   pub fn advance(&self) -> Option<ProductionState> {
     self.next().map(|_| self.advance_forced())
   }

@@ -16,9 +16,7 @@ mod grammar;
 mod pdisplay;
 mod state;
 
-use crate::grammar::{
-  Element, Grammar, NonTerminal, Production, ProductionSet,
-};
+use crate::grammar::{Element, Grammar, NonTerminal, Production, Rule};
 use std::collections::BTreeSet;
 
 #[derive(Clone)]
@@ -70,9 +68,9 @@ fn is_prod_nullable(
 
 fn are_any_prods_nullable(
   nullables: &BTreeSet<NonTerminal>,
-  prod_set: &ProductionSet,
+  rule: &Rule,
 ) -> bool {
-  for prod in prod_set.prods() {
+  for prod in rule.prods() {
     if is_prod_nullable(nullables, prod) {
       return true;
     }
@@ -96,7 +94,7 @@ fn is_nullable_fp(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::grammar::{ProductionElement, Terminal};
+  use crate::grammar::{ProductionElement, Rule, Terminal};
   use crate::pdisplay::LayoutDisplay;
 
   #[test]
@@ -108,15 +106,15 @@ mod tests {
       vec![t_a.clone().into(), nt_x.clone().into(), t_a.into()];
     let v2: Vec<ProductionElement> = vec![];
 
-    let prod_set = ProductionSet::new(vec![
-      Production::new("Recursive", v1),
-      Production::new("Empty", v2),
-    ]);
+    let x_rule = Rule::new(
+      nt_x.clone(),
+      vec![
+        Production::new("Recursive", v1),
+        Production::new("Empty", v2),
+      ],
+    );
 
-    let mut rules = std::collections::BTreeMap::new();
-    rules.insert(nt_x.clone(), prod_set);
-
-    let g = Grammar::new(nt_x.clone(), rules);
+    let g = Grammar::new(nt_x.clone(), vec![x_rule]);
 
     println!("{}", g.disp().layout(80));
 
