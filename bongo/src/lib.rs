@@ -12,28 +12,53 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/// For a given type and type parameters, generates PartialEq, Eq, and
+/// PartialOrd such that all three depend on the implementation of Ord.
+///
+/// This is necessary because the typical approach to implementing any of these
+/// for a type `Foo<T>` is to require `T` to implement that trait as well. Our
+/// grammars are using a type which does not need to implement all of those.
+macro_rules! impl_from_ord {
+  ($t:ident[$(($targ:ident : $($bound:tt)*))*]) => {
+    impl<$($targ : $($bound)*),*> std::cmp::Eq for $t<$($targ),*> {
+    }
+
+    impl<$($targ : $($bound)*),*> std::cmp::PartialEq for $t<$($targ),*> {
+      fn eq(&self, other: &Self) -> bool {
+        std::cmp::Ord::cmp(self, other) == std::cmp::Ordering::Equal
+      }
+    }
+
+    impl<$($targ : $($bound)*),*> std::cmp::PartialOrd for $t<$($targ),*> {
+      fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(std::cmp::Ord::cmp(self, other))
+      }
+    }
+  };
+}
+
 mod grammar;
 mod pdisplay;
 mod state;
 
-use crate::grammar::{Element, Grammar, NonTerminal, Production, Rule};
+use crate::grammar::{Element, ElementTypes, Grammar, Production, Rule};
 use std::collections::BTreeSet;
 
 #[derive(Clone)]
-pub struct NullableGrammar {
-  grammar: Grammar,
-  nullables: BTreeSet<NonTerminal>,
+pub struct NullableGrammar<E: ElementTypes> {
+  grammar: Grammar<E>,
+  nullables: BTreeSet<E::NonTerm>,
 }
 
-impl NullableGrammar {
-  pub fn new(grammar: Grammar) -> Self {
+impl<E: ElementTypes> NullableGrammar<E> {
+  pub fn new(grammar: Grammar<E>) -> Self {
     let nullables = fixed_point(BTreeSet::new(), |nullables| {
       is_nullable_fp(&grammar, nullables)
     });
     NullableGrammar { grammar, nullables }
   }
 
-  pub fn is_nullable(&self, nt: &NonTerminal) -> bool {
+  pub fn is_nullable(&self, nt: &E::NonTerm) -> bool {
     self.nullables.contains(nt)
   }
 }
@@ -49,9 +74,9 @@ fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   }
 }
 
-fn is_prod_nullable(
-  nullables: &BTreeSet<NonTerminal>,
-  prod: &Production,
+fn is_prod_nullable<E: ElementTypes>(
+  nullables: &BTreeSet<E::NonTerm>,
+  prod: &Production<E>,
 ) -> bool {
   for elem in prod.elements_iter() {
     match elem {
@@ -66,9 +91,9 @@ fn is_prod_nullable(
   true
 }
 
-fn are_any_prods_nullable(
-  nullables: &BTreeSet<NonTerminal>,
-  rule: &Rule,
+fn are_any_prods_nullable<E: ElementTypes>(
+  nullables: &BTreeSet<E::NonTerm>,
+  rule: &Rule<E>,
 ) -> bool {
   for prod in rule.prods() {
     if is_prod_nullable(nullables, prod) {
@@ -78,10 +103,10 @@ fn are_any_prods_nullable(
   false
 }
 
-fn is_nullable_fp(
-  grammar: &Grammar,
-  prev_nullables: &BTreeSet<NonTerminal>,
-) -> BTreeSet<NonTerminal> {
+fn is_nullable_fp<E: ElementTypes>(
+  grammar: &Grammar<E>,
+  prev_nullables: &BTreeSet<E::NonTerm>,
+) -> BTreeSet<E::NonTerm> {
   let mut curr_nullables = prev_nullables.clone();
   for (nt, prod_set) in grammar.rule_set() {
     if are_any_prods_nullable(prev_nullables, prod_set) {
@@ -94,7 +119,9 @@ fn is_nullable_fp(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::grammar::{ProductionElement, Rule, Terminal};
+  use crate::grammar::{
+    BaseElementTypes, Name, NonTerminal, ProductionElement, Rule, Terminal,
+  };
   use crate::pdisplay::LayoutDisplay;
 
   #[test]
@@ -102,15 +129,18 @@ mod tests {
     let t_a = Terminal::new("A");
     let nt_x = NonTerminal::new("x");
 
-    let v1: Vec<ProductionElement> =
-      vec![t_a.clone().into(), nt_x.clone().into(), t_a.into()];
-    let v2: Vec<ProductionElement> = vec![];
+    let v1: Vec<ProductionElement<BaseElementTypes>> = vec![
+      ProductionElement::new_empty(Element::Term(t_a.clone())),
+      ProductionElement::new_empty(Element::NonTerm(nt_x.clone())),
+      ProductionElement::new_empty(Element::Term(t_a)),
+    ];
+    let v2: Vec<ProductionElement<BaseElementTypes>> = vec![];
 
     let x_rule = Rule::new(
       nt_x.clone(),
       vec![
-        Production::new("Recursive", v1),
-        Production::new("Empty", v2),
+        Production::new(Name::new("Recursive"), v1),
+        Production::new(Name::new("Empty"), v2),
       ],
     );
 

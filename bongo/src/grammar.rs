@@ -14,8 +14,45 @@
 
 use codefmt::Layout;
 use crate::pdisplay::LayoutDisplay;
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+
+/// A trait which carries the underlying types for a grammar.
+///
+/// This allows us to specify a family of types at once as a type parameter
+/// instead of forcing us to provide a number of type variables with a long list
+/// of bounds.
+///
+/// This type is not instantiated, and will typically be a zero-sized type.
+pub trait ElementTypes: Clone {
+  // The type used to identify each possible terminal.
+  type Term: Clone
+    + PartialEq
+    + Eq
+    + PartialOrd
+    + Ord
+    + LayoutDisplay
+    + std::fmt::Debug
+    + 'static;
+
+  // The type used to identify each possible non-terminal.
+  type NonTerm: Clone
+    + PartialEq
+    + Eq
+    + PartialOrd
+    + Ord
+    + LayoutDisplay
+    + std::fmt::Debug
+    + 'static;
+
+  // The type used to identify each production.
+  type Action: Clone
+    + PartialEq
+    + Eq
+    + PartialOrd
+    + Ord
+    + std::fmt::Debug
+    + 'static;
+}
 
 /// A refcounted name type, used to avoid duplicating common string values
 /// throughout an AST.
@@ -86,13 +123,22 @@ impl LayoutDisplay for NonTerminal {
   }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub enum Element {
-  Term(Terminal),
-  NonTerm(NonTerminal),
+#[derive(Copy, Clone)]
+pub struct BaseElementTypes;
+
+impl ElementTypes for BaseElementTypes {
+  type Term = Terminal;
+  type NonTerm = NonTerminal;
+  type Action = Name;
 }
 
-impl LayoutDisplay for Element {
+#[derive(Clone, Debug)]
+pub enum Element<E: ElementTypes> {
+  Term(E::Term),
+  NonTerm(E::NonTerm),
+}
+
+impl<E: ElementTypes> LayoutDisplay for Element<E> {
   fn disp(&self) -> codefmt::Layout {
     match self {
       Element::Term(t) => t.disp(),
@@ -101,25 +147,35 @@ impl LayoutDisplay for Element {
   }
 }
 
-impl From<Terminal> for Element {
-  fn from(t: Terminal) -> Element {
-    Element::Term(t)
+impl_from_ord!(Element[(E: ElementTypes)]);
+
+impl<E: ElementTypes> Ord for Element<E> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    match (self, other) {
+      (Element::Term(_), Element::NonTerm(_)) => std::cmp::Ordering::Less,
+      (Element::NonTerm(_), Element::Term(_)) => std::cmp::Ordering::Greater,
+      (Element::Term(t1), Element::Term(t2)) => t1.cmp(t2),
+      (Element::NonTerm(nt1), Element::NonTerm(nt2)) => nt1.cmp(nt2),
+    }
   }
 }
 
-impl From<NonTerminal> for Element {
-  fn from(nt: NonTerminal) -> Element {
-    Element::NonTerm(nt)
-  }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct ProductionElement {
+#[derive(Clone, Debug)]
+pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
-  element: Element,
+  element: Element<E>,
 }
 
-impl LayoutDisplay for ProductionElement {
+impl<E: ElementTypes> ProductionElement<E> {
+  pub fn new_empty(e: Element<E>) -> Self {
+    ProductionElement {
+      identifier: None,
+      element: e,
+    }
+  }
+}
+
+impl<E: ElementTypes> LayoutDisplay for ProductionElement<E> {
   fn disp(&self) -> codefmt::Layout {
     match &self.identifier {
       Some(name) => Layout::juxtapose(&[
@@ -132,8 +188,8 @@ impl LayoutDisplay for ProductionElement {
   }
 }
 
-impl From<Element> for ProductionElement {
-  fn from(e: Element) -> ProductionElement {
+impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
+  fn from(e: Element<E>) -> ProductionElement<E> {
     ProductionElement {
       identifier: None,
       element: e,
@@ -141,95 +197,91 @@ impl From<Element> for ProductionElement {
   }
 }
 
-impl From<Terminal> for ProductionElement {
-  fn from(t: Terminal) -> ProductionElement {
-    let e: Element = t.into();
-    e.into()
+impl_from_ord!(ProductionElement[(E: ElementTypes)]);
+
+impl<E: ElementTypes> Ord for ProductionElement<E> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self
+      .identifier
+      .cmp(&other.identifier)
+      .then_with(|| self.element.cmp(&other.element))
   }
 }
 
-impl From<NonTerminal> for ProductionElement {
-  fn from(nt: NonTerminal) -> ProductionElement {
-    let e: Element = nt.into();
-    e.into()
-  }
+#[derive(Clone, Debug)]
+pub struct Production<E: ElementTypes> {
+  action_name: E::Action,
+  elements: Vec<ProductionElement<E>>,
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct Production {
-  action_name: Name,
-  elements: Vec<ProductionElement>,
-}
-
-impl Production {
-  pub fn new(name: &str, elements: Vec<ProductionElement>) -> Production {
+impl<E: ElementTypes> Production<E> {
+  pub fn new(
+    action: E::Action,
+    elements: Vec<ProductionElement<E>>,
+  ) -> Production<E> {
     Production {
-      action_name: Name::new(name),
+      action_name: action,
       elements: elements,
     }
   }
 
-  pub fn prod_elements(&self) -> &Vec<ProductionElement> {
+  pub fn prod_elements(&self) -> &Vec<ProductionElement<E>> {
     &self.elements
   }
 
-  pub fn elements_iter(&self) -> impl Iterator<Item = &Element> {
+  pub fn elements_iter(&self) -> impl Iterator<Item = &Element<E>> {
     self.elements.iter().map(|prod_elem| &prod_elem.element)
   }
 
-  pub fn element_at(&self, index: usize) -> Option<&Element> {
+  pub fn element_at(&self, index: usize) -> Option<&Element<E>> {
     self.elements.get(index).map(|prod_elem| &prod_elem.element)
   }
 }
 
-impl LayoutDisplay for Production {
+impl<E: ElementTypes> LayoutDisplay for Production<E> {
   fn disp(&self) -> Layout {
     let elements =
       Layout::wrap(self.elements.iter().map(|x| x.disp()).collect::<Vec<_>>());
     Layout::juxtapose(&[
       elements,
       Layout::text(" => "),
-      self.action_name.layout(),
+      Layout::text(format!("{:?}", self.action_name)),
     ])
   }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Rule {
-  head: NonTerminal,
-  prods: Vec<Production>,
+impl_from_ord!(Production[(E: ElementTypes)]);
+
+impl<E: ElementTypes> Ord for Production<E> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self
+      .action_name
+      .cmp(&other.action_name)
+      .then_with(|| self.elements.cmp(&other.elements))
+  }
 }
 
-impl Rule {
-  pub fn new(head: NonTerminal, prods: Vec<Production>) -> Self {
+#[derive(Clone, Debug)]
+pub struct Rule<E: ElementTypes> {
+  head: E::NonTerm,
+  prods: Vec<Production<E>>,
+}
+
+impl<E: ElementTypes> Rule<E> {
+  pub fn new(head: E::NonTerm, prods: Vec<Production<E>>) -> Self {
     Rule { head, prods }
   }
 
-  pub fn head(&self) -> &NonTerminal {
+  pub fn head(&self) -> &E::NonTerm {
     &self.head
   }
 
-  pub fn prods(&self) -> &Vec<Production> {
+  pub fn prods(&self) -> &Vec<Production<E>> {
     &self.prods
   }
 }
 
-impl PartialOrd for Rule {
-  fn partial_cmp(&self, other: &Rule) -> Option<Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl Ord for Rule {
-  fn cmp(&self, other: &Rule) -> Ordering {
-    self
-      .head
-      .cmp(&other.head)
-      .then_with(|| self.prods.cmp(&other.prods))
-  }
-}
-
-impl LayoutDisplay for Rule {
+impl<E: ElementTypes> LayoutDisplay for Rule<E> {
   fn disp(&self) -> Layout {
     let prod_layouts: Vec<_> =
       self.prods.iter().map(|prod| prod.disp()).collect();
@@ -237,30 +289,47 @@ impl LayoutDisplay for Rule {
   }
 }
 
-#[derive(Clone)]
-pub struct Grammar {
-  start_symbol: NonTerminal,
-  rule_set: BTreeMap<NonTerminal, Rule>,
+impl_from_ord!(Rule[(E: ElementTypes)]);
+
+impl<E: ElementTypes> Ord for Rule<E> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self
+      .head
+      .cmp(&other.head)
+      .then_with(|| self.prods.cmp(&other.prods))
+  }
 }
 
-impl Grammar {
-  pub fn new(start: NonTerminal, rule_set: impl IntoIterator<Item = Rule>) -> Self {
+#[derive(Clone)]
+pub struct Grammar<E: ElementTypes> {
+  start_symbol: E::NonTerm,
+  rule_set: BTreeMap<E::NonTerm, Rule<E>>,
+}
+
+impl<E: ElementTypes> Grammar<E> {
+  pub fn new(
+    start: E::NonTerm,
+    rule_set: impl IntoIterator<Item = Rule<E>>,
+  ) -> Self {
     Grammar {
       start_symbol: start,
-      rule_set: rule_set.into_iter().map(|r| (r.head().clone(), r)).collect(),
+      rule_set: rule_set
+        .into_iter()
+        .map(|r| (r.head().clone(), r))
+        .collect(),
     }
   }
 
-  pub fn rule_set(&self) -> &BTreeMap<NonTerminal, Rule> {
+  pub fn rule_set(&self) -> &BTreeMap<E::NonTerm, Rule<E>> {
     &self.rule_set
   }
 
-  pub fn get_rule(&self, nt: &NonTerminal) -> Option<&Rule> {
+  pub fn get_rule(&self, nt: &E::NonTerm) -> Option<&Rule<E>> {
     self.rule_set.get(nt)
   }
 }
 
-impl LayoutDisplay for Grammar {
+impl<E: ElementTypes> LayoutDisplay for Grammar<E> {
   fn disp(&self) -> Layout {
     let mut stack = Vec::new();
     for (k, v) in &self.rule_set {
@@ -274,5 +343,16 @@ impl LayoutDisplay for Grammar {
       stack.push(Layout::juxtapose(&[Layout::text("  "), v.disp()]));
     }
     Layout::stack(stack)
+  }
+}
+
+impl_from_ord!(Grammar[(E: ElementTypes)]);
+
+impl<E: ElementTypes> Ord for Grammar<E> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self
+      .start_symbol
+      .cmp(&other.start_symbol)
+      .then_with(|| self.rule_set.cmp(&other.rule_set))
   }
 }

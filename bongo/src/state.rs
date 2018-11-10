@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use codefmt::Layout;
-use crate::grammar::{Element, NonTerminal, Production};
+use crate::grammar::{Element, Production, ElementTypes};
 use crate::pdisplay::{self, LayoutDisplay};
 
 /// A state of a production within a parse state.
@@ -28,24 +28,24 @@ use crate::pdisplay::{self, LayoutDisplay};
 ///
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-struct ProductionState {
+#[derive(Clone, Debug)]
+struct ProductionState<E: ElementTypes> {
   /// The head nonterminal this production belongs to.
-  head: NonTerminal,
+  head: E::NonTerm,
 
   /// The production this state is part of.
-  prod: Production,
+  prod: Production<E>,
 
   /// The index of this production state. Must be in the range [0,
   /// self.prod.prod_elements().len()].
   index: usize,
 }
 
-impl ProductionState {
+impl<E: ElementTypes> ProductionState<E> {
   /// Create a ProductionState from a given NonTerminal and Production.
   ///
   /// This state's index will be at the start of the production.
-  pub fn from_start(head: NonTerminal, prod: Production) -> Self {
+  pub fn from_start(head: E::NonTerm, prod: Production<E>) -> Self {
     ProductionState {
       head,
       prod,
@@ -55,15 +55,15 @@ impl ProductionState {
 
   /// Returns the next element after the current index. If it is at the
   /// end, then it reuturns `None`.
-  pub fn next(&self) -> Option<&Element> {
+  pub fn next(&self) -> Option<&Element<E>> {
     self.prod.element_at(self.index)
   }
 
   // Unconditionally creates a new production state that is the
   // increment of this production state. If `index` >= length, then this will
   // create a production state.
-  fn advance_forced(&self) -> ProductionState {
-    let mut result = self.clone();
+  fn advance_forced(&self) -> ProductionState<E> {
+    let mut result : ProductionState<E> = self.clone();
     result.index += 1;
     result
   }
@@ -71,13 +71,13 @@ impl ProductionState {
   /// Return another `ProductionState` with the same head and production as
   /// `self`, but with the index advanced. If the index is already at the
   /// end of the production, returns `None`.
-  pub fn advance(&self) -> Option<ProductionState> {
+  pub fn advance(&self) -> Option<ProductionState<E>> {
     self.next().map(|_| self.advance_forced())
   }
 
   /// Return Some(state) which is this state advanced if
   /// the next element type is elem.
-  pub fn advance_if(&self, elem: &Element) -> Option<ProductionState> {
+  pub fn advance_if(&self, elem: &Element<E>) -> Option<ProductionState<E>> {
     self
       .next()
       .filter(|e| e == &elem)
@@ -85,7 +85,7 @@ impl ProductionState {
   }
 }
 
-impl LayoutDisplay for ProductionState {
+impl<E: ElementTypes> LayoutDisplay for ProductionState<E> {
   fn disp(&self) -> Layout {
     let mut layouts = Vec::new();
     let (first_slice, second_slice) =
@@ -103,5 +103,17 @@ impl LayoutDisplay for ProductionState {
       codefmt::Layout::text(" => "),
       body,
     ])
+  }
+}
+
+impl_from_ord!(ProductionState[(E: ElementTypes)]);
+
+impl<E: ElementTypes> Ord for ProductionState<E> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self
+      .head
+      .cmp(&other.head)
+      .then_with(|| self.prod.cmp(&other.prod))
+      .then_with(|| self.index.cmp(&other.index))
   }
 }
