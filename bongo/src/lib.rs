@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod grammar;
+pub mod grammar;
 mod pdisplay;
 mod state;
 
@@ -103,12 +103,10 @@ mod tests {
     let t_a = Terminal::new("A");
     let nt_x = NonTerminal::new("x");
 
-    let g: Grammar<BaseElementTypes> = build(nt_x.clone(), |gb| {
-      gb.add_rule(nt_x.clone(), |rb| {
+    let g: Grammar<BaseElementTypes> = build(&nt_x, |gb| {
+      gb.add_rule(&nt_x, |rb| {
         rb.add_prod(Name::new("Recursive"), |pb| {
-          pb.add_term(t_a.clone())
-            .add_nonterm(nt_x.clone())
-            .add_term(t_a.clone());
+          pb.add_term(&t_a).add_nonterm(&nt_x).add_term(&t_a);
         })
         .add_prod(Name::new("Empty"), |_pb| {});
       });
