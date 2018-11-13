@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub mod builder;
+
 use codefmt::Layout;
 use crate::pdisplay::LayoutDisplay;
 use std::collections::BTreeMap;
@@ -23,7 +25,9 @@ use std::collections::BTreeMap;
 /// of bounds.
 ///
 /// This type is not instantiated, and will typically be a zero-sized type.
-pub trait ElementTypes: Clone {
+pub trait ElementTypes:
+  Copy + Clone + Eq + PartialOrd + Ord + std::fmt::Debug + 'static
+{
   // The type used to identify each possible terminal.
   type Term: Clone
     + PartialEq
@@ -123,7 +127,7 @@ impl LayoutDisplay for NonTerminal {
   }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct BaseElementTypes;
 
 impl ElementTypes for BaseElementTypes {
@@ -132,7 +136,7 @@ impl ElementTypes for BaseElementTypes {
   type Action = Name;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Element<E: ElementTypes> {
   Term(E::Term),
   NonTerm(E::NonTerm),
@@ -147,26 +151,20 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
   }
 }
 
-impl_from_ord!(Element[(E: ElementTypes)]);
-
-impl<E: ElementTypes> Ord for Element<E> {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    match (self, other) {
-      (Element::Term(_), Element::NonTerm(_)) => std::cmp::Ordering::Less,
-      (Element::NonTerm(_), Element::Term(_)) => std::cmp::Ordering::Greater,
-      (Element::Term(t1), Element::Term(t2)) => t1.cmp(t2),
-      (Element::NonTerm(nt1), Element::NonTerm(nt2)) => nt1.cmp(nt2),
-    }
-  }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
 }
 
 impl<E: ElementTypes> ProductionElement<E> {
+  pub fn new(name: Name, e: Element<E>) -> Self {
+    ProductionElement {
+      identifier: Some(name),
+      element: e,
+    }
+  }
+
   pub fn new_empty(e: Element<E>) -> Self {
     ProductionElement {
       identifier: None,
@@ -197,18 +195,7 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   }
 }
 
-impl_from_ord!(ProductionElement[(E: ElementTypes)]);
-
-impl<E: ElementTypes> Ord for ProductionElement<E> {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    self
-      .identifier
-      .cmp(&other.identifier)
-      .then_with(|| self.element.cmp(&other.element))
-  }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Production<E: ElementTypes> {
   action_name: E::Action,
   elements: Vec<ProductionElement<E>>,
@@ -250,18 +237,7 @@ impl<E: ElementTypes> LayoutDisplay for Production<E> {
   }
 }
 
-impl_from_ord!(Production[(E: ElementTypes)]);
-
-impl<E: ElementTypes> Ord for Production<E> {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    self
-      .action_name
-      .cmp(&other.action_name)
-      .then_with(|| self.elements.cmp(&other.elements))
-  }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Rule<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<Production<E>>,
@@ -289,18 +265,7 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
   }
 }
 
-impl_from_ord!(Rule[(E: ElementTypes)]);
-
-impl<E: ElementTypes> Ord for Rule<E> {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    self
-      .head
-      .cmp(&other.head)
-      .then_with(|| self.prods.cmp(&other.prods))
-  }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
   rule_set: BTreeMap<E::NonTerm, Rule<E>>,
@@ -343,16 +308,5 @@ impl<E: ElementTypes> LayoutDisplay for Grammar<E> {
       stack.push(Layout::juxtapose(&[Layout::text("  "), v.disp()]));
     }
     Layout::stack(stack)
-  }
-}
-
-impl_from_ord!(Grammar[(E: ElementTypes)]);
-
-impl<E: ElementTypes> Ord for Grammar<E> {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    self
-      .start_symbol
-      .cmp(&other.start_symbol)
-      .then_with(|| self.rule_set.cmp(&other.rule_set))
   }
 }

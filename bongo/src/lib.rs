@@ -12,31 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// For a given type and type parameters, generates PartialEq, Eq, and
-/// PartialOrd such that all three depend on the implementation of Ord.
-///
-/// This is necessary because the typical approach to implementing any of these
-/// for a type `Foo<T>` is to require `T` to implement that trait as well. Our
-/// grammars are using a type which does not need to implement all of those.
-macro_rules! impl_from_ord {
-  ($t:ident[$(($targ:ident : $($bound:tt)*))*]) => {
-    impl<$($targ : $($bound)*),*> std::cmp::Eq for $t<$($targ),*> {
-    }
-
-    impl<$($targ : $($bound)*),*> std::cmp::PartialEq for $t<$($targ),*> {
-      fn eq(&self, other: &Self) -> bool {
-        std::cmp::Ord::cmp(self, other) == std::cmp::Ordering::Equal
-      }
-    }
-
-    impl<$($targ : $($bound)*),*> std::cmp::PartialOrd for $t<$($targ),*> {
-      fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(std::cmp::Ord::cmp(self, other))
-      }
-    }
-  };
-}
-
 mod grammar;
 mod pdisplay;
 mod state;
@@ -119,9 +94,8 @@ fn is_nullable_fp<E: ElementTypes>(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::grammar::{
-    BaseElementTypes, Name, NonTerminal, ProductionElement, Rule, Terminal,
-  };
+  use crate::grammar::builder::build;
+  use crate::grammar::{BaseElementTypes, Name, NonTerminal, Terminal};
   use crate::pdisplay::LayoutDisplay;
 
   #[test]
@@ -129,22 +103,16 @@ mod tests {
     let t_a = Terminal::new("A");
     let nt_x = NonTerminal::new("x");
 
-    let v1: Vec<ProductionElement<BaseElementTypes>> = vec![
-      ProductionElement::new_empty(Element::Term(t_a.clone())),
-      ProductionElement::new_empty(Element::NonTerm(nt_x.clone())),
-      ProductionElement::new_empty(Element::Term(t_a)),
-    ];
-    let v2: Vec<ProductionElement<BaseElementTypes>> = vec![];
-
-    let x_rule = Rule::new(
-      nt_x.clone(),
-      vec![
-        Production::new(Name::new("Recursive"), v1),
-        Production::new(Name::new("Empty"), v2),
-      ],
-    );
-
-    let g = Grammar::new(nt_x.clone(), vec![x_rule]);
+    let g: Grammar<BaseElementTypes> = build(nt_x.clone(), |gb| {
+      gb.add_rule(nt_x.clone(), |rb| {
+        rb.add_prod(Name::new("Recursive"), |pb| {
+          pb.add_term(t_a.clone())
+            .add_nonterm(nt_x.clone())
+            .add_term(t_a.clone());
+        })
+        .add_prod(Name::new("Empty"), |_pb| {});
+      });
+    });
 
     println!("{}", g.disp().layout(80));
 

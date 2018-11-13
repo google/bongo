@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use codefmt::Layout;
-use crate::grammar::{Element, Production, ElementTypes};
+use crate::grammar::{Element, ElementTypes, Production};
 use crate::pdisplay::{self, LayoutDisplay};
 
 /// A state of a production within a parse state.
@@ -28,7 +28,7 @@ use crate::pdisplay::{self, LayoutDisplay};
 ///
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct ProductionState<E: ElementTypes> {
   /// The head nonterminal this production belongs to.
   head: E::NonTerm,
@@ -63,7 +63,7 @@ impl<E: ElementTypes> ProductionState<E> {
   // increment of this production state. If `index` >= length, then this will
   // create a production state.
   fn advance_forced(&self) -> ProductionState<E> {
-    let mut result : ProductionState<E> = self.clone();
+    let mut result: ProductionState<E> = self.clone();
     result.index += 1;
     result
   }
@@ -103,17 +103,5 @@ impl<E: ElementTypes> LayoutDisplay for ProductionState<E> {
       codefmt::Layout::text(" => "),
       body,
     ])
-  }
-}
-
-impl_from_ord!(ProductionState[(E: ElementTypes)]);
-
-impl<E: ElementTypes> Ord for ProductionState<E> {
-  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-    self
-      .head
-      .cmp(&other.head)
-      .then_with(|| self.prod.cmp(&other.prod))
-      .then_with(|| self.index.cmp(&other.index))
   }
 }
