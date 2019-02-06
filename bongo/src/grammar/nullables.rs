@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::grammar::{Element, ElementTypes, Grammar, Production};
-use crate::utils::{Name, TreeNode, TreeValue, Void};
+use crate::utils::{TreeNode, TreeValue, Void};
 
 #[derive(Clone)]
 pub struct NullableInfo<A> {
