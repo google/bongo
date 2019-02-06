@@ -13,9 +13,12 @@
 // limitations under the License.
 
 pub mod builder;
+pub mod nullables;
+pub mod transform;
 
-use codefmt::Layout;
 use crate::pdisplay::LayoutDisplay;
+use crate::utils::Name;
+use codefmt::Layout;
 use std::collections::BTreeMap;
 
 /// A trait which carries the underlying types for a grammar.
@@ -26,7 +29,7 @@ use std::collections::BTreeMap;
 ///
 /// This type is not instantiated, and will typically be a zero-sized type.
 pub trait ElementTypes:
-  Copy + Clone + Eq + PartialOrd + Ord + std::fmt::Debug + 'static
+  Copy + Clone + Eq + PartialEq + PartialOrd + Ord + std::fmt::Debug + 'static
 {
   // The type used to identify each possible terminal.
   type Term: Clone
@@ -56,39 +59,6 @@ pub trait ElementTypes:
     + Ord
     + std::fmt::Debug
     + 'static;
-}
-
-/// A refcounted name type, used to avoid duplicating common string values
-/// throughout an AST.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct Name(std::rc::Rc<String>);
-
-impl Name {
-  /// Creates a new Name containing the given string.
-  pub fn new(s: &(impl AsRef<str> + ?Sized)) -> Self {
-    Name(std::rc::Rc::new(s.as_ref().to_string()))
-  }
-
-  /// Returns a reference to the internal ref.
-  fn str(&self) -> &str {
-    &**self.0
-  }
-
-  /// Returns a mutable reference to a string to modify this name. Will not
-  /// alter any other names.
-  fn make_mut(&mut self) -> &mut String {
-    std::rc::Rc::make_mut(&mut self.0)
-  }
-
-  fn layout(&self) -> codefmt::Layout {
-    Layout::text(self.str())
-  }
-}
-
-impl AsRef<str> for Name {
-  fn as_ref(&self) -> &str {
-    return self.str();
-  }
 }
 
 /// A terminal element.
@@ -142,6 +112,16 @@ pub enum Element<E: ElementTypes> {
   NonTerm(E::NonTerm),
 }
 
+impl<E: ElementTypes> Element<E> {
+  /// Gets an element as a nonterm. Panics if it is not a nonterm.
+  pub fn as_nonterm(&self) -> &E::NonTerm {
+    match self {
+      Element::NonTerm(e) => e,
+      Element::Term(_) => panic!(),
+    }
+  }
+}
+
 impl<E: ElementTypes> LayoutDisplay for Element<E> {
   fn disp(&self) -> codefmt::Layout {
     match self {
@@ -170,6 +150,14 @@ impl<E: ElementTypes> ProductionElement<E> {
       identifier: None,
       element: e,
     }
+  }
+
+  pub fn id(&self) -> Option<&Name> {
+    self.identifier.as_ref()
+  }
+
+  pub fn elem(&self) -> &Element<E> {
+    &self.element
   }
 }
 
@@ -222,6 +210,10 @@ impl<E: ElementTypes> Production<E> {
 
   pub fn element_at(&self, index: usize) -> Option<&Element<E>> {
     self.elements.get(index).map(|prod_elem| &prod_elem.element)
+  }
+
+  pub fn action(&self) -> &E::Action {
+    &self.action_name
   }
 }
 

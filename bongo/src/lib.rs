@@ -12,91 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(dead_code)]
+
 pub mod grammar;
 mod pdisplay;
 mod state;
+pub mod utils;
 
-use crate::grammar::{Element, ElementTypes, Grammar, Production, Rule};
-use std::collections::BTreeSet;
+use crate::grammar::nullables::NullableInfo;
+use crate::grammar::{ElementTypes, Grammar};
+use std::collections::BTreeMap;
 
 #[derive(Clone)]
 pub struct NullableGrammar<E: ElementTypes> {
   grammar: Grammar<E>,
-  nullables: BTreeSet<E::NonTerm>,
+  nullables: BTreeMap<E::NonTerm, NullableInfo<E::Action>>,
 }
 
 impl<E: ElementTypes> NullableGrammar<E> {
   pub fn new(grammar: Grammar<E>) -> Self {
-    let nullables = fixed_point(BTreeSet::new(), |nullables| {
-      is_nullable_fp(&grammar, nullables)
-    });
+    let nullables = crate::grammar::nullables::calculate_nullables(&grammar);
     NullableGrammar { grammar, nullables }
   }
 
   pub fn is_nullable(&self, nt: &E::NonTerm) -> bool {
-    self.nullables.contains(nt)
+    self.nullables.contains_key(nt)
   }
-}
-
-fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
-  let mut curr = start;
-  loop {
-    let next = apply(&curr);
-    if next == curr {
-      break curr;
-    }
-    curr = next;
-  }
-}
-
-fn is_prod_nullable<E: ElementTypes>(
-  nullables: &BTreeSet<E::NonTerm>,
-  prod: &Production<E>,
-) -> bool {
-  for elem in prod.elements_iter() {
-    match elem {
-      Element::Term(_) => return false,
-      Element::NonTerm(nt) => {
-        if !nullables.contains(nt) {
-          return false;
-        }
-      }
-    }
-  }
-  true
-}
-
-fn are_any_prods_nullable<E: ElementTypes>(
-  nullables: &BTreeSet<E::NonTerm>,
-  rule: &Rule<E>,
-) -> bool {
-  for prod in rule.prods() {
-    if is_prod_nullable(nullables, prod) {
-      return true;
-    }
-  }
-  false
-}
-
-fn is_nullable_fp<E: ElementTypes>(
-  grammar: &Grammar<E>,
-  prev_nullables: &BTreeSet<E::NonTerm>,
-) -> BTreeSet<E::NonTerm> {
-  let mut curr_nullables = prev_nullables.clone();
-  for (nt, prod_set) in grammar.rule_set() {
-    if are_any_prods_nullable(prev_nullables, prod_set) {
-      curr_nullables.insert(nt.clone());
-    }
-  }
-  curr_nullables
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
   use crate::grammar::builder::build;
-  use crate::grammar::{BaseElementTypes, Name, NonTerminal, Terminal};
+  use crate::grammar::{BaseElementTypes, NonTerminal, Terminal};
   use crate::pdisplay::LayoutDisplay;
+  use crate::utils::Name;
 
   #[test]
   fn test_grammar_print() {

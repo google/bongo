@@ -147,7 +147,8 @@ impl<E: ElementTypes> GrammarBuilder<E> {
 ///
 /// ```rust
 /// # use bongo::grammar::{Terminal, NonTerminal, BaseElementTypes,
-/// # Grammar, Name};
+/// # Grammar};
+/// # use bongo::utils::Name;
 /// let t_a = Terminal::new("A");
 /// let nt_x = NonTerminal::new("x");
 /// let g: Grammar<BaseElementTypes> =
