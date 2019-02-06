@@ -32,7 +32,7 @@ use std::collections as col;
 use std::fmt;
 use std::rc;
 
-use shared_string::SharedString;
+use self::shared_string::SharedString;
 
 const OVERFLOW_COST: f32 = 100.0;
 const NEWLINE_COST: f32 = 1.0;
@@ -50,7 +50,7 @@ const NEWLINE_COST: f32 = 1.0;
 /// 2. Stack
 ///
 ///    Vertically stacks two layouts. The left margins of the two layouts will
-/// be    aligned.
+///    be aligned.
 ///
 /// 3. Juxtapose
 ///
@@ -296,7 +296,7 @@ impl NodeCounter {
   }
   fn visit_node(&mut self, layout: &Layout) {
     if self.seen.insert(layout.contents() as *const LayoutContents) {
-      use LayoutContents::*;
+      use self::LayoutContents::*;
       match layout.contents() {
         Text(_) => {}
         Choice(first, second) => {
