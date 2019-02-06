@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::grammar::{Element, ElementTypes, Grammar, Production};
-use crate::utils::{TreeNode, Void};
+use crate::utils::{Name, TreeNode, TreeValue, Void};
 
 #[derive(Clone)]
 pub struct NullableInfo<A> {
@@ -9,7 +9,11 @@ pub struct NullableInfo<A> {
 }
 
 impl<A: Ord> NullableInfo<A> {
-  pub fn new() -> Self { NullableInfo { nullable_actions: BTreeSet::new() } }
+  pub fn new() -> Self {
+    NullableInfo {
+      nullable_actions: BTreeSet::new(),
+    }
+  }
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
@@ -39,21 +43,49 @@ pub fn calculate_nullables<E: ElementTypes>(
 ) -> BTreeMap<E::NonTerm, NullableInfo<E::Action>> {
   let prods_with_heads = grammar_to_prods_with_heads(g);
 
-  let mut nullable_nts = BTreeMap::new();
+  let mut nullable_nts: BTreeMap<E::NonTerm, NullableInfo<E::Action>> =
+    BTreeMap::new();
 
   loop {
     let mut changed = false;
 
     for prod_with_head in &prods_with_heads {
       if is_prod_nullable(&nullable_nts, prod_with_head.prod) {
-        let new_node =
-          TreeNode::from_action(prod_with_head.prod.action().clone());
+        let mut node_args_set: BTreeSet<
+          BTreeMap<Name, TreeValue<E::Action, Void>>,
+        > = BTreeSet::new();
+        node_args_set.insert(BTreeMap::new());
+        for prod_elem in prod_with_head.prod.prod_elements() {
+          let nt = prod_elem.elem().as_nonterm();
+          let nt_nullable_info = nullable_nts.get(nt).unwrap();
+          if let Some(id) = prod_elem.id() {
+            let mut new_node_args_set = BTreeSet::new();
+            for old_node_arg in &node_args_set {
+              for nullable_action in &nt_nullable_info.nullable_actions {
+                let mut new_node_arg = old_node_arg.clone();
+                new_node_arg.insert(
+                  id.clone(),
+                  TreeValue::Node(Box::new(nullable_action.clone())),
+                );
+                new_node_args_set.insert(new_node_arg);
+              }
+            }
+
+            node_args_set = new_node_args_set;
+          }
+        }
+
+        let new_nodes = node_args_set.into_iter().map(|node_args| {
+          TreeNode::new(prod_with_head.prod.action().clone(), node_args)
+        });
+
         let nullable_info = nullable_nts
           .entry(prod_with_head.head.clone())
           .or_insert_with(NullableInfo::new);
-
-        if nullable_info.nullable_actions.insert(new_node) {
-          changed = true;
+        for new_node in new_nodes {
+          if nullable_info.nullable_actions.insert(new_node) {
+            changed = true;
+          }
         }
       }
     }

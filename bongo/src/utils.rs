@@ -59,6 +59,12 @@ pub struct TreeNode<L, V> {
 }
 
 impl<L: Ord, V> TreeNode<L, V> {
+  pub fn new(action: L, params: BTreeMap<Name, TreeValue<L, V>>) -> Self {
+    TreeNode {
+      action_name: action,
+      params: params,
+    }
+  }
   pub fn from_action(action: L) -> Self {
     TreeNode {
       action_name: action,

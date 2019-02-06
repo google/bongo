@@ -19,8 +19,8 @@ mod pdisplay;
 mod state;
 pub mod utils;
 
-use crate::grammar::{ElementTypes, Grammar};
 use crate::grammar::nullables::NullableInfo;
+use crate::grammar::{ElementTypes, Grammar};
 use std::collections::BTreeMap;
 
 #[derive(Clone)]

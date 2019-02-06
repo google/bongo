@@ -112,6 +112,16 @@ pub enum Element<E: ElementTypes> {
   NonTerm(E::NonTerm),
 }
 
+impl<E: ElementTypes> Element<E> {
+  /// Gets an element as a nonterm. Panics if it is not a nonterm.
+  pub fn as_nonterm(&self) -> &E::NonTerm {
+    match self {
+      Element::NonTerm(e) => e,
+      Element::Term(_) => panic!(),
+    }
+  }
+}
+
 impl<E: ElementTypes> LayoutDisplay for Element<E> {
   fn disp(&self) -> codefmt::Layout {
     match self {
@@ -140,6 +150,14 @@ impl<E: ElementTypes> ProductionElement<E> {
       identifier: None,
       element: e,
     }
+  }
+
+  pub fn id(&self) -> Option<&Name> {
+    self.identifier.as_ref()
+  }
+
+  pub fn elem(&self) -> &Element<E> {
+    &self.element
   }
 }
 
