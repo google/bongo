@@ -230,6 +230,17 @@ impl<E: ElementTypes> LayoutDisplay for Production<E> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ProdAndHead<'a, E: ElementTypes> {
+  head: &'a E::NonTerm,
+  prod: &'a Production<E>,
+}
+
+impl<'a, E: ElementTypes> ProdAndHead<'a, E> {
+  fn head(&self) -> &'a E::NonTerm { self.head }
+  fn prod(&self) -> &'a Production<E> { self.prod }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Rule<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<Production<E>>,
@@ -283,6 +294,23 @@ impl<E: ElementTypes> Grammar<E> {
 
   pub fn get_rule(&self, nt: &E::NonTerm) -> Option<&Rule<E>> {
     self.rule_set.get(nt)
+  }
+
+  pub fn get_action_map(&self) -> BTreeMap<&E::Action, ProdAndHead<E>> {
+    let mut map = BTreeMap::new();
+    for (nt_head, rule) in &self.rule_set {
+      for prod in &rule.prods {
+        let prod_and_head = ProdAndHead {
+          head: nt_head,
+          prod: prod,
+        };
+
+        let result = map.insert(prod.action(), prod_and_head);
+        assert!(result.is_none());
+      }
+    }
+
+    map
   }
 }
 

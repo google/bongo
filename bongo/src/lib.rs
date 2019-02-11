@@ -14,29 +14,31 @@
 
 #![allow(dead_code)]
 
+#[macro_use]
+extern crate failure_derive;
+
 pub mod grammar;
 mod pdisplay;
 mod state;
 pub mod utils;
 
-use crate::grammar::nullables::NullableInfo;
+use crate::grammar::nullables::GrammarNullableInfo;
 use crate::grammar::{ElementTypes, Grammar};
-use std::collections::BTreeMap;
 
 #[derive(Clone)]
 pub struct NullableGrammar<E: ElementTypes> {
   grammar: Grammar<E>,
-  nullables: BTreeMap<E::NonTerm, NullableInfo<E::Action>>,
+  nullables: GrammarNullableInfo<E>,
 }
 
 impl<E: ElementTypes> NullableGrammar<E> {
   pub fn new(grammar: Grammar<E>) -> Self {
-    let nullables = crate::grammar::nullables::calculate_nullables(&grammar);
+    let nullables = crate::grammar::nullables::calculate_nullables(&grammar).unwrap();
     NullableGrammar { grammar, nullables }
   }
 
   pub fn is_nullable(&self, nt: &E::NonTerm) -> bool {
-    self.nullables.contains_key(nt)
+    self.nullables.nonterm_info().contains_key(nt)
   }
 }
 

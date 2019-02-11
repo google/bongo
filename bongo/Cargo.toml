@@ -6,3 +6,5 @@ edition = "2018"
 
 [dependencies]
 codefmt = { path = "../codefmt" }
+failure = "^0.1.5"
+failure_derive = "^0.1.5"
