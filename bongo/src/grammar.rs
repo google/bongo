@@ -120,6 +120,16 @@ impl<E: ElementTypes> Element<E> {
       Element::Term(_) => panic!(),
     }
   }
+
+  pub fn clone_as_other<E2>(&self) -> Element<E2>
+  where
+    E2: ElementTypes<Term = E::Term, NonTerm = E::NonTerm>,
+  {
+    match self {
+      Element::Term(t) => Element::Term(t.clone()),
+      Element::NonTerm(nt) => Element::NonTerm(nt.clone()),
+    } 
+  }
 }
 
 impl<E: ElementTypes> LayoutDisplay for Element<E> {
@@ -138,9 +148,16 @@ pub struct ProductionElement<E: ElementTypes> {
 }
 
 impl<E: ElementTypes> ProductionElement<E> {
-  pub fn new(name: Name, e: Element<E>) -> Self {
+  pub fn new_with_name(name: Name, e: Element<E>) -> Self {
     ProductionElement {
       identifier: Some(name),
+      element: e,
+    }
+  }
+
+  pub fn new(name: Option<Name>, e: Element<E>) -> Self {
+    ProductionElement {
+      identifier: name,
       element: e,
     }
   }
@@ -158,6 +175,16 @@ impl<E: ElementTypes> ProductionElement<E> {
 
   pub fn elem(&self) -> &Element<E> {
     &self.element
+  }
+
+  pub fn clone_as_other<E2>(&self) -> ProductionElement<E2>
+  where
+    E2: ElementTypes<Term = E::Term, NonTerm = E::NonTerm>,
+  {
+    ProductionElement {
+      identifier: self.identifier.clone(),
+      element: self.element.clone_as_other(),
+    }
   }
 }
 
@@ -236,8 +263,12 @@ pub struct ProdAndHead<'a, E: ElementTypes> {
 }
 
 impl<'a, E: ElementTypes> ProdAndHead<'a, E> {
-  fn head(&self) -> &'a E::NonTerm { self.head }
-  fn prod(&self) -> &'a Production<E> { self.prod }
+  fn head(&self) -> &'a E::NonTerm {
+    self.head
+  }
+  fn prod(&self) -> &'a Production<E> {
+    self.prod
+  }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -287,6 +318,8 @@ impl<E: ElementTypes> Grammar<E> {
         .collect(),
     }
   }
+
+  pub fn start_nt(&self) -> &E::NonTerm { &self.start_symbol }
 
   pub fn rule_set(&self) -> &BTreeMap<E::NonTerm, Rule<E>> {
     &self.rule_set

@@ -79,11 +79,32 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
   pub fn nonterm_info(&self) -> &BTreeMap<E::NonTerm, NonTermNullableInfo<E>> {
     &self.nonterm_info
   }
+
+  pub fn is_nullable(&self, nt: &E::NonTerm) -> bool {
+    self.nonterm_info.contains_key(nt)
+  }
+
+  pub fn is_prod_nullable(&self, prod: &Production<E>) -> bool {
+    is_prod_nullable(&self.nonterm_info, prod)
+  }
+
+  pub fn get_nullable_info(
+    &self,
+    nt: &E::NonTerm,
+  ) -> Option<&NonTermNullableInfo<E>> {
+    self.nonterm_info.get(nt)
+  }
 }
 
 #[derive(Clone, Debug)]
 pub struct NonTermNullableInfo<E: ElementTypes> {
   nullable_action: TreeNode<E::Action, Void>,
+}
+
+impl<E: ElementTypes> NonTermNullableInfo<E> {
+  pub fn nullable_action(&self) -> &TreeNode<E::Action, Void> {
+    &self.nullable_action
+  }
 }
 
 #[derive(Debug, Fail)]
@@ -166,7 +187,7 @@ pub fn calculate_nullables<E: ElementTypes>(
   })
 }
 
-pub fn is_prod_nullable<E: ElementTypes, V>(
+fn is_prod_nullable<E: ElementTypes, V>(
   nullables: &BTreeMap<E::NonTerm, V>,
   prod: &Production<E>,
 ) -> bool {

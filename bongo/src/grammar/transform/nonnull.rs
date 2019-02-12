@@ -45,13 +45,14 @@
 //! p := a <has-a>
 //! ```
 
-/*
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 
+use failure::Error;
+
 use crate::grammar::{
-  nullables::{calculate_nullables, is_prod_nullable},
-  ElementTypes, Grammar,
+  nullables::{calculate_nullables, GrammarNullableInfo},
+  Element, ElementTypes, Grammar, Production, ProductionElement, Rule,
 };
 
 use crate::utils::{Name, TreeNode, Void};
@@ -60,35 +61,110 @@ use crate::utils::{Name, TreeNode, Void};
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct Action<A> {
-  action: A,
-  nullables: BTreeMap<Name, Box<TreeNode<A, Void>>>,
+pub struct Action<E: ElementTypes> {
+  action: E::Action,
+  nt_nullable_states: Vec<bool>,
+  nullables: BTreeMap<Name, TreeNode<E::Action, Void>>,
 }
 
 impl<E: ElementTypes> ElementTypes for ElemTypes<E> {
   type Term = E::Term;
   type NonTerm = E::NonTerm;
-  type Action = Action<E::Action>;
+  type Action = Action<E>;
 }
 
 pub fn transform_to_nonnull<E: ElementTypes>(
   g: &Grammar<E>,
-) -> Grammar<ElemTypes<E>> {
-  let nullables = calculate_nullables(g);
+) -> Result<Grammar<ElemTypes<E>>, Error> {
+  let nullables = calculate_nullables(g)?;
 
-  for nullable_nt in &nullables {
-    for rule in g.get_rule(nullable_nt) {
-      let nullable_prods = rule
-        .prods()
-        .iter()
-        .filter(|prod| is_prod_nullable(&nullables, &prod))
-        .map(|prod| prod.action())
-        .collect::<Vec<_>>();
+  let mut new_rules = Vec::new();
 
-      for prod in &rule.prods {}
+  for (nt, rule) in g.rule_set() {
+    let nonnullable_prods = rule
+      .prods()
+      .iter()
+      .filter(|prod| !nullables.is_prod_nullable(&prod))
+      .flat_map(|prod| to_nonnull_prods(&nullables, prod))
+      .collect();
+
+    new_rules.push(Rule::new(nt.clone(), nonnullable_prods));
+  }
+
+  Ok(Grammar::new(g.start_nt().clone(), new_rules))
+}
+
+#[derive(Clone, Debug)]
+struct ProdBuildState<E: ElementTypes> {
+  elems: Vec<ProductionElement<ElemTypes<E>>>,
+  nt_nullable_states: Vec<bool>,
+  action_args: BTreeMap<Name, TreeNode<E::Action, Void>>,
+}
+
+fn to_nonnull_prods<E: ElementTypes>(
+  nullable_info: &GrammarNullableInfo<E>,
+  prod: &Production<E>,
+) -> Vec<Production<ElemTypes<E>>> {
+  let mut curr_build_states = vec![ProdBuildState {
+    elems: Vec::new(),
+    nt_nullable_states: Vec::new(),
+    action_args: BTreeMap::new(),
+  }];
+
+  for prod_elem in prod.prod_elements() {
+    match &prod_elem.elem() {
+      Element::NonTerm(nt) => {
+        match nullable_info.get_nullable_info(nt) {
+          Some(info) => {
+            // We have to clone all of the current build states.
+            let mut new_build_states = Vec::new();
+            for curr_build_state in &mut curr_build_states {
+              let mut new_build_state = curr_build_state.clone();
+              // Write non-null version into existing state
+              curr_build_state.elems.push(prod_elem.clone_as_other());
+              curr_build_state.nt_nullable_states.push(false);
+
+              // Write null version into cloned state
+              if let Some(id) = &prod_elem.identifier {
+                new_build_state
+                  .action_args
+                  .insert(id.clone(), info.nullable_action().clone());
+              }
+
+              new_build_state.nt_nullable_states.push(true);
+              new_build_states.push(new_build_state);
+            }
+
+            curr_build_states.append(&mut new_build_states);
+          }
+          None => {
+            for curr_build_state in &mut curr_build_states {
+              // Write non-null version into existing state
+              curr_build_state.elems.push(prod_elem.clone_as_other());
+              curr_build_state.nt_nullable_states.push(false);
+            }
+          }
+        }
+      }
+      Element::Term(_) => {
+        for prod_build_state in &mut curr_build_states {
+          prod_build_state.elems.push(prod_elem.clone_as_other())
+        }
+      }
     }
   }
 
-  unimplemented!()
+  let mut prods = Vec::new();
+
+  for curr_build_state in curr_build_states {
+    let new_action = Action {
+      action: prod.action().clone(),
+      nt_nullable_states: curr_build_state.nt_nullable_states,
+      nullables: curr_build_state.action_args,
+    };
+
+    prods.push(Production::new(new_action, curr_build_state.elems));
+  }
+
+  prods
 }
-*/

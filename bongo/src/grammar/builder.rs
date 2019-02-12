@@ -49,6 +49,18 @@ impl<E: ElementTypes> ProductionBuilder<E> {
     self
   }
 
+  pub fn add_named_term(
+    &mut self,
+    name: Name,
+    term: impl BuilderInto<E::Term>,
+  ) -> &mut Self {
+    self.elems.push(ProductionElement::new_with_name(
+      name,
+      Element::Term(term.builder_into()),
+    ));
+    self
+  }
+
   pub fn add_nonterm(
     &mut self,
     nonterm: impl BuilderInto<E::NonTerm>,
@@ -66,7 +78,7 @@ impl<E: ElementTypes> ProductionBuilder<E> {
     name: Name,
     nonterm: impl BuilderInto<E::NonTerm>,
   ) -> &mut Self {
-    self.elems.push(ProductionElement::new(
+    self.elems.push(ProductionElement::new_with_name(
       name,
       Element::NonTerm(nonterm.builder_into()),
     ));
