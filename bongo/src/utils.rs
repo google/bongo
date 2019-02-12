@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use codefmt::Layout;
 
+pub mod buffer;
+
 pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   let mut curr = start;
   loop {
