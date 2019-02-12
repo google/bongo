@@ -24,6 +24,12 @@ where
   }
 }
 
+impl BuilderInto<Name> for &'_ str {
+  fn builder_into(self) -> Name {
+    Name::new(self)
+  }
+}
+
 pub struct ProductionBuilder<E: ElementTypes> {
   action: E::Action,
   elems: Vec<ProductionElement<E>>,
@@ -51,11 +57,11 @@ impl<E: ElementTypes> ProductionBuilder<E> {
 
   pub fn add_named_term(
     &mut self,
-    name: Name,
+    name: impl BuilderInto<Name>,
     term: impl BuilderInto<E::Term>,
   ) -> &mut Self {
     self.elems.push(ProductionElement::new_with_name(
-      name,
+      name.builder_into(),
       Element::Term(term.builder_into()),
     ));
     self
@@ -75,11 +81,11 @@ impl<E: ElementTypes> ProductionBuilder<E> {
 
   pub fn add_named_nonterm(
     &mut self,
-    name: Name,
+    name: impl BuilderInto<Name>,
     nonterm: impl BuilderInto<E::NonTerm>,
   ) -> &mut Self {
     self.elems.push(ProductionElement::new_with_name(
-      name,
+      name.builder_into(),
       Element::NonTerm(nonterm.builder_into()),
     ));
     self

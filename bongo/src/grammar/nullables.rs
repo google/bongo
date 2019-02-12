@@ -223,6 +223,7 @@ fn get_only<I: IntoIterator>(op: I) -> I::Item {
 #[cfg(test)]
 mod test {
   use super::*;
+  use crate::grammar::NonTerminal;
   use crate::grammar::examples;
 
   #[test]
@@ -230,5 +231,32 @@ mod test {
     let g = examples::make_simple();
     let nullables = calculate_nullables(&g).unwrap();
     assert!(nullables.get_nullable_set().is_empty());
+  }
+
+  #[test]
+  fn test_simple_nullable_grammar() {
+    let g = examples::make_simple_nullable();
+    let nullables = calculate_nullables(&g).unwrap();
+    let nullable_set = nullables.get_nullable_set();
+    assert!(nullable_set.contains(&NonTerminal::new("start")));
+    assert!(nullable_set.contains(&NonTerminal::new("a")));
+    assert!(nullable_set.contains(&NonTerminal::new("b")));
+    assert!(nullable_set.contains(&NonTerminal::new("c")));
+  }
+
+  #[test]
+  fn test_paren_grammar() {
+    let g = examples::make_paren();
+    let nullables = calculate_nullables(&g).unwrap();
+    assert!(nullables.get_nullable_info(&NonTerminal::new("expr_list")).is_some());
+    assert!(nullables.get_nullable_info(&NonTerminal::new("expr")).is_none());
+    assert!(nullables.get_nullable_info(&NonTerminal::new("start")).is_none());
+  }
+
+  #[test]
+  fn test_ambiguous_nullable_grammar() {
+    let g = examples::make_ambiguous_nullable();
+    let nullable_error = calculate_nullables(&g).unwrap_err();
+    assert!(nullable_error.downcast_ref::<NullableError>().is_some());
   }
 }
