@@ -94,6 +94,10 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
   ) -> Option<&NonTermNullableInfo<E>> {
     self.nonterm_info.get(nt)
   }
+
+  pub fn get_nullable_set(&self) -> BTreeSet<E::NonTerm> {
+    self.nonterm_info().keys().cloned().collect()
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -214,4 +218,17 @@ fn get_only<I: IntoIterator>(op: I) -> I::Item {
     "get_only argument must not have more than one value."
   );
   value
+}
+
+#[cfg(test)]
+mod test {
+  use super::*;
+  use crate::grammar::examples;
+
+  #[test]
+  fn test_simple_grammar() {
+    let g = examples::make_simple();
+    let nullables = calculate_nullables(&g).unwrap();
+    assert!(nullables.get_nullable_set().is_empty());
+  }
 }

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub mod builder;
+pub mod examples;
 pub mod nullables;
 pub mod transform;
 
@@ -27,7 +28,9 @@ use std::collections::BTreeMap;
 /// instead of forcing us to provide a number of type variables with a long list
 /// of bounds.
 ///
-/// This type is not instantiated, and will typically be a zero-sized type.
+/// This type is not instantiated, and will typically be a zero-sized type. It's
+/// constrained by the standard set of derivable operations in order to make
+/// derivations of types that use it simple.
 pub trait ElementTypes:
   Copy + Clone + Eq + PartialEq + PartialOrd + Ord + std::fmt::Debug + 'static
 {
@@ -62,6 +65,8 @@ pub trait ElementTypes:
 }
 
 /// A terminal element.
+///
+/// This is a simple terminal type compatible with `ElementTypes`.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Terminal(Name);
 
@@ -128,7 +133,7 @@ impl<E: ElementTypes> Element<E> {
     match self {
       Element::Term(t) => Element::Term(t.clone()),
       Element::NonTerm(nt) => Element::NonTerm(nt.clone()),
-    } 
+    }
   }
 }
 
@@ -319,7 +324,9 @@ impl<E: ElementTypes> Grammar<E> {
     }
   }
 
-  pub fn start_nt(&self) -> &E::NonTerm { &self.start_symbol }
+  pub fn start_nt(&self) -> &E::NonTerm {
+    &self.start_symbol
+  }
 
   pub fn rule_set(&self) -> &BTreeMap<E::NonTerm, Rule<E>> {
     &self.rule_set
@@ -330,16 +337,21 @@ impl<E: ElementTypes> Grammar<E> {
   }
 
   pub fn get_action_map(&self) -> BTreeMap<&E::Action, ProdAndHead<E>> {
+    use std::collections::btree_map::Entry;
     let mut map = BTreeMap::new();
     for (nt_head, rule) in &self.rule_set {
       for prod in &rule.prods {
-        let prod_and_head = ProdAndHead {
-          head: nt_head,
-          prod: prod,
-        };
-
-        let result = map.insert(prod.action(), prod_and_head);
-        assert!(result.is_none());
+        match map.entry(prod.action()) {
+          Entry::Occupied(_) => {
+            panic!("Can be only one example of each parameter. Duplicated param: {:?}", prod.action());
+          }
+          Entry::Vacant(vac) => {
+            vac.insert(ProdAndHead {
+              head: nt_head,
+              prod: prod,
+            });
+          }
+        }
       }
     }
 
