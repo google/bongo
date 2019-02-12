@@ -8,3 +8,4 @@ edition = "2018"
 codefmt = { path = "../codefmt" }
 failure = "^0.1.5"
 failure_derive = "^0.1.5"
+unicode-segmentation = "^1.2.1"

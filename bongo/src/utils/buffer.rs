@@ -63,7 +63,7 @@ impl BufferRange {
         }
       }
     }
-    
+
     let buffer = Buffer(Rc::new(BufferInner {
       source_name: source_name.as_ref().to_string(),
       text,
@@ -86,25 +86,45 @@ impl BufferRange {
     self.start_index == self.end_index
   }
 
-  pub fn read_char(&self) -> Option<(char, BufferRange)> {
+  pub fn read_char_mut(&mut self) -> Option<char> {
     let mut chars = self.as_str().char_indices();
     match chars.next() {
       None => None,
       Some((_, next_ch)) => {
-        let new_start_index = match chars.next() {
+        self.start_index = match chars.next() {
           None => self.end_index,
           Some((new_offset, _)) => self.start_index + new_offset,
         };
 
-        Some((
-          next_ch,
-          BufferRange {
-            start_index: new_start_index,
-            end_index: self.end_index,
-            buf: self.buf.clone(),
-          },
-        ))
+        Some(next_ch)
       }
+    }
+  }
+
+  pub fn read_char(&self) -> Option<(char, BufferRange)> {
+    let mut copy = self.clone();
+    copy.read_char_mut().map(|ch| (ch, copy))
+  }
+
+  pub fn advance_n_mut(&mut self, n: usize) -> Option<&str> {
+    let old_start = self.start_index;
+    for _ in 0..n {
+      if self.read_char_mut().is_none() {
+        self.start_index = old_start;
+        return None;
+      }
+    }
+    Some(&self.buf.0.text[old_start..self.start_index])
+  }
+
+  pub fn advance_n(&self, n: usize) -> Option<(&str, BufferRange)> {
+    let mut copy = self.clone();
+    let advance_succeeded = copy.advance_n_mut(n).is_some();
+    if advance_succeeded {
+      let s = &self.buf.0.text[self.start_index.. copy.start_index];
+      Some((s, copy))
+    } else {
+      None
     }
   }
 
@@ -120,6 +140,14 @@ impl BufferRange {
       buf: self.buf.clone(),
     }
   }
+
+  pub fn start_pos(&self) -> TextPos {
+    self.buf.get_text_pos_from_byte_offset(self.start_index)
+  }
+
+  pub fn end_pos(&self) -> TextPos {
+    self.buf.get_text_pos_from_byte_offset(self.end_index)
+  }
 }
 
 /// A key form of BufferRangeKey. Only the contents of the string can be
@@ -129,7 +157,9 @@ impl BufferRange {
 pub struct BufferRangeKey(BufferRange);
 
 impl BufferRangeKey {
-  pub fn as_str(&self) -> &str { self.0.as_str() }
+  pub fn as_str(&self) -> &str {
+    self.0.as_str()
+  }
 }
 
 impl cmp::Ord for BufferRangeKey {
@@ -156,12 +186,84 @@ impl Buffer {
   fn ref_eq(&self, other: &Buffer) -> bool {
     &*self.0 as *const BufferInner == &*other.0 as *const BufferInner
   }
+
+  fn get_line_str_from_byte_offset(
+    &self,
+    byte_offset: usize,
+  ) -> (&str, usize, usize) {
+    assert!(byte_offset <= self.0.text.len());
+
+    use std::cmp::Ordering;
+    let search_result = self.0.line_ranges.binary_search_by(|&(start, end)| {
+      if byte_offset < start {
+        Ordering::Greater
+      } else if byte_offset > end {
+        Ordering::Less
+      } else {
+        Ordering::Equal
+      }
+    });
+
+    let line_range_index =
+      search_result.unwrap_or_else(|insert_pos| insert_pos - 1);
+    let (start_byte_index, end_byte_index) =
+      self.0.line_ranges[line_range_index];
+    let line = &self.0.text[start_byte_index..end_byte_index];
+
+    let line_byte_offset = if byte_offset <= end_byte_index {
+      byte_offset
+    } else {
+      end_byte_index
+    } - start_byte_index;
+
+    (line, line_range_index, line_byte_offset)
+  }
+
+  fn get_text_pos_from_byte_offset(&self, byte_offset: usize) -> TextPos {
+    use unicode_segmentation::UnicodeSegmentation;
+    let (line, line_number, line_byte_offset) =
+      self.get_line_str_from_byte_offset(byte_offset);
+
+    // Linear search within the line for the grapheme index.
+    let mut col_index = 0usize;
+    for (grapheme_offset, _) in line.grapheme_indices(true) {
+      if grapheme_offset >= line_byte_offset {
+        break;
+      }
+      col_index += 1;
+    }
+
+    TextPos {
+      line: line_number,
+      column: col_index,
+      byte_offset: byte_offset,
+    }
+  }
 }
 
 struct BufferInner {
   source_name: String,
   text: String,
   line_ranges: Vec<(usize, usize)>,
+}
+
+#[derive(Copy, Clone)]
+pub struct TextPos {
+  line: usize,
+  column: usize,
+  byte_offset: usize,
+}
+
+impl TextPos {
+  fn line(&self) -> usize {
+    self.line
+  }
+  fn column(&self) -> usize {
+    self.column
+  }
+  fn byte_offset(&self) -> usize {
+    self.byte_offset
+  }
 }
 
 #[cfg(test)]
@@ -177,7 +279,23 @@ mod test {
   }
 
   #[test]
+  fn test_simple_read_char_mut() {
+    let mut range = BufferRange::new("<test1>", "Hello\nWorld!\n");
+    let ch = range.read_char_mut().unwrap();
+    assert_eq!('H', ch);
+    assert_eq!("ello\nWorld!\n", range.as_str());
+  }
+
+  #[test]
   fn test_unicode_read_char() {
+    let range = BufferRange::new("<test>", "あいうえお");
+    let (ch, next_range) = range.read_char().unwrap();
+    assert_eq!('あ', ch);
+    assert_eq!("いうえお", next_range.as_str());
+  }
+
+  #[test]
+  fn test_unicode_read_char_mut() {
     let range = BufferRange::new("<test>", "あいうえお");
     let (ch, next_range) = range.read_char().unwrap();
     assert_eq!('あ', ch);
@@ -202,6 +320,13 @@ mod test {
   }
 
   #[test]
+  fn test_simple_advance_n_mut() {
+    let mut range = BufferRange::new("<test1>", "Hello\nWorld!\n");
+    let prefix = range.advance_n_mut(3).unwrap();
+    assert_eq!("Hel", prefix);
+  }
+
+  #[test]
   fn test_unicode_remove_suffix() {
     let range = BufferRange::new("<test1>", "あいうえお");
     let (_, next_range) = range.read_char().unwrap();
@@ -210,5 +335,17 @@ mod test {
 
     let prefix = range.remove_suffix(&next_range);
     assert_eq!("あいう", prefix.as_str());
+  }
+
+  #[test]
+  fn test_simple_text_pos() {
+    let range = BufferRange::new("<test1>", "Hello\nWorld!\n");
+    let start = range.start_pos();
+    assert_eq!(start.line(), 0);
+    assert_eq!(start.column(), 0);
+
+    let end = range.end_pos();
+    assert_eq!(end.line(), 2);
+    assert_eq!(end.column(), 0);
   }
 }
