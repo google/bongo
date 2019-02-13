@@ -259,6 +259,10 @@ impl<E: ElementTypes> Production<E> {
   pub fn action_key(&self) -> &E::ActionKey {
     &self.action_key
   }
+
+  pub fn action_value(&self) -> &E::ActionValue {
+    &self.action_value
+  }
 }
 
 impl<E: ElementTypes> LayoutDisplay for Production<E> {

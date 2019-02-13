@@ -61,17 +61,22 @@ use crate::utils::{Name, TreeNode, Void};
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
-pub struct Action<E: ElementTypes> {
+pub struct ActionKey<E: ElementTypes> {
   action: E::ActionKey,
   nt_nullable_states: Vec<bool>,
-  nullables: BTreeMap<Name, TreeNode<E::ActionKey, Void>>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ActionValue<E: ElementTypes> {
+  parent_value: E::ActionValue,
+  nullable_arguments: BTreeMap<Name, TreeNode<E::ActionKey, Void>>,
 }
 
 impl<E: ElementTypes> ElementTypes for ElemTypes<E> {
   type Term = E::Term;
   type NonTerm = E::NonTerm;
-  type ActionKey = Action<E>;
-  type ActionValue = ();
+  type ActionKey = ActionKey<E>;
+  type ActionValue = ActionValue<E>;
 }
 
 pub fn transform_to_nonnull<E: ElementTypes>(
@@ -158,13 +163,21 @@ fn to_nonnull_prods<E: ElementTypes>(
   let mut prods = Vec::new();
 
   for curr_build_state in curr_build_states {
-    let new_action = Action {
+    let new_action_key = ActionKey {
       action: prod.action_key().clone(),
       nt_nullable_states: curr_build_state.nt_nullable_states,
-      nullables: curr_build_state.action_args,
     };
 
-    prods.push(Production::new(new_action, (), curr_build_state.elems));
+    let new_action_value = ActionValue {
+      parent_value: prod.action_value().clone(),
+      nullable_arguments: curr_build_state.action_args,
+    };
+
+    prods.push(Production::new(
+      new_action_key,
+      new_action_value,
+      curr_build_state.elems,
+    ));
   }
 
   prods
