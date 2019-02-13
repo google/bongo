@@ -11,20 +11,20 @@ pub fn make_simple() -> Grammar<BaseElementTypes> {
   build(&start, |b| {
     b.add_rule(&start, |builder| {
       builder
-        .add_prod("a_prod", |b| {
+        .add_prod("a_prod", (), |b| {
           b.add_named_nonterm("value", &a_nt);
         })
-        .add_prod("b_prod", |b| {
+        .add_prod("b_prod", (), |b| {
           b.add_named_nonterm("value", &b_nt);
         });
     })
     .add_rule(&a_nt, |b| {
-      b.add_prod("a_term_prod", |b| {
+      b.add_prod("a_term_prod", (), |b| {
         b.add_term(&a_t);
       });
     })
     .add_rule(&b_nt, |b| {
-      b.add_prod("b_term_prod", |b| {
+      b.add_prod("b_term_prod", (), |b| {
         b.add_term(&b_t);
       });
     });
@@ -39,22 +39,22 @@ pub fn make_simple_nullable() -> Grammar<BaseElementTypes> {
 
   build(&start, |b| {
     b.add_rule(&start, |b| {
-      b.add_prod("start", |b| {
+      b.add_prod("start", (), |b| {
         b.add_named_nonterm("value", &c_nt);
       });
     })
     .add_rule(&a_nt, |b| {
-      b.add_prod("a_value", |_| {
+      b.add_prod("a_value", (), |_| {
         // Empty list.
       });
     })
     .add_rule(&b_nt, |b| {
-      b.add_prod("b_value", |_| {
+      b.add_prod("b_value", (), |_| {
         // Empty list.
       });
     })
     .add_rule(&c_nt, |b| {
-      b.add_prod("c_value", |b| {
+      b.add_prod("c_value", (), |b| {
         b.add_named_nonterm("left", &a_nt)
           .add_named_nonterm("right", &b_nt);
       });
@@ -72,22 +72,22 @@ pub fn make_paren() -> Grammar<BaseElementTypes> {
 
   build(&start, |b| {
     b.add_rule(&start, |b| {
-      b.add_prod("start", |b| {
+      b.add_prod("start", (), |b| {
         b.add_named_nonterm("expr", &expr);
       });
     })
     .add_rule(&expr, |b| {
-      b.add_prod("paren_expr", |b| {
+      b.add_prod("paren_expr", (), |b| {
         b.add_term(&lparen)
           .add_named_nonterm("contents", &expr_list)
           .add_term(&rparen);
       });
     })
     .add_rule(&expr_list, |b| {
-      b.add_prod("empty", |_| {
+      b.add_prod("empty", (), |_| {
         // Empty list.
       })
-      .add_prod("elem", |b| {
+      .add_prod("elem", (), |b| {
         b.add_named_nonterm("left", &expr)
           .add_named_nonterm("right", &expr_list);
       });
@@ -103,24 +103,24 @@ pub fn make_ambiguous_nullable() -> Grammar<BaseElementTypes> {
 
   build(&start, |b| {
     b.add_rule(&start, |b| {
-      b.add_prod("start", |b| {
+      b.add_prod("start", (), |b| {
         b.add_named_nonterm("value", &c_nt);
       });
     })
     .add_rule(&a_nt, |b| {
-      b.add_prod("a_value", |_| {
+      b.add_prod("a_value", (), |_| {
         // Empty list.
       });
     })
     .add_rule(&b_nt, |b| {
-      b.add_prod("b_value", |_| {
+      b.add_prod("b_value", (), |_| {
         // Empty list.
       });
     })
     .add_rule(&c_nt, |b| {
-      b.add_prod("c_left", |b| {
+      b.add_prod("c_left", (), |b| {
         b.add_named_nonterm("value", &a_nt);
-      }).add_prod("c_right", |b| {
+      }).add_prod("c_right", (), |b| {
         b.add_named_nonterm("value", &b_nt);
       });
     });

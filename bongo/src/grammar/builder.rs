@@ -32,21 +32,27 @@ impl BuilderInto<Name> for &'_ str {
 }
 
 pub struct ProductionBuilder<E: ElementTypes> {
-  action: E::Action,
+  action_key: E::ActionKey,
+  action_value: E::ActionValue,
   elems: Vec<ProductionElement<E>>,
 }
 
 impl<E: ElementTypes> ProductionBuilder<E> {
-  fn new(action: E::Action) -> Self {
+  fn new(action_key: E::ActionKey, action_value: E::ActionValue) -> Self {
     ProductionBuilder {
-      action,
+      action_key,
+      action_value,
       elems: Vec::new(),
     }
   }
 
   fn build(self) -> Production<E> {
-    let ProductionBuilder { action, elems } = self;
-    Production::new(action, elems)
+    let ProductionBuilder {
+      action_key,
+      action_value,
+      elems,
+    } = self;
+    Production::new(action_key, action_value, elems)
   }
 
   pub fn add_term(&mut self, term: impl BuilderInto<E::Term>) -> &mut Self {
@@ -115,10 +121,14 @@ impl<E: ElementTypes> RuleBuilder<E> {
 
   pub fn add_prod(
     &mut self,
-    action: impl BuilderInto<E::Action>,
+    action_key: impl BuilderInto<E::ActionKey>,
+    action_value: impl BuilderInto<E::ActionValue>,
     build_fn: impl FnOnce(&mut ProductionBuilder<E>),
   ) -> &mut Self {
-    let mut builder = ProductionBuilder::new(action.builder_into());
+    let mut builder = ProductionBuilder::new(
+      action_key.builder_into(),
+      action_value.builder_into(),
+    );
     build_fn(&mut builder);
     self.prods.push(builder.build());
     self
@@ -173,10 +183,10 @@ impl<E: ElementTypes> GrammarBuilder<E> {
 /// let g: Grammar<BaseElementTypes> =
 ///   bongo::grammar::builder::build(&nt_x, |gb| {
 ///     gb.add_rule(&nt_x, |rb| {
-///       rb.add_prod(Name::new("Recursive"), |pb| {
+///       rb.add_prod(Name::new("Recursive"), (), |pb| {
 ///         pb.add_term(&t_a).add_nonterm(&nt_x).add_term(&t_a);
 ///       })
-///       .add_prod(Name::new("Empty"), |_pb| {});
+///       .add_prod(Name::new("Empty"), (), |_pb| {});
 ///     });
 ///   }).unwrap();
 /// ```

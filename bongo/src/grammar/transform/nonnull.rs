@@ -62,15 +62,16 @@ pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct Action<E: ElementTypes> {
-  action: E::Action,
+  action: E::ActionKey,
   nt_nullable_states: Vec<bool>,
-  nullables: BTreeMap<Name, TreeNode<E::Action, Void>>,
+  nullables: BTreeMap<Name, TreeNode<E::ActionKey, Void>>,
 }
 
 impl<E: ElementTypes> ElementTypes for ElemTypes<E> {
   type Term = E::Term;
   type NonTerm = E::NonTerm;
-  type Action = Action<E>;
+  type ActionKey = Action<E>;
+  type ActionValue = ();
 }
 
 pub fn transform_to_nonnull<E: ElementTypes>(
@@ -98,7 +99,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
 struct ProdBuildState<E: ElementTypes> {
   elems: Vec<ProductionElement<ElemTypes<E>>>,
   nt_nullable_states: Vec<bool>,
-  action_args: BTreeMap<Name, TreeNode<E::Action, Void>>,
+  action_args: BTreeMap<Name, TreeNode<E::ActionKey, Void>>,
 }
 
 fn to_nonnull_prods<E: ElementTypes>(
@@ -158,12 +159,12 @@ fn to_nonnull_prods<E: ElementTypes>(
 
   for curr_build_state in curr_build_states {
     let new_action = Action {
-      action: prod.action().clone(),
+      action: prod.action_key().clone(),
       nt_nullable_states: curr_build_state.nt_nullable_states,
       nullables: curr_build_state.action_args,
     };
 
-    prods.push(Production::new(new_action, curr_build_state.elems));
+    prods.push(Production::new(new_action, (), curr_build_state.elems));
   }
 
   prods

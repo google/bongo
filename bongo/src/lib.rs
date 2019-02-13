@@ -57,10 +57,10 @@ mod tests {
 
     let g: Grammar<BaseElementTypes> = build(&nt_x, |gb| {
       gb.add_rule(&nt_x, |rb| {
-        rb.add_prod(Name::new("Recursive"), |pb| {
+        rb.add_prod(Name::new("Recursive"), (), |pb| {
           pb.add_term(&t_a).add_nonterm(&nt_x).add_term(&t_a);
         })
-        .add_prod(Name::new("Empty"), |_pb| {});
+        .add_prod(Name::new("Empty"), (), |_pb| {});
       });
     }).unwrap();
 

@@ -28,7 +28,7 @@ use codefmt::Layout;
 ///
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug)]
 struct ProductionState<E: ElementTypes> {
   /// The head nonterminal this production belongs to.
   head: E::NonTerm,

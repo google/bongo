@@ -18,7 +18,7 @@ impl<A: Ord> InternalNullableInfo<A> {
   }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Copy, Clone, Debug)]
 struct ProdWithHead<'a, E: ElementTypes> {
   head: &'a E::NonTerm,
   prod: &'a Production<E>,
@@ -42,7 +42,7 @@ fn grammar_to_prods_with_heads<E: ElementTypes>(
 /// that can parse the empty terminal sequence.
 fn inner_calculate_nullables<E: ElementTypes>(
   g: &Grammar<E>,
-) -> BTreeMap<E::NonTerm, InternalNullableInfo<E::Action>> {
+) -> BTreeMap<E::NonTerm, InternalNullableInfo<E::ActionKey>> {
   let prods_with_heads = grammar_to_prods_with_heads(g);
 
   let mut nullable_nts = BTreeMap::new();
@@ -57,7 +57,7 @@ fn inner_calculate_nullables<E: ElementTypes>(
           .or_insert_with(InternalNullableInfo::new);
         if nullable_info
           .nullable_actions
-          .insert(prod_with_head.prod.action().clone())
+          .insert(prod_with_head.prod.action_key().clone())
         {
           changed = true;
         }
@@ -102,11 +102,11 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
 
 #[derive(Clone, Debug)]
 pub struct NonTermNullableInfo<E: ElementTypes> {
-  nullable_action: TreeNode<E::Action, Void>,
+  nullable_action: TreeNode<E::ActionKey, Void>,
 }
 
 impl<E: ElementTypes> NonTermNullableInfo<E> {
-  pub fn nullable_action(&self) -> &TreeNode<E::Action, Void> {
+  pub fn nullable_action(&self) -> &TreeNode<E::ActionKey, Void> {
     &self.nullable_action
   }
 }

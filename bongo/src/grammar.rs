@@ -55,13 +55,15 @@ pub trait ElementTypes:
     + 'static;
 
   // The type used to identify each production.
-  type Action: Clone
+  type ActionKey: Clone
     + PartialEq
     + Eq
     + PartialOrd
     + Ord
     + std::fmt::Debug
     + 'static;
+
+  type ActionValue: Clone + std::fmt::Debug + 'static;
 }
 
 /// A terminal element.
@@ -108,7 +110,8 @@ pub struct BaseElementTypes;
 impl ElementTypes for BaseElementTypes {
   type Term = Terminal;
   type NonTerm = NonTerminal;
-  type Action = Name;
+  type ActionKey = Name;
+  type ActionValue = ();
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
@@ -152,7 +155,7 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
   }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Debug)]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
@@ -221,20 +224,23 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Production<E: ElementTypes> {
-  action_name: E::Action,
+  action_key: E::ActionKey,
+  action_value: E::ActionValue,
   elements: Vec<ProductionElement<E>>,
 }
 
 impl<E: ElementTypes> Production<E> {
   pub fn new(
-    action: E::Action,
+    action_key: E::ActionKey,
+    action_value: E::ActionValue,
     elements: Vec<ProductionElement<E>>,
   ) -> Production<E> {
     Production {
-      action_name: action,
-      elements: elements,
+      action_key,
+      action_value,
+      elements,
     }
   }
 
@@ -250,8 +256,8 @@ impl<E: ElementTypes> Production<E> {
     self.elements.get(index).map(|prod_elem| &prod_elem.element)
   }
 
-  pub fn action(&self) -> &E::Action {
-    &self.action_name
+  pub fn action_key(&self) -> &E::ActionKey {
+    &self.action_key
   }
 }
 
@@ -262,12 +268,12 @@ impl<E: ElementTypes> LayoutDisplay for Production<E> {
     Layout::juxtapose(&[
       elements,
       Layout::text(" => "),
-      Layout::text(format!("{:?}", self.action_name)),
+      Layout::text(format!("{:?}", self.action_key)),
     ])
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct ProdAndHead<'a, E: ElementTypes> {
   head: &'a E::NonTerm,
   prod: &'a Production<E>,
@@ -282,7 +288,7 @@ impl<'a, E: ElementTypes> ProdAndHead<'a, E> {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Debug)]
 pub struct Rule<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<Production<E>>,
@@ -310,7 +316,7 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
   }
 }
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Clone, Debug)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
   rule_set: BTreeMap<E::NonTerm, Rule<E>>,
@@ -344,14 +350,14 @@ impl<E: ElementTypes> Grammar<E> {
     self.rule_set.get(nt)
   }
 
-  pub fn get_action_map(&self) -> BTreeMap<&E::Action, ProdAndHead<E>> {
+  pub fn get_action_map(&self) -> BTreeMap<&E::ActionKey, ProdAndHead<E>> {
     use std::collections::btree_map::Entry;
     let mut map = BTreeMap::new();
     for (nt_head, rule) in &self.rule_set {
       for prod in &rule.prods {
-        match map.entry(prod.action()) {
+        match map.entry(prod.action_key()) {
           Entry::Occupied(_) => {
-            panic!("Can be only one example of each parameter. Duplicated param: {:?}", prod.action());
+            panic!("Can be only one example of each parameter. Duplicated param: {:?}", prod.action_key());
           }
           Entry::Vacant(vac) => {
             vac.insert(ProdAndHead {
