@@ -1,5 +1,6 @@
 use super::{
-  Element, ElementTypes, Grammar, Name, Production, ProductionElement, Rule,
+  Element, ElementTypes, Grammar, GrammarErrors, Name, Production,
+  ProductionElement, Rule,
 };
 
 /// A helper trait to allow builder methods to either take a type `T`, or a
@@ -139,7 +140,7 @@ impl<E: ElementTypes> GrammarBuilder<E> {
     }
   }
 
-  fn build(self) -> Grammar<E> {
+  fn build(self) -> Result<Grammar<E>, GrammarErrors<E>> {
     let GrammarBuilder { start, rules } = self;
     Grammar::new(start, rules)
   }
@@ -177,7 +178,7 @@ impl<E: ElementTypes> GrammarBuilder<E> {
 ///       })
 ///       .add_prod(Name::new("Empty"), |_pb| {});
 ///     });
-///   });
+///   }).unwrap();
 /// ```
 ///
 /// Note that arguments that take `E::Term`, `E::NonTerm`, or `E::Action` can
@@ -185,7 +186,7 @@ impl<E: ElementTypes> GrammarBuilder<E> {
 pub fn build<E>(
   start: impl BuilderInto<E::NonTerm>,
   build_fn: impl FnOnce(&mut GrammarBuilder<E>),
-) -> Grammar<E>
+) -> Result<Grammar<E>, GrammarErrors<E>>
 where
   E: ElementTypes,
 {

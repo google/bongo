@@ -91,7 +91,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
     new_rules.push(Rule::new(nt.clone(), nonnullable_prods));
   }
 
-  Ok(Grammar::new(g.start_nt().clone(), new_rules))
+  Ok(Grammar::new(g.start_nt().clone(), new_rules).unwrap())
 }
 
 #[derive(Clone, Debug)]

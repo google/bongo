@@ -320,14 +320,16 @@ impl<E: ElementTypes> Grammar<E> {
   pub fn new(
     start: E::NonTerm,
     rule_set: impl IntoIterator<Item = Rule<E>>,
-  ) -> Self {
-    Grammar {
+  ) -> Result<Self, GrammarErrors<E>> {
+    let g = Grammar {
       start_symbol: start,
       rule_set: rule_set
         .into_iter()
         .map(|r| (r.head().clone(), r))
         .collect(),
-    }
+    };
+
+    g.check_grammar().map(|_| g)
   }
 
   pub fn start_nt(&self) -> &E::NonTerm {
@@ -419,13 +421,14 @@ impl<E: ElementTypes> Grammar<E> {
   }
 }
 
-pub struct GrammarErrors<'a, E: ElementTypes> {
-  unreachable_nonterms: BTreeSet<&'a E::NonTerm>,
-  nonterms_without_rules: BTreeSet<&'a E::NonTerm>,
-  rules_without_prods: BTreeSet<&'a E::NonTerm>,
+#[derive(Clone, Debug)]
+pub struct GrammarErrors<E: ElementTypes> {
+  unreachable_nonterms: BTreeSet<E::NonTerm>,
+  nonterms_without_rules: BTreeSet<E::NonTerm>,
+  rules_without_prods: BTreeSet<E::NonTerm>,
 }
 
-impl<E: ElementTypes> GrammarErrors<'_, E> {
+impl<E: ElementTypes> GrammarErrors<E> {
   fn into_result(self) -> Result<(), Self> {
     if self.unreachable_nonterms.is_empty()
       && self.nonterms_without_rules.is_empty()
@@ -441,10 +444,23 @@ impl<E: ElementTypes> GrammarErrors<'_, E> {
 impl<E: ElementTypes> Grammar<E> {
   fn check_grammar(&self) -> Result<(), GrammarErrors<E>> {
     GrammarErrors {
-      unreachable_nonterms: self.unreachable_nonterms(),
-      nonterms_without_rules: self.nonterminals_without_rules(),
-      rules_without_prods: self.rules_without_prods(),
-    }.into_result()
+      unreachable_nonterms: self
+        .unreachable_nonterms()
+        .into_iter()
+        .cloned()
+        .collect(),
+      nonterms_without_rules: self
+        .nonterminals_without_rules()
+        .into_iter()
+        .cloned()
+        .collect(),
+      rules_without_prods: self
+        .rules_without_prods()
+        .into_iter()
+        .cloned()
+        .collect(),
+    }
+    .into_result()
   }
 }
 

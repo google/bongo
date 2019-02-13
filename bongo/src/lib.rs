@@ -62,7 +62,7 @@ mod tests {
         })
         .add_prod(Name::new("Empty"), |_pb| {});
       });
-    });
+    }).unwrap();
 
     println!("{}", g.disp().layout(80));
 

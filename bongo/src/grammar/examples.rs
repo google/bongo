@@ -28,7 +28,7 @@ pub fn make_simple() -> Grammar<BaseElementTypes> {
         b.add_term(&b_t);
       });
     });
-  })
+  }).unwrap()
 }
 
 pub fn make_simple_nullable() -> Grammar<BaseElementTypes> {
@@ -59,7 +59,7 @@ pub fn make_simple_nullable() -> Grammar<BaseElementTypes> {
           .add_named_nonterm("right", &b_nt);
       });
     });
-  })
+  }).unwrap()
 }
 
 pub fn make_paren() -> Grammar<BaseElementTypes> {
@@ -92,7 +92,7 @@ pub fn make_paren() -> Grammar<BaseElementTypes> {
           .add_named_nonterm("right", &expr_list);
       });
     });
-  })
+  }).unwrap()
 }
 
 pub fn make_ambiguous_nullable() -> Grammar<BaseElementTypes> {
@@ -124,5 +124,5 @@ pub fn make_ambiguous_nullable() -> Grammar<BaseElementTypes> {
         b.add_named_nonterm("value", &b_nt);
       });
     });
-  })
+  }).unwrap()
 }
