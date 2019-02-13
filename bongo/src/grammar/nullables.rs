@@ -1,39 +1,21 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::grammar::{Element, ElementTypes, Grammar, Production};
+use crate::grammar::{Element, ElementTypes, Grammar, Production, ProdKey};
 use crate::utils::{TreeNode, TreeValue, Void};
 
 use failure::Error;
 
 #[derive(Clone)]
-struct InternalNullableInfo<A> {
-  nullable_actions: BTreeSet<A>,
+struct InternalNullableInfo<E: ElementTypes> {
+  nullable_actions: BTreeSet<ProdKey<E>>,
 }
 
-impl<A: Ord> InternalNullableInfo<A> {
+impl<E: ElementTypes> InternalNullableInfo<E> {
   pub fn new() -> Self {
     InternalNullableInfo {
       nullable_actions: BTreeSet::new(),
     }
   }
-}
-
-#[derive(Copy, Clone, Debug)]
-struct ProdWithHead<'a, E: ElementTypes> {
-  head: &'a E::NonTerm,
-  prod: &'a Production<E>,
-}
-
-fn grammar_to_prods_with_heads<E: ElementTypes>(
-  g: &Grammar<E>,
-) -> Vec<ProdWithHead<E>> {
-  let mut result = Vec::new();
-  for (head, rule) in g.rule_set() {
-    for prod in rule.prods() {
-      result.push(ProdWithHead { head, prod });
-    }
-  }
-  result
 }
 
 /// Calculate the nullable set of a grammar
@@ -42,8 +24,8 @@ fn grammar_to_prods_with_heads<E: ElementTypes>(
 /// that can parse the empty terminal sequence.
 fn inner_calculate_nullables<E: ElementTypes>(
   g: &Grammar<E>,
-) -> BTreeMap<E::NonTerm, InternalNullableInfo<E::ActionKey>> {
-  let prods_with_heads = grammar_to_prods_with_heads(g);
+) -> BTreeMap<E::NonTerm, InternalNullableInfo<E>> {
+  let prods_with_heads = g.prod_and_heads().collect::<Vec<_>>();
 
   let mut nullable_nts = BTreeMap::new();
 
@@ -57,7 +39,7 @@ fn inner_calculate_nullables<E: ElementTypes>(
           .or_insert_with(InternalNullableInfo::new);
         if nullable_info
           .nullable_actions
-          .insert(prod_with_head.prod.action_key().clone())
+          .insert(prod_with_head.key())
         {
           changed = true;
         }
@@ -102,11 +84,11 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
 
 #[derive(Clone, Debug)]
 pub struct NonTermNullableInfo<E: ElementTypes> {
-  nullable_action: TreeNode<E::ActionKey, Void>,
+  nullable_action: TreeNode<ProdKey<E>, Void>,
 }
 
 impl<E: ElementTypes> NonTermNullableInfo<E> {
-  pub fn nullable_action(&self) -> &TreeNode<E::ActionKey, Void> {
+  pub fn nullable_action(&self) -> &TreeNode<ProdKey<E>, Void> {
     &self.nullable_action
   }
 }
@@ -223,8 +205,8 @@ fn get_only<I: IntoIterator>(op: I) -> I::Item {
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::grammar::NonTerminal;
   use crate::grammar::examples;
+  use crate::grammar::NonTerminal;
 
   #[test]
   fn test_simple_grammar() {
@@ -248,9 +230,15 @@ mod test {
   fn test_paren_grammar() {
     let g = examples::make_paren();
     let nullables = calculate_nullables(&g).unwrap();
-    assert!(nullables.get_nullable_info(&NonTerminal::new("expr_list")).is_some());
-    assert!(nullables.get_nullable_info(&NonTerminal::new("expr")).is_none());
-    assert!(nullables.get_nullable_info(&NonTerminal::new("start")).is_none());
+    assert!(nullables
+      .get_nullable_info(&NonTerminal::new("expr_list"))
+      .is_some());
+    assert!(nullables
+      .get_nullable_info(&NonTerminal::new("expr"))
+      .is_none());
+    assert!(nullables
+      .get_nullable_info(&NonTerminal::new("start"))
+      .is_none());
   }
 
   #[test]

@@ -277,6 +277,12 @@ impl<E: ElementTypes> LayoutDisplay for Production<E> {
   }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ProdKey<E: ElementTypes> {
+  head: E::NonTerm,
+  action_key: E::ActionKey,
+}
+
 #[derive(Clone, Debug)]
 pub struct ProdAndHead<'a, E: ElementTypes> {
   head: &'a E::NonTerm,
@@ -289,6 +295,12 @@ impl<'a, E: ElementTypes> ProdAndHead<'a, E> {
   }
   fn prod(&self) -> &'a Production<E> {
     self.prod
+  }
+  fn key(&self) -> ProdKey<E> {
+    ProdKey {
+      head: self.head.clone(),
+      action_key: self.prod.action_key().clone(),
+    }
   }
 }
 
@@ -354,12 +366,15 @@ impl<E: ElementTypes> Grammar<E> {
     self.rule_set.get(nt)
   }
 
-  pub fn get_action_map(&self) -> BTreeMap<&E::ActionKey, ProdAndHead<E>> {
+  pub fn get_action_map(&self) -> BTreeMap<ProdKey<E>, ProdAndHead<E>> {
     use std::collections::btree_map::Entry;
-    let mut map = BTreeMap::new();
+    let mut map: BTreeMap<ProdKey<E>, ProdAndHead<E>> = BTreeMap::new();
     for (nt_head, rule) in &self.rule_set {
       for prod in &rule.prods {
-        match map.entry(prod.action_key()) {
+        match map.entry(ProdKey {
+          head: nt_head.clone(),
+          action_key: prod.action_key().clone(),
+        }) {
           Entry::Occupied(_) => {
             panic!("Can be only one example of each parameter. Duplicated param: {:?}", prod.action_key());
           }
@@ -374,6 +389,18 @@ impl<E: ElementTypes> Grammar<E> {
     }
 
     map
+  }
+
+  pub fn prod_and_heads(&self) -> impl Iterator<Item = ProdAndHead<E>> {
+    self
+      .rule_set
+      .iter()
+      .flat_map(|(head, rule)| {
+        rule
+          .prods()
+          .iter()
+          .map(move |prod| ProdAndHead { head, prod })
+      })
   }
 
   fn get_elements(&self) -> impl Iterator<Item = &Element<E>> {
