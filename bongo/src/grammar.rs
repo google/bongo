@@ -18,9 +18,9 @@ pub mod nullables;
 pub mod transform;
 
 use crate::pdisplay::LayoutDisplay;
-use crate::utils::Name;
+use crate::utils::{breadth_first_search, Name};
 use codefmt::Layout;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A trait which carries the underlying types for a grammar.
 ///
@@ -118,11 +118,17 @@ pub enum Element<E: ElementTypes> {
 }
 
 impl<E: ElementTypes> Element<E> {
-  /// Gets an element as a nonterm. Panics if it is not a nonterm.
-  pub fn as_nonterm(&self) -> &E::NonTerm {
+  pub fn as_term(&self) -> Option<&E::Term> {
     match self {
-      Element::NonTerm(e) => e,
-      Element::Term(_) => panic!(),
+      Element::NonTerm(_) => None,
+      Element::Term(t) => Some(t),
+    }
+  }
+  /// Gets an element as a nonterm. Panics if it is not a nonterm.
+  pub fn as_nonterm(&self) -> Option<&E::NonTerm> {
+    match self {
+      Element::NonTerm(nt) => Some(nt),
+      Element::Term(_) => None,
     }
   }
 
@@ -356,6 +362,89 @@ impl<E: ElementTypes> Grammar<E> {
     }
 
     map
+  }
+
+  fn get_elements(&self) -> impl Iterator<Item = &Element<E>> {
+    self
+      .rule_set
+      .values()
+      .flat_map(|r| &r.prods)
+      .flat_map(|p| p.elements_iter())
+  }
+
+  fn get_terminals(&self) -> impl Iterator<Item = &E::Term> {
+    self.get_elements().filter_map(|e| e.as_term())
+  }
+
+  fn get_nonterminals(&self) -> impl Iterator<Item = &E::NonTerm> {
+    self.get_elements().filter_map(|e| e.as_nonterm())
+  }
+
+  fn nonterminals_without_rules(&self) -> BTreeSet<&E::NonTerm> {
+    self
+      .get_nonterminals()
+      .filter(move |nt| !self.rule_set.contains_key(nt))
+      .collect()
+  }
+
+  fn rules_without_prods(&self) -> BTreeSet<&E::NonTerm> {
+    self
+      .rule_set()
+      .values()
+      .filter(|r| r.prods.is_empty())
+      .map(|r| &r.head)
+      .collect()
+  }
+
+  fn reachable_nonterms(&self) -> BTreeSet<&E::NonTerm> {
+    breadth_first_search(std::iter::once(&self.start_symbol), |nt| {
+      match self.get_rule(nt) {
+        Some(rule) => rule
+          .prods
+          .iter()
+          .flat_map(|p| p.elements_iter())
+          .filter_map(|e| e.as_nonterm())
+          .collect(),
+        None => BTreeSet::new(),
+      }
+    })
+  }
+
+  fn unreachable_nonterms(&self) -> BTreeSet<&E::NonTerm> {
+    let reachable_nonterms = self.reachable_nonterms();
+    self
+      .get_nonterminals()
+      .filter(|nt| !reachable_nonterms.contains(nt))
+      .collect()
+  }
+}
+
+pub struct GrammarErrors<'a, E: ElementTypes> {
+  unreachable_nonterms: BTreeSet<&'a E::NonTerm>,
+  nonterms_without_rules: BTreeSet<&'a E::NonTerm>,
+  rules_without_prods: BTreeSet<&'a E::NonTerm>,
+}
+
+impl<E: ElementTypes> GrammarErrors<'_, E> {
+  fn into_result(self) -> Result<(), Self> {
+    if self.unreachable_nonterms.is_empty()
+      && self.nonterms_without_rules.is_empty()
+      && self.rules_without_prods.is_empty()
+    {
+      Ok(())
+    } else {
+      Err(self)
+    }
+  }
+}
+
+impl<E: ElementTypes> Grammar<E> {
+  fn check_grammar(&self) -> Result<(), GrammarErrors<E>> {
+    GrammarErrors {
+      unreachable_nonterms: self.unreachable_nonterms(),
+      nonterms_without_rules: self.nonterminals_without_rules(),
+      rules_without_prods: self.rules_without_prods(),
+    }.into_result()
   }
 }
 

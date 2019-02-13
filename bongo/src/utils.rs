@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use codefmt::Layout;
 
@@ -77,3 +77,31 @@ impl<L: Ord, V> TreeNode<L, V> {
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Void {}
+
+pub fn breadth_first_search<T, InitI, StepI, F>(initial: InitI, mut f: F) -> BTreeSet<T>
+where
+  T: Ord + Clone,
+  InitI: IntoIterator<Item = T>,
+  StepI: IntoIterator<Item = T>,
+  F: FnMut(&T) -> StepI,
+{
+  let mut next_set = BTreeSet::new();
+  let mut curr_set: BTreeSet<_> = initial.into_iter().collect();
+  let mut seen_set = next_set.clone();
+
+  while !curr_set.is_empty() {
+    for next_item in &curr_set {
+      for step_item in f(next_item) {
+        if !seen_set.contains(&step_item) {
+          next_set.insert(step_item.clone());
+          seen_set.insert(step_item);
+        }
+      }
+    }
+
+    std::mem::swap(&mut curr_set, &mut next_set);
+    next_set.clear();
+  }
+
+  seen_set
+}
