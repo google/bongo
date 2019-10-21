@@ -21,6 +21,7 @@ pub mod grammar;
 mod pdisplay;
 mod state;
 pub mod utils;
+pub mod parsers;
 
 use crate::grammar::nullables::GrammarNullableInfo;
 use crate::grammar::{ElementTypes, Grammar};

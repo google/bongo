@@ -2,6 +2,7 @@ use super::{
   Element, ElementTypes, Grammar, GrammarErrors, Name, Production,
   ProductionElement, Rule,
 };
+use std::collections::BTreeMap;
 
 /// A helper trait to allow builder methods to either take a type `T`, or a
 /// reference to `T` if it is clonable.
@@ -33,26 +34,20 @@ impl BuilderInto<Name> for &'_ str {
 
 pub struct ProductionBuilder<E: ElementTypes> {
   action_key: E::ActionKey,
-  action_value: E::ActionValue,
   elems: Vec<ProductionElement<E>>,
 }
 
 impl<E: ElementTypes> ProductionBuilder<E> {
-  fn new(action_key: E::ActionKey, action_value: E::ActionValue) -> Self {
+  fn new(action_key: E::ActionKey) -> Self {
     ProductionBuilder {
       action_key,
-      action_value,
       elems: Vec::new(),
     }
   }
 
   fn build(self) -> Production<E> {
-    let ProductionBuilder {
-      action_key,
-      action_value,
-      elems,
-    } = self;
-    Production::new(action_key, action_value, elems)
+    let ProductionBuilder { action_key, elems } = self;
+    Production::new(action_key, elems)
   }
 
   pub fn add_term(&mut self, term: impl BuilderInto<E::Term>) -> &mut Self {
@@ -101,21 +96,26 @@ impl<E: ElementTypes> ProductionBuilder<E> {
 
 // ----------------
 
-pub struct RuleBuilder<E: ElementTypes> {
+pub struct RuleBuilder<'a, E: ElementTypes> {
+  action_map: &'a mut BTreeMap<E::ActionKey, E::ActionValue>,
   head: E::NonTerm,
   prods: Vec<Production<E>>,
 }
 
-impl<E: ElementTypes> RuleBuilder<E> {
-  fn new(head: E::NonTerm) -> Self {
+impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
+  fn new(
+    action_map: &'a mut BTreeMap<E::ActionKey, E::ActionValue>,
+    head: E::NonTerm,
+  ) -> Self {
     RuleBuilder {
+      action_map,
       head,
       prods: Vec::new(),
     }
   }
 
   fn build(self) -> Rule<E> {
-    let RuleBuilder { head, prods } = self;
+    let RuleBuilder { head, prods, .. } = self;
     Rule::new(head, prods)
   }
 
@@ -125,10 +125,11 @@ impl<E: ElementTypes> RuleBuilder<E> {
     action_value: impl BuilderInto<E::ActionValue>,
     build_fn: impl FnOnce(&mut ProductionBuilder<E>),
   ) -> &mut Self {
-    let mut builder = ProductionBuilder::new(
-      action_key.builder_into(),
-      action_value.builder_into(),
-    );
+    let action_key = action_key.builder_into();
+    self
+      .action_map
+      .insert(action_key.clone(), action_value.builder_into());
+    let mut builder = ProductionBuilder::new(action_key);
     build_fn(&mut builder);
     self.prods.push(builder.build());
     self
@@ -140,6 +141,7 @@ impl<E: ElementTypes> RuleBuilder<E> {
 pub struct GrammarBuilder<E: ElementTypes> {
   start: E::NonTerm,
   rules: Vec<Rule<E>>,
+  action_map: BTreeMap<E::ActionKey, E::ActionValue>,
 }
 
 impl<E: ElementTypes> GrammarBuilder<E> {
@@ -147,12 +149,17 @@ impl<E: ElementTypes> GrammarBuilder<E> {
     GrammarBuilder {
       start,
       rules: Vec::new(),
+      action_map: BTreeMap::new(),
     }
   }
 
   fn build(self) -> Result<Grammar<E>, GrammarErrors<E>> {
-    let GrammarBuilder { start, rules } = self;
-    Grammar::new(start, rules)
+    let GrammarBuilder {
+      start,
+      rules,
+      action_map,
+    } = self;
+    Grammar::new(start, rules, action_map)
   }
 
   pub fn add_rule<F>(
@@ -163,7 +170,8 @@ impl<E: ElementTypes> GrammarBuilder<E> {
   where
     F: FnOnce(&mut RuleBuilder<E>),
   {
-    let mut rule_builder = RuleBuilder::new(head.builder_into());
+    let mut rule_builder =
+      RuleBuilder::new(&mut self.action_map, head.builder_into());
     build_fn(&mut rule_builder);
     self.rules.push(rule_builder.build());
     self

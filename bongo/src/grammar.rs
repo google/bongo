@@ -34,7 +34,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub trait ElementTypes:
   Copy + Clone + Eq + PartialEq + PartialOrd + Ord + std::fmt::Debug + 'static
 {
-  // The type used to identify each possible terminal.
+  /// The type used to identify each possible terminal.
+  ///
+  /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
   type Term: Clone
     + PartialEq
     + Eq
@@ -155,7 +157,7 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
@@ -224,22 +226,19 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Production<E: ElementTypes> {
   action_key: E::ActionKey,
-  action_value: E::ActionValue,
   elements: Vec<ProductionElement<E>>,
 }
 
 impl<E: ElementTypes> Production<E> {
   pub fn new(
     action_key: E::ActionKey,
-    action_value: E::ActionValue,
     elements: Vec<ProductionElement<E>>,
   ) -> Production<E> {
     Production {
       action_key,
-      action_value,
       elements,
     }
   }
@@ -258,10 +257,6 @@ impl<E: ElementTypes> Production<E> {
 
   pub fn action_key(&self) -> &E::ActionKey {
     &self.action_key
-  }
-
-  pub fn action_value(&self) -> &E::ActionValue {
-    &self.action_value
   }
 }
 
@@ -332,16 +327,26 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
   rule_set: BTreeMap<E::NonTerm, Rule<E>>,
+  action_map: BTreeMap<E::ActionKey, E::ActionValue>,
+}
+
+impl<E: ElementTypes> std::fmt::Debug for Grammar<E> {
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let mut dbg_struct = f.debug_struct("Grammar");
+    dbg_struct.field("Terms", &self.get_terminals().collect::<Vec<_>>());
+    unimplemented!()
+  }
 }
 
 impl<E: ElementTypes> Grammar<E> {
   pub fn new(
     start: E::NonTerm,
     rule_set: impl IntoIterator<Item = Rule<E>>,
+    action_map: BTreeMap<E::ActionKey, E::ActionValue>,
   ) -> Result<Self, GrammarErrors<E>> {
     let g = Grammar {
       start_symbol: start,
@@ -349,6 +354,7 @@ impl<E: ElementTypes> Grammar<E> {
         .into_iter()
         .map(|r| (r.head().clone(), r))
         .collect(),
+      action_map,
     };
 
     g.check_grammar().map(|_| g)
@@ -392,15 +398,12 @@ impl<E: ElementTypes> Grammar<E> {
   }
 
   pub fn prod_and_heads(&self) -> impl Iterator<Item = ProdAndHead<E>> {
-    self
-      .rule_set
-      .iter()
-      .flat_map(|(head, rule)| {
-        rule
-          .prods()
-          .iter()
-          .map(move |prod| ProdAndHead { head, prod })
-      })
+    self.rule_set.iter().flat_map(|(head, rule)| {
+      rule
+        .prods()
+        .iter()
+        .map(move |prod| ProdAndHead { head, prod })
+    })
   }
 
   fn get_elements(&self) -> impl Iterator<Item = &Element<E>> {

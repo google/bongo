@@ -193,7 +193,6 @@ impl Buffer {
   ) -> (&str, usize, usize) {
     assert!(byte_offset <= self.0.text.len());
 
-    use std::cmp::Ordering;
     let search_result = self.0.line_ranges.binary_search_by(|&(start, end)| {
       if byte_offset < start {
         Ordering::Greater

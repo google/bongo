@@ -52,7 +52,7 @@ use failure::Error;
 
 use crate::grammar::{
   nullables::{calculate_nullables, GrammarNullableInfo},
-  Element, ElementTypes, Grammar, Production, ProductionElement, Rule, ProdKey,
+  Element, ElementTypes, Grammar, ProdKey, Production, ProductionElement, Rule,
 };
 
 use crate::utils::{Name, TreeNode, Void};
@@ -85,19 +85,22 @@ pub fn transform_to_nonnull<E: ElementTypes>(
   let nullables = calculate_nullables(g)?;
 
   let mut new_rules = Vec::new();
+  let mut new_action_map = BTreeMap::new();
 
   for (nt, rule) in g.rule_set() {
     let nonnullable_prods = rule
       .prods()
       .iter()
       .filter(|prod| !nullables.is_prod_nullable(&prod))
-      .flat_map(|prod| to_nonnull_prods(&nullables, prod))
+      .flat_map(|prod| {
+        to_nonnull_prods(&nullables, prod, &g.action_map, &mut new_action_map)
+      })
       .collect();
 
     new_rules.push(Rule::new(nt.clone(), nonnullable_prods));
   }
 
-  Ok(Grammar::new(g.start_nt().clone(), new_rules).unwrap())
+  Ok(Grammar::new(g.start_nt().clone(), new_rules, new_action_map).unwrap())
 }
 
 #[derive(Clone, Debug)]
@@ -110,6 +113,8 @@ struct ProdBuildState<E: ElementTypes> {
 fn to_nonnull_prods<E: ElementTypes>(
   nullable_info: &GrammarNullableInfo<E>,
   prod: &Production<E>,
+  prev_action_map: &BTreeMap<E::ActionKey, E::ActionValue>,
+  action_map: &mut BTreeMap<ActionKey<E>, ActionValue<E>>,
 ) -> Vec<Production<ElemTypes<E>>> {
   let mut curr_build_states = vec![ProdBuildState {
     elems: Vec::new(),
@@ -163,21 +168,21 @@ fn to_nonnull_prods<E: ElementTypes>(
   let mut prods = Vec::new();
 
   for curr_build_state in curr_build_states {
+    let prev_action_value = prev_action_map.get(prod.action_key()).unwrap();
+
     let new_action_key = ActionKey {
       action: prod.action_key().clone(),
       nt_nullable_states: curr_build_state.nt_nullable_states,
     };
 
     let new_action_value = ActionValue {
-      parent_value: prod.action_value().clone(),
+      parent_value: prev_action_value.clone(),
       nullable_arguments: curr_build_state.action_args,
     };
 
-    prods.push(Production::new(
-      new_action_key,
-      new_action_value,
-      curr_build_state.elems,
-    ));
+    action_map.insert(new_action_key.clone(), new_action_value);
+
+    prods.push(Production::new(new_action_key, curr_build_state.elems));
   }
 
   prods
