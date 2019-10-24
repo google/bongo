@@ -5,9 +5,9 @@
 
 use {
   crate::{
-    ElementTypes,
-    parsers::{self, TokenStream, ParseTree},
+    parsers::ParseTree,
     state::ProductionState,
+    ElementTypes,
   },
   std::collections::BTreeMap,
 };
@@ -22,6 +22,8 @@ struct EarleyState<E: ElementTypes, Leaf> {
 
 impl<E: ElementTypes, Leaf> EarleyState<E, Leaf> {
   fn new() -> Self {
-    EarleyState { state : BTreeMap::new() }
+    EarleyState {
+      state: BTreeMap::new(),
+    }
   }
 }
