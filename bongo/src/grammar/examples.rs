@@ -1,4 +1,4 @@
-use crate::grammar::builder::build;
+use crate::grammar::build;
 use crate::grammar::{BaseElementTypes, Grammar, NonTerminal, Terminal};
 
 pub fn make_simple() -> Grammar<BaseElementTypes> {

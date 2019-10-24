@@ -1,11 +1,12 @@
 [package]
-name = "bongo"
-version = "0.1.0"
 authors = ["Brian Chin <brian.chin@gmail.com>"]
 edition = "2018"
-
+name = "bongo"
+version = "0.1.0"
 [dependencies]
-codefmt = { path = "../codefmt" }
 failure = "^0.1.5"
 failure_derive = "^0.1.5"
 unicode-segmentation = "^1.2.1"
+
+[dependencies.codefmt]
+path = "../codefmt"

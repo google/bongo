@@ -134,6 +134,23 @@ impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
     self.prods.push(builder.build());
     self
   }
+
+  pub fn add_prod_with_elems(
+    &mut self,
+    action_key: impl BuilderInto<E::ActionKey>,
+    action_value: impl BuilderInto<E::ActionValue>,
+    elems: impl BuilderInto<Vec<ProductionElement<E>>>,
+  ) -> &mut Self {
+    let action_key = action_key.builder_into();
+    self
+      .action_map
+      .insert(action_key.clone(), action_value.builder_into());
+    self.prods.push(Production {
+      action_key,
+      elements: elems.builder_into(),
+    });
+    self
+  }
 }
 
 // ----------------
@@ -189,7 +206,7 @@ impl<E: ElementTypes> GrammarBuilder<E> {
 /// let t_a = Terminal::new("A");
 /// let nt_x = NonTerminal::new("x");
 /// let g: Grammar<BaseElementTypes> =
-///   bongo::grammar::builder::build(&nt_x, |gb| {
+///   bongo::grammar::build(&nt_x, |gb| {
 ///     gb.add_rule(&nt_x, |rb| {
 ///       rb.add_prod(Name::new("Recursive"), (), |pb| {
 ///         pb.add_term(&t_a).add_nonterm(&nt_x).add_term(&t_a);

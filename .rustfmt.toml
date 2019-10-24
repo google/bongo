@@ -1,3 +1,4 @@
 tab_spaces = 2
 max_width = 80
 edition = "2018"
+merge_imports = true

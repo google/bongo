@@ -18,10 +18,10 @@
 extern crate failure_derive;
 
 pub mod grammar;
+pub mod parsers;
 mod pdisplay;
 mod state;
 pub mod utils;
-pub mod parsers;
 
 use crate::grammar::nullables::GrammarNullableInfo;
 use crate::grammar::{ElementTypes, Grammar};
@@ -34,7 +34,8 @@ pub struct NullableGrammar<E: ElementTypes> {
 
 impl<E: ElementTypes> NullableGrammar<E> {
   pub fn new(grammar: Grammar<E>) -> Self {
-    let nullables = crate::grammar::nullables::calculate_nullables(&grammar).unwrap();
+    let nullables =
+      crate::grammar::nullables::calculate_nullables(&grammar).unwrap();
     NullableGrammar { grammar, nullables }
   }
 
@@ -46,7 +47,7 @@ impl<E: ElementTypes> NullableGrammar<E> {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::grammar::builder::build;
+  use crate::grammar::build;
   use crate::grammar::{BaseElementTypes, NonTerminal, Terminal};
   use crate::pdisplay::LayoutDisplay;
   use crate::utils::Name;
@@ -63,7 +64,8 @@ mod tests {
         })
         .add_prod(Name::new("Empty"), (), |_pb| {});
       });
-    }).unwrap();
+    })
+    .unwrap();
 
     println!("{}", g.disp().layout(80));
 

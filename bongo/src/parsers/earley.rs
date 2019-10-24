@@ -5,23 +5,25 @@
 
 use {
   crate::{
-    ElementTypes,
-    parsers::{self, TokenStream, ParseTree},
+    parsers::ParseTree,
     state::ProductionState,
+    ElementTypes,
   },
   std::collections::BTreeMap,
 };
 
-struct ParserImpl<E: ElementTypes, Leaf> {
-  states: Vec<EarleyState<E, Leaf>>,
+struct ParserImpl<'a, E: ElementTypes, Leaf> {
+  states: Vec<EarleyState<'a, E, Leaf>>,
 }
 
-struct EarleyState<E: ElementTypes, Leaf> {
-  state: BTreeMap<ProductionState<E>, Vec<ParseTree<E, Leaf>>>,
+struct EarleyState<'a, E: ElementTypes, Leaf> {
+  state: BTreeMap<ProductionState<'a, E>, Vec<ParseTree<E, Leaf>>>,
 }
 
-impl<E: ElementTypes, Leaf> EarleyState<E, Leaf> {
+impl<E: ElementTypes, Leaf> EarleyState<'_, E, Leaf> {
   fn new() -> Self {
-    EarleyState { state : BTreeMap::new() }
+    EarleyState {
+      state: BTreeMap::new(),
+    }
   }
 }

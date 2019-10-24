@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::{Element, ElementTypes, Production};
+use crate::grammar::{Element, ElementTypes, ProdRef};
 use crate::pdisplay::{self, LayoutDisplay};
 use codefmt::Layout;
 
@@ -29,25 +29,21 @@ use codefmt::Layout;
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct ProductionState<E: ElementTypes> {
-  /// The head nonterminal this production belongs to.
-  head: E::NonTerm,
-
+pub struct ProductionState<'a, E: ElementTypes> {
   /// The production this state is part of.
-  prod: Production<E>,
+  prod: ProdRef<'a, E>,
 
   /// The index of this production state. Must be in the range [0,
   /// self.prod.prod_elements().len()].
   index: usize,
 }
 
-impl<E: ElementTypes> ProductionState<E> {
+impl<'a, E: ElementTypes> ProductionState<'a, E> {
   /// Create a ProductionState from a given NonTerminal and Production.
   ///
   /// This state's index will be at the start of the production.
-  pub fn from_start(head: E::NonTerm, prod: Production<E>) -> Self {
+  pub fn from_start(prod: ProdRef<'a, E>) -> Self {
     ProductionState {
-      head,
       prod,
       index: 0,
     }
@@ -85,7 +81,7 @@ impl<E: ElementTypes> ProductionState<E> {
   }
 }
 
-impl<E: ElementTypes> LayoutDisplay for ProductionState<E> {
+impl<'a, E: ElementTypes> LayoutDisplay for ProductionState<'a, E> {
   fn disp(&self) -> Layout {
     let mut layouts = Vec::new();
     let (first_slice, second_slice) =
@@ -99,7 +95,7 @@ impl<E: ElementTypes> LayoutDisplay for ProductionState<E> {
     }
     let body = pdisplay::join_layout(layouts, codefmt::Layout::text(" "));
     codefmt::Layout::juxtapose(vec![
-      self.head.disp(),
+      self.prod.head().disp(),
       codefmt::Layout::text(" => "),
       body,
     ])
