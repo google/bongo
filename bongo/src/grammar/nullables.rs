@@ -1,16 +1,17 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::grammar::{Element, ElementTypes, Grammar, Production, ProdKey};
+use crate::grammar::{Element, ElementTypes, Grammar, ProdRef, ProdKey};
 use crate::utils::{TreeNode, TreeValue, Void};
 
 use failure::Error;
 
 #[derive(Clone)]
-struct InternalNullableInfo<E: ElementTypes> {
-  nullable_actions: BTreeSet<ProdKey<E>>,
+struct InternalNullableInfo<'a, E: ElementTypes> {
+  /// The set of productions that are nullable
+  nullable_actions: BTreeSet<ProdRef<'a, E>>,
 }
 
-impl<E: ElementTypes> InternalNullableInfo<E> {
+impl<E: ElementTypes> InternalNullableInfo<'_, E> {
   pub fn new() -> Self {
     InternalNullableInfo {
       nullable_actions: BTreeSet::new(),
@@ -25,22 +26,20 @@ impl<E: ElementTypes> InternalNullableInfo<E> {
 fn inner_calculate_nullables<E: ElementTypes>(
   g: &Grammar<E>,
 ) -> BTreeMap<E::NonTerm, InternalNullableInfo<E>> {
-  let prods_with_heads = g.prod_and_heads().collect::<Vec<_>>();
+  let prods = g.prods().collect::<Vec<_>>();
 
-  let mut nullable_nts = BTreeMap::new();
+  let mut nullable_nts: BTreeMap<E::NonTerm, InternalNullableInfo<E>> =
+    BTreeMap::new();
 
   loop {
     let mut changed = false;
 
-    for prod_with_head in &prods_with_heads {
-      if is_prod_nullable(&nullable_nts, prod_with_head.prod) {
+    for prod in &prods {
+      if is_prod_nullable(&nullable_nts, prod) {
         let nullable_info = nullable_nts
-          .entry(prod_with_head.head.clone())
+          .entry(prod.head().clone())
           .or_insert_with(InternalNullableInfo::new);
-        if nullable_info
-          .nullable_actions
-          .insert(prod_with_head.key())
-        {
+        if nullable_info.nullable_actions.insert(*prod) {
           changed = true;
         }
       }
@@ -66,7 +65,7 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
     self.nonterm_info.contains_key(nt)
   }
 
-  pub fn is_prod_nullable(&self, prod: &Production<E>) -> bool {
+  pub fn is_prod_nullable(&self, prod: &ProdRef<E>) -> bool {
     is_prod_nullable(&self.nonterm_info, prod)
   }
 
@@ -121,20 +120,17 @@ pub fn calculate_nullables<E: ElementTypes>(
     nullable_action_map.insert(nt, get_only(&info.nullable_actions));
   }
 
-  let action_map = g.get_action_map();
-
   let mut remaining_nullables: BTreeSet<E::NonTerm> =
     inner_info.keys().cloned().collect();
   let mut nullable_infos: BTreeMap<E::NonTerm, NonTermNullableInfo<E>> =
     BTreeMap::new();
   loop {
     'outer: for null_nt in &remaining_nullables {
-      let action = nullable_action_map.get(&null_nt).unwrap();
-      let prod_and_head = action_map.get(action).unwrap();
+      let prod = nullable_action_map.get(&null_nt).unwrap();
 
       let mut nullable_tree_fields: BTreeMap<_, TreeValue<_, Void>> =
         BTreeMap::new();
-      for prod_elem in prod_and_head.prod.prod_elements() {
+      for prod_elem in prod.prod_elements() {
         if let (Some(id), Element::NonTerm(nt)) =
           (prod_elem.id(), prod_elem.elem())
         {
@@ -152,7 +148,7 @@ pub fn calculate_nullables<E: ElementTypes>(
         null_nt.clone(),
         NonTermNullableInfo {
           nullable_action: TreeNode::new(
-            (*action).clone(),
+            prod.prod_key(),
             nullable_tree_fields,
           ),
         },
@@ -175,7 +171,7 @@ pub fn calculate_nullables<E: ElementTypes>(
 
 fn is_prod_nullable<E: ElementTypes, V>(
   nullables: &BTreeMap<E::NonTerm, V>,
-  prod: &Production<E>,
+  prod: &ProdRef<E>,
 ) -> bool {
   for elem in prod.elements_iter() {
     match elem {

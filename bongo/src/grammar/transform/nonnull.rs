@@ -52,7 +52,8 @@ use failure::Error;
 
 use crate::grammar::{
   nullables::{calculate_nullables, GrammarNullableInfo},
-  Element, ElementTypes, Grammar, ProdKey, Production, ProductionElement, Rule,
+  Element, ElementTypes, Grammar, ProdKey, ProdRef, Production,
+  ProductionElement, Rule,
 };
 
 use crate::utils::{Name, TreeNode, Void};
@@ -112,7 +113,7 @@ struct ProdBuildState<E: ElementTypes> {
 
 fn to_nonnull_prods<E: ElementTypes>(
   nullable_info: &GrammarNullableInfo<E>,
-  prod: &Production<E>,
+  prod: &ProdRef<E>,
   prev_action_map: &BTreeMap<E::ActionKey, E::ActionValue>,
   action_map: &mut BTreeMap<ActionKey<E>, ActionValue<E>>,
 ) -> Vec<Production<ElemTypes<E>>> {

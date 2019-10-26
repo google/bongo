@@ -377,12 +377,34 @@ impl<E: ElementTypes> Grammar<E> {
     &self.start_symbol
   }
 
-  pub fn rule_set(&self) -> &BTreeMap<E::NonTerm, Rule<E>> {
-    &self.rule_set
+  pub fn rules<'a>(&'a self) -> impl Iterator<Item = RuleRef<'a, E>> + 'a {
+    self.rule_set.iter().map(move |(_, rule)| RuleRef {
+      grammar: ParentRef(self),
+      rule: RefCompare(rule),
+    })
   }
 
-  pub fn get_rule(&self, nt: &E::NonTerm) -> Option<&Rule<E>> {
-    self.rule_set.get(nt)
+  pub fn rule_set<'a>(&'a self) -> BTreeMap<&'a E::NonTerm, RuleRef<'a, E>> {
+    self
+      .rule_set
+      .iter()
+      .map(|(k, rule)| {
+        (
+          k,
+          RuleRef {
+            grammar: ParentRef(self),
+            rule: RefCompare(rule),
+          },
+        )
+      })
+      .collect()
+  }
+
+  pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<RuleRef<'a, E>> {
+    self.rule_set.get(nt).map(|rule| RuleRef {
+      grammar: ParentRef(self),
+      rule: RefCompare(rule),
+    })
   }
 
   pub fn get_action_map(&self) -> BTreeMap<ProdKey<E>, ProdAndHead<E>> {
@@ -408,6 +430,10 @@ impl<E: ElementTypes> Grammar<E> {
     }
 
     map
+  }
+
+  pub fn prods<'a>(&'a self) -> impl Iterator<Item = ProdRef<'a, E>> {
+    self.rules().flat_map(|rule| rule.prods())
   }
 
   pub fn prod_and_heads(&self) -> impl Iterator<Item = ProdAndHead<E>> {
@@ -442,20 +468,18 @@ impl<E: ElementTypes> Grammar<E> {
       .collect()
   }
 
-  fn rules_without_prods(&self) -> BTreeSet<&E::NonTerm> {
-    self
-      .rule_set()
-      .values()
-      .filter(|r| r.prods.is_empty())
-      .map(|r| &r.head)
-      .collect()
+  fn rules_without_prods<'a>(&'a self) -> BTreeSet<&'a E::NonTerm> {
+    let rules = self.rules();
+    let prodless_rules = rules.filter(|r| r.prods().is_empty());
+    let head_iter = prodless_rules.map(|r| r.head());
+    head_iter.collect()
   }
 
   fn reachable_nonterms(&self) -> BTreeSet<&E::NonTerm> {
     breadth_first_search(std::iter::once(&self.start_symbol), |nt| {
       match self.get_rule(nt) {
         Some(rule) => rule
-          .prods
+          .prods()
           .iter()
           .flat_map(|p| p.elements_iter())
           .filter_map(|e| e.as_nonterm())
@@ -538,6 +562,7 @@ impl<E: ElementTypes> LayoutDisplay for Grammar<E> {
 
 /// A simple deref wrapper that ensures that two references _must_ be the same during
 /// comparison. This ensures that we can't accidentally incorporate refs from different parents together.
+#[derive(Debug)]
 struct ParentRef<'a, T>(&'a T);
 
 impl<'a, T> ParentRef<'a, T> {
@@ -585,7 +610,7 @@ impl<T> Copy for ParentRef<'_, T> {}
 
 // ------------
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct NoCompare<T>(T);
 
 impl<T> cmp::PartialEq for NoCompare<T> {
@@ -617,6 +642,7 @@ impl<T> ops::Deref for NoCompare<T> {
 
 // ------------
 
+#[derive(Debug)]
 struct RefCompare<'a, T>(&'a T);
 
 impl<T> cmp::PartialEq for RefCompare<'_, T> {
@@ -659,22 +685,22 @@ impl<T> Copy for RefCompare<'_, T> {}
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RuleRef<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
-  head: &'a E::NonTerm,
-  prods: &'a Vec<Production<E>>,
+  rule: RefCompare<'a, Rule<E>>,
 }
 
 impl<'a, E: ElementTypes> RuleRef<'a, E> {
-  pub fn head(&self) -> &E::NonTerm {
-    self.head
+  pub fn head(&self) -> &'a E::NonTerm {
+    &self.rule.head
   }
 
   pub fn prods(&self) -> Vec<ProdRef<'a, E>> {
     self
+      .rule
       .prods
       .iter()
       .map(|prod| ProdRef {
         grammar: self.grammar,
-        head: self.head,
+        head: &self.rule.head,
         prod: RefCompare(prod),
         action_value: NoCompare(
           self.grammar.action_map.get(&prod.action_key).unwrap(),
@@ -686,7 +712,7 @@ impl<'a, E: ElementTypes> RuleRef<'a, E> {
 
 // ------------
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug)]
 pub struct ProdRef<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   head: &'a E::NonTerm,
@@ -695,12 +721,23 @@ pub struct ProdRef<'a, E: ElementTypes> {
 }
 
 impl<'a, E: ElementTypes> ProdRef<'a, E> {
+  pub fn head(&self) -> &'a E::NonTerm {
+    self.head
+  }
+
   pub fn prod_elements(&self) -> &'a Vec<ProductionElement<E>> {
     &self.prod.elements
   }
 
   pub fn elements_iter(&self) -> impl Iterator<Item = &'a Element<E>> {
     self.prod.elements_iter()
+  }
+
+  pub fn prod_element_at(
+    &self,
+    index: usize,
+  ) -> Option<&'a ProductionElement<E>> {
+    self.prod.elements.get(index)
   }
 
   pub fn element_at(&self, index: usize) -> Option<&'a Element<E>> {
@@ -714,4 +751,50 @@ impl<'a, E: ElementTypes> ProdRef<'a, E> {
   pub fn action_value(&self) -> &'a E::ActionValue {
     *self.action_value
   }
+
+  pub fn prod_key(&self) -> ProdKey<E> {
+    ProdKey {
+      head: self.head().clone(),
+      action_key: self.action_key().clone(),
+    }
+  }
 }
+
+impl<E: ElementTypes> cmp::Eq for ProdRef<'_, E> {}
+
+impl<E: ElementTypes> cmp::PartialEq for ProdRef<'_, E> {
+  fn eq(&self, other: &Self) -> bool {
+    self.grammar == other.grammar
+      && self.head == other.head
+      && self.prod == other.prod
+      && self.action_value == other.action_value
+  }
+}
+
+impl<E: ElementTypes> cmp::PartialOrd for ProdRef<'_, E> {
+  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<E: ElementTypes> cmp::Ord for ProdRef<'_, E> {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
+    (self.grammar.cmp(&other.grammar))
+      .then_with(|| self.head.cmp(&other.head))
+      .then_with(|| self.prod.cmp(&other.prod))
+      .then_with(|| self.action_value.cmp(&other.action_value))
+  }
+}
+
+impl<'a, E: ElementTypes> Clone for ProdRef<'a, E> {
+  fn clone(&self) -> Self {
+    ProdRef {
+      grammar: self.grammar,
+      head: self.head,
+      prod: self.prod,
+      action_value: self.action_value,
+    }
+  }
+}
+
+impl< E: ElementTypes> Copy for ProdRef<'_, E> {}
