@@ -236,13 +236,13 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct Production<E: ElementTypes> {
+struct Production<E: ElementTypes> {
   action_key: E::ActionKey,
   elements: Vec<ProductionElement<E>>,
 }
 
 impl<E: ElementTypes> Production<E> {
-  pub fn new(
+  fn new(
     action_key: E::ActionKey,
     elements: Vec<ProductionElement<E>>,
   ) -> Production<E> {
@@ -288,7 +288,7 @@ pub struct ProdKey<E: ElementTypes> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Rule<E: ElementTypes> {
+struct Rule<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<Production<E>>,
 }
@@ -332,7 +332,7 @@ impl<E: ElementTypes> std::fmt::Debug for Grammar<E> {
 }
 
 impl<E: ElementTypes> Grammar<E> {
-  pub fn new(
+  fn new(
     start: E::NonTerm,
     rule_set: impl IntoIterator<Item = Rule<E>>,
     action_map: BTreeMap<E::ActionKey, E::ActionValue>,
@@ -739,4 +739,4 @@ impl<'a, E: ElementTypes> Clone for ProdRef<'a, E> {
   }
 }
 
-impl< E: ElementTypes> Copy for ProdRef<'_, E> {}
+impl<E: ElementTypes> Copy for ProdRef<'_, E> {}
