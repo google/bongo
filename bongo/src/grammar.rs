@@ -20,7 +20,19 @@ pub mod transform;
 use crate::pdisplay::LayoutDisplay;
 use crate::utils::{breadth_first_search, Name};
 use codefmt::Layout;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+  cmp,
+  collections::{BTreeMap, BTreeSet},
+  ops,
+};
+
+fn ref_eq<T>(a: &T, b: &T) -> bool {
+  (a as *const T) == (b as *const T)
+}
+
+fn ref_cmp<T>(a: &T, b: &T) -> cmp::Ordering {
+  (a as *const T).cmp(&(b as *const T))
+}
 
 /// A trait which carries the underlying types for a grammar.
 ///
@@ -327,6 +339,7 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
   }
 }
 
+/// A grammar
 #[derive(Clone)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
@@ -518,5 +531,187 @@ impl<E: ElementTypes> LayoutDisplay for Grammar<E> {
       stack.push(Layout::juxtapose(&[Layout::text("  "), v.disp()]));
     }
     Layout::stack(stack)
+  }
+}
+
+// ------------
+
+/// A simple deref wrapper that ensures that two references _must_ be the same during
+/// comparison. This ensures that we can't accidentally incorporate refs from different parents together.
+struct ParentRef<'a, T>(&'a T);
+
+impl<'a, T> ParentRef<'a, T> {
+  fn new(r: &'a T) -> Self {
+    ParentRef(r)
+  }
+}
+
+impl<T> cmp::PartialEq for ParentRef<'_, T> {
+  fn eq(&self, other: &Self) -> bool {
+    assert!(ref_eq(self.0, other.0));
+    true
+  }
+}
+
+impl<T> cmp::Eq for ParentRef<'_, T> {}
+
+impl<T> cmp::PartialOrd for ParentRef<'_, T> {
+  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<T> cmp::Ord for ParentRef<'_, T> {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
+    assert!(ref_eq(self.0, other.0));
+    cmp::Ordering::Equal
+  }
+}
+
+impl<'a, T> ops::Deref for ParentRef<'a, T> {
+  type Target = &'a T;
+  fn deref(&self) -> &&'a T {
+    &self.0
+  }
+}
+
+impl<T> Clone for ParentRef<'_, T> {
+  fn clone(&self) -> Self {
+    ParentRef(self.0)
+  }
+}
+
+impl<T> Copy for ParentRef<'_, T> {}
+
+// ------------
+
+#[derive(Clone, Copy)]
+struct NoCompare<T>(T);
+
+impl<T> cmp::PartialEq for NoCompare<T> {
+  fn eq(&self, _: &Self) -> bool {
+    true
+  }
+}
+
+impl<T> cmp::Eq for NoCompare<T> {}
+
+impl<T> cmp::PartialOrd for NoCompare<T> {
+  fn partial_cmp(&self, _: &Self) -> Option<cmp::Ordering> {
+    Some(cmp::Ordering::Equal)
+  }
+}
+
+impl<T> cmp::Ord for NoCompare<T> {
+  fn cmp(&self, _: &Self) -> cmp::Ordering {
+    cmp::Ordering::Equal
+  }
+}
+
+impl<T> ops::Deref for NoCompare<T> {
+  type Target = T;
+  fn deref(&self) -> &T {
+    &self.0
+  }
+}
+
+// ------------
+
+struct RefCompare<'a, T>(&'a T);
+
+impl<T> cmp::PartialEq for RefCompare<'_, T> {
+  fn eq(&self, other: &Self) -> bool {
+    ref_eq(self.0, other.0)
+  }
+}
+
+impl<T> cmp::Eq for RefCompare<'_, T> {}
+
+impl<T> cmp::PartialOrd for RefCompare<'_, T> {
+  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<T> cmp::Ord for RefCompare<'_, T> {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
+    ref_cmp(self.0, other.0)
+  }
+}
+
+impl<'a, T> ops::Deref for RefCompare<'a, T> {
+  type Target = &'a T;
+  fn deref(&self) -> &&'a T {
+    &self.0
+  }
+}
+
+impl<T> Clone for RefCompare<'_, T> {
+  fn clone(&self) -> Self {
+    RefCompare(self.0)
+  }
+}
+
+impl<T> Copy for RefCompare<'_, T> {}
+
+// ------------
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct RuleRef<'a, E: ElementTypes> {
+  grammar: ParentRef<'a, Grammar<E>>,
+  head: &'a E::NonTerm,
+  prods: &'a Vec<Production<E>>,
+}
+
+impl<'a, E: ElementTypes> RuleRef<'a, E> {
+  pub fn head(&self) -> &E::NonTerm {
+    self.head
+  }
+
+  pub fn prods(&self) -> Vec<ProdRef<'a, E>> {
+    self
+      .prods
+      .iter()
+      .map(|prod| ProdRef {
+        grammar: self.grammar,
+        head: self.head,
+        prod: RefCompare(prod),
+        action_value: NoCompare(
+          self.grammar.action_map.get(&prod.action_key).unwrap(),
+        ),
+      })
+      .collect()
+  }
+}
+
+// ------------
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ProdRef<'a, E: ElementTypes> {
+  grammar: ParentRef<'a, Grammar<E>>,
+  head: &'a E::NonTerm,
+  prod: RefCompare<'a, Production<E>>,
+  action_value: NoCompare<&'a E::ActionValue>,
+}
+
+impl<'a, E: ElementTypes> ProdRef<'a, E> {
+  pub fn prod_elements(&self) -> &'a Vec<ProductionElement<E>> {
+    &self.prod.elements
+  }
+
+  pub fn elements_iter(&self) -> impl Iterator<Item = &'a Element<E>> {
+    self.prod.elements_iter()
+  }
+
+  pub fn element_at(&self, index: usize) -> Option<&'a Element<E>> {
+    self.prod.element_at(index)
+  }
+
+  pub fn action_key(&self) -> &'a E::ActionKey {
+    self.prod.action_key()
+  }
+
+  pub fn action_value(&self) -> &'a E::ActionValue {
+    *self.action_value
   }
 }
