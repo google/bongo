@@ -125,6 +125,7 @@ impl ElementTypes for BaseElementTypes {
   type ActionValue = ();
 }
 
+/// A single element (terminal or non-terminal).
 pub enum Element<E: ElementTypes> {
   Term(E::Term),
   NonTerm(E::NonTerm),
@@ -222,6 +223,7 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
   }
 }
 
+/// An element within a production. Includes an optional identifier.
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
@@ -331,6 +333,7 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   }
 }
 
+/// A production within a rule.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct Production<E: ElementTypes> {
   action_key: E::ActionKey,
