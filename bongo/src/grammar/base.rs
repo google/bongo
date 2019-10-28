@@ -132,6 +132,46 @@ pub enum Element<E: ElementTypes> {
   NonTerm(E::NonTerm),
 }
 
+// Manual definition of common traits
+
+impl<E: ElementTypes> Clone for Element<E> {
+  fn clone(&self) -> Self {
+    match self {
+      Element::Term(t) => Element::Term(t.clone()),
+      Element::NonTerm(nt) => Element::NonTerm(nt.clone()),
+    }
+  }
+}
+
+impl<E: ElementTypes> PartialEq for Element<E> {
+  fn eq(&self, other: &Self) -> bool {
+    match (self, other) {
+      (Element::Term(t1), Element::Term(t2)) => t1 == t2,
+      (Element::NonTerm(nt1), Element::NonTerm(nt2)) => nt1 == nt2,
+      _ => false,
+    }
+  }
+}
+
+impl<E: ElementTypes> Eq for Element<E> {}
+
+impl<E: ElementTypes> Ord for Element<E> {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
+    match (self, other) {
+      (Element::Term(t1), Element::Term(t2)) => t1.cmp(t2),
+      (Element::NonTerm(nt1), Element::NonTerm(nt2)) => nt1.cmp(nt2),
+      (Element::Term(_), Element::NonTerm(_)) => cmp::Ordering::Less,
+      (Element::NonTerm(_), Element::Term(_)) => cmp::Ordering::Greater,
+    }
+  }
+}
+
+impl<E: ElementTypes> PartialOrd for Element<E> {
+  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
 impl<E: ElementTypes> Element<E> {
   /// If this element is a terminal, returns a `Some` value containing a
   /// terminal datum. Returns `None` otherwise.
