@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Bongo is a library for generating Marpa parsers, and executing them on inputs.
+
 #![allow(dead_code)]
 
 #[macro_use]

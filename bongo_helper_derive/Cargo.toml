@@ -1,0 +1,13 @@
+[package]
+authors = ["brianchin"]
+edition = "2018"
+name = "bongo_helper_derive"
+version = "0.1.0"
+
+[dependencies]
+proc-macro2 = "^1.0.6"
+quote = "^1.0.2"
+syn = { version = "^1.0.7", features = ["visit", "extra-traits", "full"] }
+
+[lib]
+proc-macro = true

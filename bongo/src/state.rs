@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::{Element, ElementTypes, ProdRef};
+use crate::grammar::{Element, ElementTypes, ProdRef, ProductionElement};
 use crate::pdisplay::{self, LayoutDisplay};
 use codefmt::Layout;
 
@@ -43,41 +43,39 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
   ///
   /// This state's index will be at the start of the production.
   pub fn from_start(prod: ProdRef<'a, E>) -> Self {
-    ProductionState {
-      prod,
-      index: 0,
-    }
+    ProductionState { prod, index: 0 }
+  }
+  
+  pub fn prod(&self) -> ProdRef<'a, E> {
+    self.prod
   }
 
   /// Returns the next element after the current index. If it is at the
   /// end, then it reuturns `None`.
-  pub fn next(&self) -> Option<&Element<E>> {
-    self.prod.element_at(self.index)
-  }
-
-  // Unconditionally creates a new production state that is the
-  // increment of this production state. If `index` >= length, then this will
-  // create a production state.
-  fn advance_forced(&self) -> ProductionState<E> {
-    let mut result: ProductionState<E> = self.clone();
-    result.index += 1;
-    result
-  }
-
-  /// Return another `ProductionState` with the same head and production as
-  /// `self`, but with the index advanced. If the index is already at the
-  /// end of the production, returns `None`.
-  pub fn advance(&self) -> Option<ProductionState<E>> {
-    self.next().map(|_| self.advance_forced())
+  pub fn next(
+    &self,
+  ) -> Option<(&'a ProductionElement<E>, ProductionState<'a, E>)> {
+    self.prod.prod_elements().get(self.index).map(|prod_elem| {
+      (
+        prod_elem,
+        ProductionState {
+          prod: self.prod,
+          index: self.index + 1,
+        },
+      )
+    })
   }
 
   /// Return Some(state) which is this state advanced if
   /// the next element type is elem.
-  pub fn advance_if(&self, elem: &Element<E>) -> Option<ProductionState<E>> {
+  pub fn advance_if(
+    &self,
+    elem: &Element<E>,
+  ) -> Option<ProductionState<'a, E>> {
     self
       .next()
-      .filter(|e| e == &elem)
-      .map(|_| self.advance_forced())
+      .filter(|(e, _)| e.elem() == elem)
+      .map(|(_, next)| next)
   }
 }
 
