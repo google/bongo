@@ -20,7 +20,7 @@ use codefmt::Layout;
 use std::{
   cmp,
   collections::{BTreeMap, BTreeSet},
-  ops,
+  fmt, ops,
 };
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
@@ -125,7 +125,6 @@ impl ElementTypes for BaseElementTypes {
   type ActionValue = ();
 }
 
-#[derive(Debug)]
 pub enum Element<E: ElementTypes> {
   Term(E::Term),
   NonTerm(E::NonTerm),
@@ -171,14 +170,28 @@ impl<E: ElementTypes> PartialOrd for Element<E> {
   }
 }
 
+impl<E: ElementTypes> fmt::Debug for Element<E> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Element::Term(t) => f.debug_tuple("Element::Term").field(t).finish(),
+      Element::NonTerm(nt) => {
+        f.debug_tuple("Element::NonTerm").field(nt).finish()
+      }
+    }
+  }
+}
+
 impl<E: ElementTypes> Element<E> {
+  /// If this element is a terminal, returns a `Some` value containing a
+  /// terminal datum. Returns `None` otherwise.
   pub fn as_term(&self) -> Option<&E::Term> {
     match self {
       Element::NonTerm(_) => None,
       Element::Term(t) => Some(t),
     }
   }
-  /// Gets an element as a nonterm. Panics if it is not a nonterm.
+
+  /// Gets an element as a nonterm. Returns a `None` value otherwise.
   pub fn as_nonterm(&self) -> Option<&E::NonTerm> {
     match self {
       Element::NonTerm(nt) => Some(nt),
@@ -186,6 +199,9 @@ impl<E: ElementTypes> Element<E> {
     }
   }
 
+  /// Clone this element into an element of another ElementTypes instance.
+  /// The `E::Term` and `E::NonTerm` datum types must be the same as those in
+  /// `E2`.
   pub fn clone_as_other<E2>(&self) -> Element<E2>
   where
     E2: ElementTypes<Term = E::Term, NonTerm = E::NonTerm>,
@@ -206,10 +222,50 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
   }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
+}
+
+// Manual definition of common traits
+
+impl<E: ElementTypes> Clone for ProductionElement<E> {
+  fn clone(&self) -> Self {
+    ProductionElement {
+      identifier: self.identifier.clone(),
+      element: self.element.clone(),
+    }
+  }
+}
+
+impl<E: ElementTypes> PartialEq for ProductionElement<E> {
+  fn eq(&self, other: &Self) -> bool {
+    self.identifier == other.identifier && self.element == other.element
+  }
+}
+
+impl<E: ElementTypes> Eq for ProductionElement<E> {}
+
+impl<E: ElementTypes> Ord for ProductionElement<E> {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
+    (self.identifier.cmp(&other.identifier))
+      .then_with(|| self.element.cmp(&other.element))
+  }
+}
+
+impl<E: ElementTypes> PartialOrd for ProductionElement<E> {
+  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<E: ElementTypes> fmt::Debug for ProductionElement<E> {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.debug_struct("ProductionElement")
+      .field("identifier", &self.identifier)
+      .field("element", &self.element)
+      .finish()
+  }
 }
 
 impl<E: ElementTypes> ProductionElement<E> {
