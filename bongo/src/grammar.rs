@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Creation and manipulation of grammars.
+
 mod base;
 pub mod examples;
 pub mod nullables;
@@ -20,5 +22,5 @@ pub mod transform;
 pub use base::{
   builder::{build, GrammarBuilder, ProductionBuilder, RuleBuilder},
   BaseElementTypes, Element, ElementTypes, Grammar, GrammarErrors, NonTerminal,
-  ProdKey, ProdRef, ProductionElement, Terminal,
+  ProdKey, ProdRef, ProductionElement, RuleRef, Terminal,
 };
