@@ -1,14 +1,18 @@
 extern crate proc_macro;
 
+mod enum_derive;
+mod struct_derive;
+
 use {
   proc_macro::TokenStream,
+  quote::quote,
   syn::{
     parenthesized,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
-    token, Ident, Result, Token, Type, Item,
+    spanned::Spanned,
+    token, Ident, Item, Result, Token, Type,
   },
-  quote::quote,
 };
 
 struct AttrBounds {
@@ -47,11 +51,17 @@ impl Parse for AttrContents {
   }
 }
 
-fn derive_from_struct(attr: &AttrContents, st: &syn::ItemStruct) -> syn::Result<proc_macro2::TokenStream> {
-  unimplemented!();
+fn derive_from_struct(
+  attr: &AttrContents,
+  st: &syn::ItemStruct,
+) -> syn::Result<proc_macro2::TokenStream> {
+  Ok(quote! {})
 }
 
-fn derive_from_enum(attr: &AttrContents, en: &syn::ItemEnum) -> syn::Result<proc_macro2::TokenStream> {
+fn derive_from_enum(
+  attr: &AttrContents,
+  en: &syn::ItemEnum,
+) -> syn::Result<proc_macro2::TokenStream> {
   unimplemented!();
 }
 
@@ -64,11 +74,18 @@ pub fn derive_unbounded(attr: TokenStream, item: TokenStream) -> TokenStream {
   let result = match &parsed_item {
     Item::Struct(st) => derive_from_struct(&attr_contents, st),
     Item::Enum(en) => derive_from_enum(&attr_contents, en),
-    _ => Err(syn::Error::new(parsed_item.span())),
+    _ => Err(syn::Error::new(
+      parsed_item.span(),
+      "Can't handle this kind of item.",
+    )),
   };
 
   match result {
-    Ok(ts) => ts.into(),
+    Ok(ts) => (quote! {
+      #parsed_item
+      #ts
+    })
+    .into(),
     Err(e) => e.to_compile_error().into(),
   }
 }
