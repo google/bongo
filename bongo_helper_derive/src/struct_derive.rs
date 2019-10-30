@@ -1,6 +1,7 @@
 use {
+  crate::struct_clone_expr,
   proc_macro2::TokenStream,
-  quote::quote,
+  quote::{quote, ToTokens},
   syn::{
     Fields, GenericParam, Ident, Index, ItemStruct, Result, WherePredicate,
   },
@@ -22,12 +23,33 @@ fn generic_param_literal(param: &GenericParam) -> TokenStream {
   }
 }
 
-struct ImplData {
+pub struct ImplData {
   name: Ident,
   generics_clause: TokenStream,
   args_clause: TokenStream,
   where_clause: TokenStream,
   arg_names: Vec<TokenStream>,
+}
+
+impl ImplData {
+  pub fn impl_item(
+    &self,
+    impl_trait: impl ToTokens,
+    body: impl ToTokens,
+  ) -> TokenStream {
+    let ImplData {
+      name,
+      generics_clause,
+      args_clause,
+      where_clause,
+      ..
+    } = self;
+    quote! {
+      impl #generics_clause #impl_trait for #name #args_clause #where_clause {
+        #body
+      }
+    }
+  }
 }
 
 fn extract_impl_data(
@@ -94,59 +116,39 @@ fn extract_impl_data(
 pub fn derive_clone(
   st: &ItemStruct,
   bounds: &Vec<WherePredicate>,
-) -> Result<TokenStream> {
+) -> TokenStream {
   let impl_data = extract_impl_data(st, bounds);
 
-  let field_assignments = impl_data.arg_names.iter().map(|id| {
-    quote! { #id : ::std::clone::Clone::clone(&self.#id) }
-  });
+  let clone_expr =
+    struct_clone_expr(&impl_data.name, &quote! {self}, &impl_data.arg_names);
 
-  let ImplData {
-    name,
-    generics_clause,
-    args_clause,
-    where_clause,
-    ..
-  } = &impl_data;
-
-  Ok(quote! {
-    impl #generics_clause ::std::clone::Clone for #name #args_clause #where_clause {
+  impl_data.impl_item(
+    quote! {::std::clone::Clone},
+    quote! {
       fn clone(&self) -> Self {
-        #name {
-          #(#field_assignments),*
-        }
+        #clone_expr
       }
-    }
-  })
+    },
+  )
 }
 
 #[allow(dead_code)]
 pub fn derive_ord(
-  st: &ItemStruct,
-  bounds: &Vec<WherePredicate>,
-) -> Result<TokenStream> {
-  let impl_data = extract_impl_data(st, bounds);
-
-  let ImplData {
-    name,
-    generics_clause,
-    args_clause,
-    where_clause,
-    arg_names,
-  } = &impl_data;
-
-  let field_cmps = arg_names.iter().map(|id| {
+  impl_data: &ImplData
+) -> TokenStream {
+  let field_cmps = impl_data.arg_names.iter().map(|id| {
     quote! { .then_with(|| self.#id.cmp(&other.#id)) }
   });
 
-  Ok(quote! {
-    impl #generics_clause ::std::cmp::Ord for #name #args_clause #where_clause {
+  impl_data.impl_item(
+    quote!{ ::std::cmp::Ord },
+    quote!{
       fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
         ::std::cmp::Ordering::Equal
         #(#field_cmps)*
       }
     }
-  })
+  )
 }
 
 #[allow(dead_code)]
@@ -231,6 +233,34 @@ pub fn derive_eq(
   Ok(quote! {
     impl #generics_clause ::std::cmp::PartialOrd for #name #args_clause #where_clause {
       fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+        #(#field_cmps)&&*
+      }
+    }
+  })
+}
+
+#[allow(dead_code)]
+pub fn derive_debug(
+  st: &ItemStruct,
+  bounds: &Vec<WherePredicate>,
+) -> Result<TokenStream> {
+  let impl_data = extract_impl_data(st, bounds);
+
+  let ImplData {
+    name,
+    generics_clause,
+    args_clause,
+    where_clause,
+    arg_names,
+  } = &impl_data;
+
+  let field_cmps = arg_names.iter().map(|id| {
+    quote! { self.#id == other.#id }
+  });
+
+  Ok(quote! {
+    impl #generics_clause ::std::fmt::Debug for #name #args_clause #where_clause {
+      fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::cmp::Ordering {
         #(#field_cmps)&&*
       }
     }

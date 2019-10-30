@@ -4,8 +4,9 @@ mod enum_derive;
 mod struct_derive;
 
 use {
-  proc_macro::TokenStream,
-  quote::quote,
+  proc_macro::TokenStream as ProcTokenStream,
+  proc_macro2::TokenStream,
+  quote::{quote, ToTokens},
   syn::{
     parenthesized,
     parse::{Parse, ParseStream},
@@ -14,6 +15,23 @@ use {
     token, Ident, Item, Result, Token, Type,
   },
 };
+
+fn struct_clone_expr<'a>(
+  struct_name: impl ToTokens,
+  var: impl ToTokens,
+  fields: impl IntoIterator<Item = &'a TokenStream>,
+) -> TokenStream {
+
+  let field_assignments = fields.into_iter().map(|id| {
+    quote! { #id : ::std::clone::Clone::clone(&#var.#id) }
+  });
+
+  quote! {
+    #struct_name {
+      #(#field_assignments),*
+    }
+  }
+}
 
 struct AttrBounds {
   where_literal: syn::LitStr,
@@ -66,7 +84,7 @@ fn derive_from_enum(
 }
 
 #[proc_macro_attribute]
-pub fn derive_unbounded(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn derive_unbounded(attr: ProcTokenStream, item: ProcTokenStream) -> ProcTokenStream {
   let item2 = item.clone();
   let attr_contents = syn::parse_macro_input!(attr as AttrContents);
   let parsed_item = syn::parse_macro_input!(item2 as Item);
