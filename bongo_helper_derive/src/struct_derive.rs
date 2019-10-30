@@ -3,8 +3,7 @@ use {
   proc_macro2::{Span, TokenStream},
   quote::{quote, ToTokens},
   syn::{
-    Fields, GenericParam, Ident, Index, ItemStruct, LitStr, Result,
-    WherePredicate,
+    Fields, GenericParam, Ident, Index, ItemStruct, LitStr, WherePredicate,
   },
 };
 
@@ -53,7 +52,7 @@ impl ImplData {
   }
 }
 
-fn extract_impl_data(
+pub fn extract_impl_data(
   st: &ItemStruct,
   bounds: &Vec<WherePredicate>,
 ) -> ImplData {
@@ -114,12 +113,7 @@ fn extract_impl_data(
 }
 
 #[allow(dead_code)]
-pub fn derive_clone(
-  st: &ItemStruct,
-  bounds: &Vec<WherePredicate>,
-) -> TokenStream {
-  let impl_data = extract_impl_data(st, bounds);
-
+pub fn derive_clone(impl_data: &ImplData) -> TokenStream {
   let clone_expr =
     struct_clone_expr(&impl_data.name, &quote! {self}, &impl_data.arg_names);
 
@@ -131,6 +125,11 @@ pub fn derive_clone(
       }
     },
   )
+}
+
+#[allow(dead_code)]
+pub fn derive_copy(impl_data: &ImplData) -> TokenStream {
+  impl_data.impl_item(quote! {::std::marker::Copy}, quote! {})
 }
 
 #[allow(dead_code)]
@@ -153,7 +152,7 @@ pub fn derive_ord(impl_data: &ImplData) -> TokenStream {
 #[allow(dead_code)]
 pub fn derive_partial_ord(impl_data: &ImplData) -> TokenStream {
   let field_cmps = impl_data.arg_names.iter().map(|id| {
-    quote! { .and_then(|ord| match self.#id.cmp(&other.#id) {
+    quote! { .and_then(|ord| match self.#id.partial_cmp(&other.#id) {
       Some(new_ord) => Some(ord.then(new_ord)),
       None => None,
     }) }
@@ -162,7 +161,7 @@ pub fn derive_partial_ord(impl_data: &ImplData) -> TokenStream {
   impl_data.impl_item(
     quote! { ::std::cmp::PartialOrd },
     quote! {
-      fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+      fn partial_cmp(&self, other: &Self) -> ::std::option::Option<::std::cmp::Ordering> {
         Some(::std::cmp::Ordering::Equal)
         #(#field_cmps)*
       }
@@ -179,7 +178,7 @@ pub fn derive_partial_eq(impl_data: &ImplData) -> TokenStream {
   impl_data.impl_item(
     quote! { ::std::cmp::PartialEq },
     quote! {
-      fn eq(&self, other: &Self) -> ::std::cmp::Ordering {
+      fn eq(&self, other: &Self) -> bool {
         #(#field_cmps)&&*
       }
     },
@@ -188,7 +187,7 @@ pub fn derive_partial_eq(impl_data: &ImplData) -> TokenStream {
 
 #[allow(dead_code)]
 pub fn derive_eq(impl_data: &ImplData) -> TokenStream {
-  impl_data.impl_item(quote! { ::std::cmp::PartialOrd }, quote! {})
+  impl_data.impl_item(quote! { ::std::cmp::Eq }, quote! {})
 }
 
 #[allow(dead_code)]
@@ -207,10 +206,10 @@ pub fn derive_debug(impl_data: &ImplData) -> TokenStream {
   impl_data.impl_item(
     quote! { ::std::fmt::Debug },
     quote! {
-      fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::cmp::Ordering {
+      fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         f.debug_struct(#struct_string_lit)
         #(#field_calls)*
-        .finish
+        .finish()
       }
     },
   )

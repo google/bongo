@@ -1,8 +1,12 @@
-#[bongo_helper_derive::derive_unbounded("A: B + C", Clone, Ord, PartialOrd)]
-struct Foo(u32);
+use bongo_helper_derive::derive_unbounded;
+
+#[derive_unbounded(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive_unbounded(Ord, PartialOrd)]
+struct Foo<T>(u32, ::std::marker::PhantomData<T>);
 
 #[test]
 fn my_test() {
-  let x = Foo(3);
-  let Foo(y) = x;
+  let x: Foo<String> = Foo(3, ::std::marker::PhantomData {});
+  assert!(x == x);
+  let Foo(_y, _) = x;
 }
