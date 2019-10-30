@@ -1,9 +1,10 @@
 use {
   crate::struct_clone_expr,
-  proc_macro2::TokenStream,
+  proc_macro2::{Span, TokenStream},
   quote::{quote, ToTokens},
   syn::{
-    Fields, GenericParam, Ident, Index, ItemStruct, Result, WherePredicate,
+    Fields, GenericParam, Ident, Index, ItemStruct, LitStr, Result,
+    WherePredicate,
   },
 };
 
@@ -133,136 +134,84 @@ pub fn derive_clone(
 }
 
 #[allow(dead_code)]
-pub fn derive_ord(
-  impl_data: &ImplData
-) -> TokenStream {
+pub fn derive_ord(impl_data: &ImplData) -> TokenStream {
   let field_cmps = impl_data.arg_names.iter().map(|id| {
     quote! { .then_with(|| self.#id.cmp(&other.#id)) }
   });
 
   impl_data.impl_item(
-    quote!{ ::std::cmp::Ord },
-    quote!{
+    quote! { ::std::cmp::Ord },
+    quote! {
       fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
         ::std::cmp::Ordering::Equal
         #(#field_cmps)*
       }
-    }
+    },
   )
 }
 
 #[allow(dead_code)]
-pub fn derive_partial_ord(
-  st: &ItemStruct,
-  bounds: &Vec<WherePredicate>,
-) -> Result<TokenStream> {
-  let impl_data = extract_impl_data(st, bounds);
-
-  let ImplData {
-    name,
-    generics_clause,
-    args_clause,
-    where_clause,
-    arg_names,
-  } = &impl_data;
-
-  let field_cmps = arg_names.iter().map(|id| {
+pub fn derive_partial_ord(impl_data: &ImplData) -> TokenStream {
+  let field_cmps = impl_data.arg_names.iter().map(|id| {
     quote! { .and_then(|ord| match self.#id.cmp(&other.#id) {
       Some(new_ord) => Some(ord.then(new_ord)),
       None => None,
     }) }
   });
 
-  Ok(quote! {
-    impl #generics_clause ::std::cmp::PartialOrd for #name #args_clause #where_clause {
+  impl_data.impl_item(
+    quote! { ::std::cmp::PartialOrd },
+    quote! {
       fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
         Some(::std::cmp::Ordering::Equal)
         #(#field_cmps)*
       }
-    }
-  })
+    },
+  )
 }
 
 #[allow(dead_code)]
-pub fn derive_partial_eq(
-  st: &ItemStruct,
-  bounds: &Vec<WherePredicate>,
-) -> Result<TokenStream> {
-  let impl_data = extract_impl_data(st, bounds);
-
-  let ImplData {
-    name,
-    generics_clause,
-    args_clause,
-    where_clause,
-    arg_names,
-  } = &impl_data;
-
-  let field_cmps = arg_names.iter().map(|id| {
+pub fn derive_partial_eq(impl_data: &ImplData) -> TokenStream {
+  let field_cmps = impl_data.arg_names.iter().map(|id| {
     quote! { self.#id == other.#id }
   });
 
-  Ok(quote! {
-    impl #generics_clause ::std::cmp::PartialEq for #name #args_clause #where_clause {
+  impl_data.impl_item(
+    quote! { ::std::cmp::PartialEq },
+    quote! {
       fn eq(&self, other: &Self) -> ::std::cmp::Ordering {
         #(#field_cmps)&&*
       }
-    }
-  })
+    },
+  )
 }
 
 #[allow(dead_code)]
-pub fn derive_eq(
-  st: &ItemStruct,
-  bounds: &Vec<WherePredicate>,
-) -> Result<TokenStream> {
-  let impl_data = extract_impl_data(st, bounds);
-
-  let ImplData {
-    name,
-    generics_clause,
-    args_clause,
-    where_clause,
-    arg_names,
-  } = &impl_data;
-
-  let field_cmps = arg_names.iter().map(|id| {
-    quote! { self.#id == other.#id }
-  });
-
-  Ok(quote! {
-    impl #generics_clause ::std::cmp::PartialOrd for #name #args_clause #where_clause {
-      fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
-        #(#field_cmps)&&*
-      }
-    }
-  })
+pub fn derive_eq(impl_data: &ImplData) -> TokenStream {
+  impl_data.impl_item(quote! { ::std::cmp::PartialOrd }, quote! {})
 }
 
 #[allow(dead_code)]
-pub fn derive_debug(
-  st: &ItemStruct,
-  bounds: &Vec<WherePredicate>,
-) -> Result<TokenStream> {
-  let impl_data = extract_impl_data(st, bounds);
-
+pub fn derive_debug(impl_data: &ImplData) -> TokenStream {
   let ImplData {
-    name,
-    generics_clause,
-    args_clause,
-    where_clause,
-    arg_names,
+    name, arg_names, ..
   } = &impl_data;
 
-  let field_cmps = arg_names.iter().map(|id| {
-    quote! { self.#id == other.#id }
+  let struct_string_lit = LitStr::new(&*name.to_string(), name.span());
+
+  let field_calls = arg_names.iter().map(|id| {
+    let field_string_lit = LitStr::new(&*id.to_string(), Span::call_site());
+    quote! { .field(#field_string_lit, &self.#id) }
   });
 
-  Ok(quote! {
-    impl #generics_clause ::std::fmt::Debug for #name #args_clause #where_clause {
+  impl_data.impl_item(
+    quote! { ::std::fmt::Debug },
+    quote! {
       fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::cmp::Ordering {
-        #(#field_cmps)&&*
+        f.debug_struct(#struct_string_lit)
+        #(#field_calls)*
+        .finish
       }
-    }
-  })
+    },
+  )
 }
