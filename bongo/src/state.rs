@@ -12,10 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::{Element, ElementTypes, ProdRef, ProductionElement};
-use crate::pdisplay::{self, LayoutDisplay};
-use codefmt::Layout;
-use bongo_helper_derive::derive_unbounded;
+use {
+  crate::{
+    grammar::{Element, ElementTypes, ProdRef, ProductionElement},
+    pdisplay::{self, LayoutDisplay},
+  },
+  bongo_helper_derive::derive_unbounded,
+  codefmt::Layout,
+};
 
 /// A state of a production within a parse state.
 ///
@@ -46,7 +50,6 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
   pub fn from_start(prod: ProdRef<'a, E>) -> Self {
     ProductionState { prod, index: 0 }
   }
-  
   pub fn prod(&self) -> ProdRef<'a, E> {
     self.prod
   }

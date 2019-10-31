@@ -45,20 +45,20 @@
 //! p := a <has-a>
 //! ```
 
-use std::collections::BTreeMap;
-use std::marker::PhantomData;
-
-use failure::{format_err, Error};
-
-use crate::grammar::{
-  build,
-  nullables::{calculate_nullables, GrammarNullableInfo},
-  Element, ElementTypes, Grammar, ProdKey, ProdRef, ProductionElement,
-  RuleBuilder,
+use {
+  crate::{
+    grammar::{
+      build,
+      nullables::{calculate_nullables, GrammarNullableInfo},
+      Element, ElementTypes, Grammar, ProdKey, ProdRef, ProductionElement,
+      RuleBuilder,
+    },
+    utils::{Name, TreeNode, Void},
+  },
+  bongo_helper_derive::derive_unbounded,
+  failure::{format_err, Error},
+  std::{collections::BTreeMap, marker::PhantomData},
 };
-
-use crate::utils::{Name, TreeNode, Void};
-use bongo_helper_derive::derive_unbounded;
 
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
 
@@ -86,19 +86,22 @@ pub fn transform_to_nonnull<E: ElementTypes>(
 ) -> Result<Grammar<ElemTypes<E>>, Error> {
   let nullables = calculate_nullables(g)?;
 
-  Ok(build(g.start_nt().clone(), |g_builder| {
-    for (nt, rule) in g.rule_set() {
-      g_builder.add_rule(nt.clone(), |r_builder| {
-        for prod in rule.prods() {
-          if nullables.is_prod_nullable(&prod) {
-            continue;
-          }
+  Ok(
+    build(g.start_nt().clone(), |g_builder| {
+      for (nt, rule) in g.rule_set() {
+        g_builder.add_rule(nt.clone(), |r_builder| {
+          for prod in rule.prods() {
+            if nullables.is_prod_nullable(&prod) {
+              continue;
+            }
 
-          build_nonnull_prods(&nullables, &prod, r_builder);
-        }
-      });
-    }
-  }).map_err(|_| format_err!("Grammar failed to build"))?)
+            build_nonnull_prods(&nullables, &prod, r_builder);
+          }
+        });
+      }
+    })
+    .map_err(|_| format_err!("Grammar failed to build"))?,
+  )
 }
 
 #[derive_unbounded(Clone, Debug)]

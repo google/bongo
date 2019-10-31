@@ -13,8 +13,7 @@
 // limitations under the License.
 
 //! Text buffers and related types.
-use std::cmp::{self, Ordering};
-use std::rc::Rc;
+use std::{cmp, rc::Rc};
 
 /// A text buffer. This is refcounted behind-the-scenes, so copies are fairly
 /// cheap.
@@ -135,7 +134,7 @@ impl BufferRange {
     let mut copy = self.clone();
     let advance_succeeded = copy.advance_n_mut(n).is_some();
     if advance_succeeded {
-      let s = &self.buf.0.text[self.start_index.. copy.start_index];
+      let s = &self.buf.0.text[self.start_index..copy.start_index];
       Some((s, copy))
     } else {
       None
@@ -177,20 +176,20 @@ impl BufferRangeKey {
 }
 
 impl cmp::Ord for BufferRangeKey {
-  fn cmp(&self, other: &Self) -> Ordering {
+  fn cmp(&self, other: &Self) -> cmp::Ordering {
     self.as_str().cmp(other.as_str())
   }
 }
 
 impl cmp::PartialOrd for BufferRangeKey {
-  fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
     Some(self.cmp(other))
   }
 }
 
 impl cmp::PartialEq for BufferRangeKey {
   fn eq(&self, other: &Self) -> bool {
-    self.cmp(other) == Ordering::Equal
+    self.cmp(other) == cmp::Ordering::Equal
   }
 }
 
@@ -209,11 +208,11 @@ impl Buffer {
 
     let search_result = self.0.line_ranges.binary_search_by(|&(start, end)| {
       if byte_offset < start {
-        Ordering::Greater
+        cmp::Ordering::Greater
       } else if byte_offset > end {
-        Ordering::Less
+        cmp::Ordering::Less
       } else {
-        Ordering::Equal
+        cmp::Ordering::Equal
       }
     });
 

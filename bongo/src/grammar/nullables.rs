@@ -11,14 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-use std::collections::{BTreeMap, BTreeSet};
-
-use crate::grammar::{Element, ElementTypes, Grammar, ProdRef, ProdKey};
-use crate::utils::{TreeNode, TreeValue, Void};
-use bongo_helper_derive::derive_unbounded;
-
-use failure::Error;
+use {
+  crate::{
+    grammar::{Element, ElementTypes, Grammar, ProdKey, ProdRef},
+    utils::{TreeNode, TreeValue, Void},
+  },
+  bongo_helper_derive::derive_unbounded,
+  failure::Error,
+  std::collections::{BTreeMap, BTreeSet},
+};
 
 #[derive_unbounded(Clone)]
 struct InternalNullableInfo<'a, E: ElementTypes> {
@@ -162,10 +163,7 @@ pub fn calculate_nullables<E: ElementTypes>(
       nullable_infos.insert(
         null_nt.clone(),
         NonTermNullableInfo {
-          nullable_action: TreeNode::new(
-            prod.prod_key(),
-            nullable_tree_fields,
-          ),
+          nullable_action: TreeNode::new(prod.prod_key(), nullable_tree_fields),
         },
       );
     }

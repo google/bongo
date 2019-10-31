@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, BTreeSet};
-
-use codefmt::Layout;
+use {
+  codefmt::Layout,
+  std::collections::{BTreeMap, BTreeSet},
+};
 
 pub mod buffer;
 
@@ -92,7 +93,10 @@ impl<L: Ord, V> TreeNode<L, V> {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Void {}
 
-pub fn breadth_first_search<T, InitI, StepI, F>(initial: InitI, mut f: F) -> BTreeSet<T>
+pub fn breadth_first_search<T, InitI, StepI, F>(
+  initial: InitI,
+  mut f: F,
+) -> BTreeSet<T>
 where
   T: Ord + Clone,
   InitI: IntoIterator<Item = T>,

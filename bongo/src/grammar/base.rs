@@ -14,15 +14,19 @@
 
 pub mod builder;
 
-use crate::pdisplay::LayoutDisplay;
-use crate::utils::{breadth_first_search, Name};
-use codefmt::Layout;
-use std::{
-  cmp,
-  collections::{BTreeMap, BTreeSet},
-  fmt, ops,
+use {
+  crate::{
+    pdisplay::LayoutDisplay,
+    utils::{breadth_first_search, Name},
+  },
+  bongo_helper_derive::derive_unbounded,
+  codefmt::Layout,
+  std::{
+    cmp,
+    collections::{BTreeMap, BTreeSet},
+    fmt, ops,
+  },
 };
-use bongo_helper_derive::derive_unbounded;
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
   (a as *const T) == (b as *const T)

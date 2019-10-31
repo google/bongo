@@ -25,8 +25,7 @@ mod pdisplay;
 mod state;
 pub mod utils;
 
-use crate::grammar::nullables::GrammarNullableInfo;
-use crate::grammar::{ElementTypes, Grammar};
+use crate::grammar::{nullables::GrammarNullableInfo, ElementTypes, Grammar};
 
 #[derive(Clone)]
 pub struct NullableGrammar<E: ElementTypes> {

@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::build;
-use crate::grammar::{BaseElementTypes, Grammar, NonTerminal, Terminal};
+use crate::grammar::{build, BaseElementTypes, Grammar, NonTerminal, Terminal};
 
 pub fn make_simple() -> Grammar<BaseElementTypes> {
   let start = NonTerminal::new("start");

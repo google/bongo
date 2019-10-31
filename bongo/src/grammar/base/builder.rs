@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{
-  Element, ElementTypes, Grammar, GrammarErrors, Name, Production,
-  ProductionElement, Rule,
+use {
+  super::{
+    Element, ElementTypes, Grammar, GrammarErrors, Name, Production,
+    ProductionElement, Rule,
+  },
+  std::collections::BTreeMap,
 };
-use std::collections::BTreeMap;
 
 /// A helper trait to allow builder methods to either take a type `T`, or a
 /// reference to `T` if it is clonable.
