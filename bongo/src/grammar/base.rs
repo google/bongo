@@ -42,9 +42,7 @@ fn ref_cmp<T>(a: &T, b: &T) -> cmp::Ordering {
 /// instead of forcing us to provide a number of type variables with a long list
 /// of bounds.
 ///
-/// This type is not instantiated, and will typically be a zero-sized type. It's
-/// constrained by the standard set of derivable operations in order to make
-/// derivations of types that use it simple.
+/// This type is not instantiated, and will typically be a zero-sized type.
 pub trait ElementTypes: 'static {
   /// The type used to identify each possible terminal.
   ///
@@ -134,6 +132,8 @@ pub enum Element<E: ElementTypes> {
 }
 
 // Manual definition of common traits
+//
+// Note: This is still required with derive_unbounded, as we do not support enums at this time.
 
 impl<E: ElementTypes> Clone for Element<E> {
   fn clone(&self) -> Self {
@@ -376,7 +376,21 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
   }
 }
 
-/// A grammar
+/// A context-free language grammar.
+/// 
+/// This is a context-free grammar consisting of
+/// 
+/// - A start nonterminal
+/// - A set of rules, each which consist of
+///   - A head nonterminal
+///   - A set of productions, where each production consist of
+///     - A list of production elements, which may have an identifier,
+///       and is either a terminal or nonterminal (an element).
+///     - An action key (identifier unique to that production)
+///     - An action value (Data associated with that action key)
+/// 
+/// Grammars are read-only, and the accessors use the lifetime of the
+/// grammar object.
 #[derive_unbounded(Clone)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
@@ -410,17 +424,20 @@ impl<E: ElementTypes> Grammar<E> {
     g.check_grammar().map(|_| g)
   }
 
+  /// Returns the start nonterminal for this grammar.
   pub fn start_nt(&self) -> &E::NonTerm {
     &self.start_symbol
   }
 
-  pub fn rules<'a>(&'a self) -> impl Iterator<Item = RuleRef<'a, E>> + 'a {
+  /// Returns an iterator over all of the rules for this grammar.
+  pub fn rules<'a>(&'a self) -> impl Iterator<Item = RuleRef<'a, E>> {
     self.rule_set.iter().map(move |(_, rule)| RuleRef {
       grammar: ParentRef(self),
       rule: RefCompare(rule),
     })
   }
 
+  /// Returns a map over rules of the grammar, keyed by the rule's head nonterminal.
   pub fn rule_set<'a>(&'a self) -> BTreeMap<&'a E::NonTerm, RuleRef<'a, E>> {
     self
       .rule_set
@@ -437,6 +454,7 @@ impl<E: ElementTypes> Grammar<E> {
       .collect()
   }
 
+  /// Gets the rule that has the given nonterminal as a head.
   pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<RuleRef<'a, E>> {
     self.rule_set.get(nt).map(|rule| RuleRef {
       grammar: ParentRef(self),
@@ -444,6 +462,7 @@ impl<E: ElementTypes> Grammar<E> {
     })
   }
 
+  /// Gets an iterator over all productions in the grammar.
   pub fn prods<'a>(&'a self) -> impl Iterator<Item = ProdRef<'a, E>> {
     self.rules().flat_map(|rule| rule.prods())
   }
@@ -473,7 +492,7 @@ impl<E: ElementTypes> Grammar<E> {
 
   fn rules_without_prods<'a>(&'a self) -> BTreeSet<&'a E::NonTerm> {
     let rules = self.rules();
-    let prodless_rules = rules.filter(|r| r.prods().is_empty());
+    let prodless_rules = rules.into_iter().filter(|r| r.prods().is_empty());
     let head_iter = prodless_rules.map(|r| r.head());
     head_iter.collect()
   }
