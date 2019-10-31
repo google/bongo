@@ -14,7 +14,7 @@
 
 use {
   crate::{
-    grammar::{Element, ElementTypes, ProdRef, ProductionElement},
+    grammar::{Element, ElementTypes, Prod, ProductionElement},
     pdisplay::{self, LayoutDisplay},
   },
   bongo_helper_derive::derive_unbounded,
@@ -36,7 +36,7 @@ use {
 #[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProductionState<'a, E: ElementTypes> {
   /// The production this state is part of.
-  prod: ProdRef<'a, E>,
+  prod: Prod<'a, E>,
 
   /// The index of this production state. Must be in the range [0,
   /// self.prod.prod_elements().len()].
@@ -47,10 +47,10 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
   /// Create a ProductionState from a given NonTerminal and Production.
   ///
   /// This state's index will be at the start of the production.
-  pub fn from_start(prod: ProdRef<'a, E>) -> Self {
+  pub fn from_start(prod: Prod<'a, E>) -> Self {
     ProductionState { prod, index: 0 }
   }
-  pub fn prod(&self) -> ProdRef<'a, E> {
+  pub fn prod(&self) -> Prod<'a, E> {
     self.prod
   }
 

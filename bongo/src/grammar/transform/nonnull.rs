@@ -50,7 +50,7 @@ use {
     grammar::{
       build,
       nullables::{calculate_nullables, GrammarNullableInfo},
-      Element, ElementTypes, Grammar, ProdKey, ProdRef, ProductionElement,
+      Element, ElementTypes, Grammar, Prod, ProdKey, ProductionElement,
       RuleBuilder,
     },
     utils::{Name, TreeNode, Void},
@@ -113,7 +113,7 @@ struct ProdBuildState<E: ElementTypes> {
 
 fn build_nonnull_prods<E: ElementTypes>(
   nullable_info: &GrammarNullableInfo<E>,
-  prod: &ProdRef<E>,
+  prod: &Prod<E>,
   r_builder: &mut RuleBuilder<ElemTypes<E>>,
 ) {
   let mut curr_build_states = vec![ProdBuildState {

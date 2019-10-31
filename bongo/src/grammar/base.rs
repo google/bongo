@@ -297,17 +297,17 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
 
 /// A production within a rule.
 #[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct Production<E: ElementTypes> {
+struct ProductionInner<E: ElementTypes> {
   action_key: E::ActionKey,
   elements: Vec<ProductionElement<E>>,
 }
 
-impl<E: ElementTypes> Production<E> {
+impl<E: ElementTypes> ProductionInner<E> {
   fn new(
     action_key: E::ActionKey,
     elements: Vec<ProductionElement<E>>,
-  ) -> Production<E> {
-    Production {
+  ) -> Self {
+    ProductionInner {
       action_key,
       elements,
     }
@@ -330,7 +330,7 @@ impl<E: ElementTypes> Production<E> {
   }
 }
 
-impl<E: ElementTypes> LayoutDisplay for Production<E> {
+impl<E: ElementTypes> LayoutDisplay for ProductionInner<E> {
   fn disp(&self) -> Layout {
     let elements =
       Layout::wrap(self.elements.iter().map(|x| x.disp()).collect::<Vec<_>>());
@@ -349,26 +349,26 @@ pub struct ProdKey<E: ElementTypes> {
 }
 
 #[derive_unbounded(Clone, Debug)]
-struct Rule<E: ElementTypes> {
+struct RuleInner<E: ElementTypes> {
   head: E::NonTerm,
-  prods: Vec<Production<E>>,
+  prods: Vec<ProductionInner<E>>,
 }
 
-impl<E: ElementTypes> Rule<E> {
-  pub fn new(head: E::NonTerm, prods: Vec<Production<E>>) -> Self {
-    Rule { head, prods }
+impl<E: ElementTypes> RuleInner<E> {
+  pub fn new(head: E::NonTerm, prods: Vec<ProductionInner<E>>) -> Self {
+    RuleInner { head, prods }
   }
 
   pub fn head(&self) -> &E::NonTerm {
     &self.head
   }
 
-  pub fn prods(&self) -> &Vec<Production<E>> {
+  pub fn prods(&self) -> &Vec<ProductionInner<E>> {
     &self.prods
   }
 }
 
-impl<E: ElementTypes> LayoutDisplay for Rule<E> {
+impl<E: ElementTypes> LayoutDisplay for RuleInner<E> {
   fn disp(&self) -> Layout {
     let prod_layouts: Vec<_> =
       self.prods.iter().map(|prod| prod.disp()).collect();
@@ -377,9 +377,9 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
 }
 
 /// A context-free language grammar.
-/// 
+///
 /// This is a context-free grammar consisting of
-/// 
+///
 /// - A start nonterminal
 /// - A set of rules, each which consist of
 ///   - A head nonterminal
@@ -388,13 +388,13 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
 ///       and is either a terminal or nonterminal (an element).
 ///     - An action key (identifier unique to that production)
 ///     - An action value (Data associated with that action key)
-/// 
+///
 /// Grammars are read-only, and the accessors use the lifetime of the
 /// grammar object.
 #[derive_unbounded(Clone)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
-  rule_set: BTreeMap<E::NonTerm, Rule<E>>,
+  rule_set: BTreeMap<E::NonTerm, RuleInner<E>>,
   action_map: BTreeMap<E::ActionKey, E::ActionValue>,
 }
 
@@ -409,7 +409,7 @@ impl<E: ElementTypes> std::fmt::Debug for Grammar<E> {
 impl<E: ElementTypes> Grammar<E> {
   fn new(
     start: E::NonTerm,
-    rule_set: impl IntoIterator<Item = Rule<E>>,
+    rule_set: impl IntoIterator<Item = RuleInner<E>>,
     action_map: BTreeMap<E::ActionKey, E::ActionValue>,
   ) -> Result<Self, GrammarErrors<E>> {
     let g = Grammar {
@@ -430,22 +430,22 @@ impl<E: ElementTypes> Grammar<E> {
   }
 
   /// Returns an iterator over all of the rules for this grammar.
-  pub fn rules<'a>(&'a self) -> impl Iterator<Item = RuleRef<'a, E>> {
-    self.rule_set.iter().map(move |(_, rule)| RuleRef {
+  pub fn rules<'a>(&'a self) -> impl Iterator<Item = Rule<'a, E>> {
+    self.rule_set.iter().map(move |(_, rule)| Rule {
       grammar: ParentRef(self),
       rule: RefCompare(rule),
     })
   }
 
   /// Returns a map over rules of the grammar, keyed by the rule's head nonterminal.
-  pub fn rule_set<'a>(&'a self) -> BTreeMap<&'a E::NonTerm, RuleRef<'a, E>> {
+  pub fn rule_set<'a>(&'a self) -> BTreeMap<&'a E::NonTerm, Rule<'a, E>> {
     self
       .rule_set
       .iter()
       .map(|(k, rule)| {
         (
           k,
-          RuleRef {
+          Rule {
             grammar: ParentRef(self),
             rule: RefCompare(rule),
           },
@@ -455,15 +455,15 @@ impl<E: ElementTypes> Grammar<E> {
   }
 
   /// Gets the rule that has the given nonterminal as a head.
-  pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<RuleRef<'a, E>> {
-    self.rule_set.get(nt).map(|rule| RuleRef {
+  pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<Rule<'a, E>> {
+    self.rule_set.get(nt).map(|rule| Rule {
       grammar: ParentRef(self),
       rule: RefCompare(rule),
     })
   }
 
   /// Gets an iterator over all productions in the grammar.
-  pub fn prods<'a>(&'a self) -> impl Iterator<Item = ProdRef<'a, E>> {
+  pub fn prods<'a>(&'a self) -> impl Iterator<Item = Prod<'a, E>> {
     self.rules().flat_map(|rule| rule.prods())
   }
 
@@ -705,22 +705,22 @@ impl<T> Copy for RefCompare<'_, T> {}
 // ------------
 
 #[derive_unbounded(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct RuleRef<'a, E: ElementTypes> {
+pub struct Rule<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
-  rule: RefCompare<'a, Rule<E>>,
+  rule: RefCompare<'a, RuleInner<E>>,
 }
 
-impl<'a, E: ElementTypes> RuleRef<'a, E> {
+impl<'a, E: ElementTypes> Rule<'a, E> {
   pub fn head(&self) -> &'a E::NonTerm {
     &self.rule.head
   }
 
-  pub fn prods(&self) -> Vec<ProdRef<'a, E>> {
+  pub fn prods(&self) -> Vec<Prod<'a, E>> {
     self
       .rule
       .prods
       .iter()
-      .map(|prod| ProdRef {
+      .map(|prod| Prod {
         grammar: self.grammar,
         head: &self.rule.head,
         prod: RefCompare(prod),
@@ -735,14 +735,14 @@ impl<'a, E: ElementTypes> RuleRef<'a, E> {
 // ------------
 
 #[derive_unbounded(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct ProdRef<'a, E: ElementTypes> {
+pub struct Prod<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   head: &'a E::NonTerm,
-  prod: RefCompare<'a, Production<E>>,
+  prod: RefCompare<'a, ProductionInner<E>>,
   action_value: NoCompare<&'a E::ActionValue>,
 }
 
-impl<'a, E: ElementTypes> ProdRef<'a, E> {
+impl<'a, E: ElementTypes> Prod<'a, E> {
   pub fn head(&self) -> &'a E::NonTerm {
     self.head
   }

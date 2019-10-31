@@ -13,18 +13,18 @@
 // limitations under the License.
 use {
   crate::{
-    grammar::{Element, ElementTypes, Grammar, ProdKey, ProdRef},
+    grammar::{Element, ElementTypes, Grammar, Prod, ProdKey},
     utils::{TreeNode, TreeValue, Void},
   },
-  bongo_helper_derive::derive_unbounded,
   anyhow::Error,
+  bongo_helper_derive::derive_unbounded,
   std::collections::{BTreeMap, BTreeSet},
 };
 
 #[derive_unbounded(Clone)]
 struct InternalNullableInfo<'a, E: ElementTypes> {
   /// The set of productions that are nullable
-  nullable_actions: BTreeSet<ProdRef<'a, E>>,
+  nullable_actions: BTreeSet<Prod<'a, E>>,
 }
 
 impl<E: ElementTypes> InternalNullableInfo<'_, E> {
@@ -81,7 +81,7 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
     self.nonterm_info.contains_key(nt)
   }
 
-  pub fn is_prod_nullable(&self, prod: &ProdRef<E>) -> bool {
+  pub fn is_prod_nullable(&self, prod: &Prod<E>) -> bool {
     is_prod_nullable(&self.nonterm_info, prod)
   }
 
@@ -184,7 +184,7 @@ pub fn calculate_nullables<E: ElementTypes>(
 
 fn is_prod_nullable<E: ElementTypes, V>(
   nullables: &BTreeMap<E::NonTerm, V>,
-  prod: &ProdRef<E>,
+  prod: &Prod<E>,
 ) -> bool {
   for elem in prod.elements_iter() {
     match elem {

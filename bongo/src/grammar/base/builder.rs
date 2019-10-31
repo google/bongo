@@ -14,8 +14,8 @@
 
 use {
   super::{
-    Element, ElementTypes, Grammar, GrammarErrors, Name, Production,
-    ProductionElement, Rule,
+    Element, ElementTypes, Grammar, GrammarErrors, Name, ProductionElement,
+    ProductionInner, RuleInner,
   },
   std::collections::BTreeMap,
 };
@@ -61,9 +61,9 @@ impl<E: ElementTypes> ProductionBuilder<E> {
     }
   }
 
-  fn build(self) -> Production<E> {
+  fn build(self) -> ProductionInner<E> {
     let ProductionBuilder { action_key, elems } = self;
-    Production::new(action_key, elems)
+    ProductionInner::new(action_key, elems)
   }
 
   pub fn add_term(&mut self, term: impl BuilderInto<E::Term>) -> &mut Self {
@@ -115,7 +115,7 @@ impl<E: ElementTypes> ProductionBuilder<E> {
 pub struct RuleBuilder<'a, E: ElementTypes> {
   action_map: &'a mut BTreeMap<E::ActionKey, E::ActionValue>,
   head: E::NonTerm,
-  prods: Vec<Production<E>>,
+  prods: Vec<ProductionInner<E>>,
 }
 
 impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
@@ -130,9 +130,9 @@ impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
     }
   }
 
-  fn build(self) -> Rule<E> {
+  fn build(self) -> RuleInner<E> {
     let RuleBuilder { head, prods, .. } = self;
-    Rule::new(head, prods)
+    RuleInner::new(head, prods)
   }
 
   pub fn add_prod(
@@ -161,7 +161,7 @@ impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
     self
       .action_map
       .insert(action_key.clone(), action_value.builder_into());
-    self.prods.push(Production {
+    self.prods.push(ProductionInner {
       action_key,
       elements: elems.builder_into(),
     });
@@ -173,7 +173,7 @@ impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
 
 pub struct GrammarBuilder<E: ElementTypes> {
   start: E::NonTerm,
-  rules: Vec<Rule<E>>,
+  rules: Vec<RuleInner<E>>,
   action_map: BTreeMap<E::ActionKey, E::ActionValue>,
 }
 
