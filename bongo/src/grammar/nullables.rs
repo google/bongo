@@ -16,10 +16,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::grammar::{Element, ElementTypes, Grammar, ProdRef, ProdKey};
 use crate::utils::{TreeNode, TreeValue, Void};
+use bongo_helper_derive::derive_unbounded;
 
 use failure::Error;
 
-#[derive(Clone)]
+#[derive_unbounded(Clone)]
 struct InternalNullableInfo<'a, E: ElementTypes> {
   /// The set of productions that are nullable
   nullable_actions: BTreeSet<ProdRef<'a, E>>,
@@ -65,7 +66,7 @@ fn inner_calculate_nullables<E: ElementTypes>(
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive_unbounded(Clone, Debug)]
 pub struct GrammarNullableInfo<E: ElementTypes> {
   nonterm_info: BTreeMap<E::NonTerm, NonTermNullableInfo<E>>,
 }
@@ -95,7 +96,7 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive_unbounded(Clone, Debug)]
 pub struct NonTermNullableInfo<E: ElementTypes> {
   nullable_action: TreeNode<ProdKey<E>, Void>,
 }

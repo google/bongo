@@ -41,7 +41,7 @@ pub fn make_simple() -> Grammar<BaseElementTypes> {
       b.add_prod("b_term_prod", (), |b| {
         b.add_term(&b_t);
       });
-    });
+    }); 
   }).unwrap()
 }
 

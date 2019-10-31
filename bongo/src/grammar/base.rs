@@ -22,6 +22,7 @@ use std::{
   collections::{BTreeMap, BTreeSet},
   fmt, ops,
 };
+use bongo_helper_derive::derive_unbounded;
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
   (a as *const T) == (b as *const T)
@@ -40,9 +41,7 @@ fn ref_cmp<T>(a: &T, b: &T) -> cmp::Ordering {
 /// This type is not instantiated, and will typically be a zero-sized type. It's
 /// constrained by the standard set of derivable operations in order to make
 /// derivations of types that use it simple.
-pub trait ElementTypes:
-  Copy + Clone + Eq + PartialEq + PartialOrd + Ord + std::fmt::Debug + 'static
-{
+pub trait ElementTypes: 'static {
   /// The type used to identify each possible terminal.
   ///
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
@@ -115,7 +114,6 @@ impl LayoutDisplay for NonTerminal {
   }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct BaseElementTypes;
 
 impl ElementTypes for BaseElementTypes {
@@ -224,50 +222,10 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
 }
 
 /// An element within a production. Includes an optional identifier.
+#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
-}
-
-// Manual definition of common traits
-
-impl<E: ElementTypes> Clone for ProductionElement<E> {
-  fn clone(&self) -> Self {
-    ProductionElement {
-      identifier: self.identifier.clone(),
-      element: self.element.clone(),
-    }
-  }
-}
-
-impl<E: ElementTypes> PartialEq for ProductionElement<E> {
-  fn eq(&self, other: &Self) -> bool {
-    self.identifier == other.identifier && self.element == other.element
-  }
-}
-
-impl<E: ElementTypes> Eq for ProductionElement<E> {}
-
-impl<E: ElementTypes> Ord for ProductionElement<E> {
-  fn cmp(&self, other: &Self) -> cmp::Ordering {
-    (self.identifier.cmp(&other.identifier))
-      .then_with(|| self.element.cmp(&other.element))
-  }
-}
-
-impl<E: ElementTypes> PartialOrd for ProductionElement<E> {
-  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl<E: ElementTypes> fmt::Debug for ProductionElement<E> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    f.debug_struct("ProductionElement")
-      .field("identifier", &self.identifier)
-      .field("element", &self.element)
-      .finish()
-  }
 }
 
 impl<E: ElementTypes> ProductionElement<E> {
@@ -334,7 +292,7 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
 }
 
 /// A production within a rule.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct Production<E: ElementTypes> {
   action_key: E::ActionKey,
   elements: Vec<ProductionElement<E>>,
@@ -380,13 +338,13 @@ impl<E: ElementTypes> LayoutDisplay for Production<E> {
   }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive_unbounded(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub struct ProdKey<E: ElementTypes> {
   head: E::NonTerm,
   action_key: E::ActionKey,
 }
 
-#[derive(Clone, Debug)]
+#[derive_unbounded(Clone, Debug)]
 struct Rule<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<Production<E>>,
@@ -415,7 +373,7 @@ impl<E: ElementTypes> LayoutDisplay for Rule<E> {
 }
 
 /// A grammar
-#[derive(Clone)]
+#[derive_unbounded(Clone)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
   rule_set: BTreeMap<E::NonTerm, Rule<E>>,
@@ -539,7 +497,7 @@ impl<E: ElementTypes> Grammar<E> {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive_unbounded(Clone, Debug)]
 pub struct GrammarErrors<E: ElementTypes> {
   unreachable_nonterms: BTreeSet<E::NonTerm>,
   nonterms_without_rules: BTreeSet<E::NonTerm>,
@@ -723,7 +681,7 @@ impl<T> Copy for RefCompare<'_, T> {}
 
 // ------------
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive_unbounded(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RuleRef<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   rule: RefCompare<'a, Rule<E>>,
@@ -753,7 +711,7 @@ impl<'a, E: ElementTypes> RuleRef<'a, E> {
 
 // ------------
 
-#[derive(Debug)]
+#[derive_unbounded(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProdRef<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   head: &'a E::NonTerm,
@@ -800,42 +758,3 @@ impl<'a, E: ElementTypes> ProdRef<'a, E> {
     }
   }
 }
-
-impl<E: ElementTypes> cmp::Eq for ProdRef<'_, E> {}
-
-impl<E: ElementTypes> cmp::PartialEq for ProdRef<'_, E> {
-  fn eq(&self, other: &Self) -> bool {
-    self.grammar == other.grammar
-      && self.head == other.head
-      && self.prod == other.prod
-      && self.action_value == other.action_value
-  }
-}
-
-impl<E: ElementTypes> cmp::PartialOrd for ProdRef<'_, E> {
-  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl<E: ElementTypes> cmp::Ord for ProdRef<'_, E> {
-  fn cmp(&self, other: &Self) -> cmp::Ordering {
-    (self.grammar.cmp(&other.grammar))
-      .then_with(|| self.head.cmp(&other.head))
-      .then_with(|| self.prod.cmp(&other.prod))
-      .then_with(|| self.action_value.cmp(&other.action_value))
-  }
-}
-
-impl<'a, E: ElementTypes> Clone for ProdRef<'a, E> {
-  fn clone(&self) -> Self {
-    ProdRef {
-      grammar: self.grammar,
-      head: self.head,
-      prod: self.prod,
-      action_value: self.action_value,
-    }
-  }
-}
-
-impl<E: ElementTypes> Copy for ProdRef<'_, E> {}

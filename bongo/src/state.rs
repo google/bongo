@@ -15,6 +15,7 @@
 use crate::grammar::{Element, ElementTypes, ProdRef, ProductionElement};
 use crate::pdisplay::{self, LayoutDisplay};
 use codefmt::Layout;
+use bongo_helper_derive::derive_unbounded;
 
 /// A state of a production within a parse state.
 ///
@@ -28,7 +29,7 @@ use codefmt::Layout;
 ///
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct ProductionState<'a, E: ElementTypes> {
   /// The production this state is part of.
   prod: ProdRef<'a, E>,

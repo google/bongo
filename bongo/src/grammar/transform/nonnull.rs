@@ -58,17 +58,17 @@ use crate::grammar::{
 };
 
 use crate::utils::{Name, TreeNode, Void};
+use bongo_helper_derive::derive_unbounded;
 
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive_unbounded(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ActionKey<E: ElementTypes> {
   action: E::ActionKey,
   nt_nullable_states: Vec<bool>,
 }
 
-#[derive(Clone, Debug)]
+#[derive_unbounded(Clone, Debug)]
 pub struct ActionValue<E: ElementTypes> {
   parent_value: E::ActionValue,
   nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
@@ -101,7 +101,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
   }).map_err(|_| format_err!("Grammar failed to build"))?)
 }
 
-#[derive(Clone, Debug)]
+#[derive_unbounded(Clone, Debug)]
 struct ProdBuildState<E: ElementTypes> {
   elems: Vec<ProductionElement<ElemTypes<E>>>,
   nt_nullable_states: Vec<bool>,
