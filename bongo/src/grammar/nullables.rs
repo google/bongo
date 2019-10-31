@@ -17,7 +17,7 @@ use {
     utils::{TreeNode, TreeValue, Void},
   },
   bongo_helper_derive::derive_unbounded,
-  failure::Error,
+  anyhow::Error,
   std::collections::{BTreeMap, BTreeSet},
 };
 
@@ -108,9 +108,9 @@ impl<E: ElementTypes> NonTermNullableInfo<E> {
   }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, thiserror::Error)]
 pub enum NullableError {
-  #[fail(display = "found nullable ambiguities in grammar")]
+  #[error("found nullable ambiguities in grammar")]
   NullableAmbiguity,
 }
 

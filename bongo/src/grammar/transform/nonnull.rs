@@ -55,8 +55,8 @@ use {
     },
     utils::{Name, TreeNode, Void},
   },
+  anyhow::{anyhow, Error},
   bongo_helper_derive::derive_unbounded,
-  failure::{format_err, Error},
   std::{collections::BTreeMap, marker::PhantomData},
 };
 
@@ -100,7 +100,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
         });
       }
     })
-    .map_err(|_| format_err!("Grammar failed to build"))?,
+    .map_err(|_| anyhow!("Grammar failed to build"))?,
   )
 }
 
