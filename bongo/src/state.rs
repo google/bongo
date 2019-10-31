@@ -34,7 +34,7 @@ use {
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
 #[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-pub struct ProductionState<'a, E: ElementTypes> {
+pub struct ProdState<'a, E: ElementTypes> {
   /// The production this state is part of.
   prod: Prod<'a, E>,
 
@@ -43,12 +43,12 @@ pub struct ProductionState<'a, E: ElementTypes> {
   index: usize,
 }
 
-impl<'a, E: ElementTypes> ProductionState<'a, E> {
-  /// Create a ProductionState from a given NonTerminal and Production.
+impl<'a, E: ElementTypes> ProdState<'a, E> {
+  /// Create a ProdState from a given NonTerminal and Prod.
   ///
   /// This state's index will be at the start of the production.
   pub fn from_start(prod: Prod<'a, E>) -> Self {
-    ProductionState { prod, index: 0 }
+    ProdState { prod, index: 0 }
   }
   pub fn prod(&self) -> Prod<'a, E> {
     self.prod
@@ -56,13 +56,11 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
 
   /// Returns the next element after the current index. If it is at the
   /// end, then it reuturns `None`.
-  pub fn next(
-    &self,
-  ) -> Option<(&'a ProductionElement<E>, ProductionState<'a, E>)> {
+  pub fn next(&self) -> Option<(&'a ProductionElement<E>, ProdState<'a, E>)> {
     self.prod.prod_elements().get(self.index).map(|prod_elem| {
       (
         prod_elem,
-        ProductionState {
+        ProdState {
           prod: self.prod,
           index: self.index + 1,
         },
@@ -72,10 +70,7 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
 
   /// Return Some(state) which is this state advanced if
   /// the next element type is elem.
-  pub fn advance_if(
-    &self,
-    elem: &Element<E>,
-  ) -> Option<ProductionState<'a, E>> {
+  pub fn advance_if(&self, elem: &Element<E>) -> Option<ProdState<'a, E>> {
     self
       .next()
       .filter(|(e, _)| e.elem() == elem)
@@ -83,7 +78,7 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
   }
 }
 
-impl<'a, E: ElementTypes> LayoutDisplay for ProductionState<'a, E> {
+impl<'a, E: ElementTypes> LayoutDisplay for ProdState<'a, E> {
   fn disp(&self) -> Layout {
     let mut layouts = Vec::new();
     let (first_slice, second_slice) =

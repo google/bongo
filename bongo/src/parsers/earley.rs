@@ -18,7 +18,7 @@
 //! grammar, but a baseline that can be validated against.
 
 use {
-  crate::{parsers::ParseTree, state::ProductionState, ElementTypes},
+  crate::{parsers::ParseTree, state::ProdState, ElementTypes},
   std::collections::BTreeMap,
 };
 
@@ -27,7 +27,7 @@ struct ParserImpl<'a, E: ElementTypes, Leaf> {
 }
 
 struct EarleyState<'a, E: ElementTypes, Leaf> {
-  state: BTreeMap<ProductionState<'a, E>, Vec<ParseTree<E, Leaf>>>,
+  state: BTreeMap<ProdState<'a, E>, Vec<ParseTree<E, Leaf>>>,
 }
 
 impl<E: ElementTypes, Leaf> EarleyState<'_, E, Leaf> {
