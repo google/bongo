@@ -11,9 +11,82 @@ use {
     parse::{Parse, ParseStream, Parser},
     punctuated::Punctuated,
     spanned::Spanned,
-    Ident, Item, Result, Token, WherePredicate,
+    GenericParam, Generics, Ident, Item, Result, Token, WherePredicate,
   },
 };
+
+fn generic_param_literal(param: &GenericParam) -> TokenStream {
+  match param {
+    GenericParam::Type(t) => {
+      let id = &t.ident;
+      quote! { #id }
+    }
+    GenericParam::Lifetime(l) => {
+      quote! { #l }
+    }
+    GenericParam::Const(c) => {
+      let id = &c.ident;
+      quote! { #id }
+    }
+  }
+}
+
+struct GenericsData {
+  generics_clause: TokenStream,
+  args_clause: TokenStream,
+  where_clause: TokenStream,
+}
+
+impl GenericsData {
+  pub fn new(gen: &Generics, bounds: &Vec<WherePredicate>) -> Self {
+    let generics_clause;
+    let args_clause;
+    if gen.lt_token.is_some() {
+      let params = &gen.params;
+      let type_vars = params.iter().map(generic_param_literal);
+      generics_clause = quote! { < #params > };
+      args_clause = quote! { < #(#type_vars),* >};
+    } else {
+      generics_clause = quote! {};
+      args_clause = quote! {};
+    };
+
+    let mut where_params = Vec::new();
+    where_params
+      .extend(gen.where_clause.iter().flat_map(|c| c.predicates.iter()));
+    where_params.extend(bounds.iter());
+    let where_clause = if where_params.is_empty() {
+      quote! {}
+    } else {
+      quote! { where #(#where_params),* }
+    };
+
+    GenericsData {
+      generics_clause,
+      args_clause,
+      where_clause,
+    }
+  }
+
+  pub fn impl_item(
+    &self,
+    name: impl ToTokens,
+    impl_trait: impl ToTokens,
+    body: impl ToTokens,
+  ) -> TokenStream {
+    let GenericsData {
+      generics_clause,
+      args_clause,
+      where_clause,
+    } = self;
+
+    quote! {
+      impl #generics_clause #impl_trait for #name #args_clause #where_clause {
+        #body
+      }
+    }
+  }
+}
 
 fn struct_clone_expr<'a>(
   struct_name: impl ToTokens,
@@ -74,7 +147,7 @@ fn derive_from_struct(
   attr: &AttrContents,
   st: &syn::ItemStruct,
 ) -> syn::Result<proc_macro2::TokenStream> {
-  let impl_data = struct_derive::extract_impl_data(st, &attr.where_clauses);
+  let impl_data = struct_derive::ImplData::new(st, &attr.where_clauses);
   let mut impl_items = Vec::new();
   for trait_id in &attr.traits {
     impl_items.push(match &*trait_id.to_string() {
@@ -92,13 +165,24 @@ fn derive_from_struct(
 }
 
 fn derive_from_enum(
-  _: &AttrContents,
+  attr: &AttrContents,
   en: &syn::ItemEnum,
 ) -> syn::Result<proc_macro2::TokenStream> {
-  Err(syn::Error::new_spanned(
-    en.enum_token,
-    "enums are not supported.",
-  ))
+  let impl_data = enum_derive::ImplData::new(en, &attr.where_clauses);
+  let mut impl_items = Vec::new();
+  for trait_id in &attr.traits {
+    impl_items.push(match &*trait_id.to_string() {
+      "Copy" => enum_derive::derive_copy(&impl_data),
+      "Clone" => enum_derive::derive_clone(&impl_data),
+      "PartialEq" => enum_derive::derive_partial_eq(&impl_data),
+      "Eq" => enum_derive::derive_eq(&impl_data),
+      "PartialOrd" => enum_derive::derive_partial_ord(&impl_data),
+      "Ord" => enum_derive::derive_ord(&impl_data),
+      "Debug" => enum_derive::derive_debug(&impl_data),
+      _ => return Err(syn::Error::new_spanned(trait_id, "Unknown impl type")),
+    })
+  }
+  Ok(quote! { #(#impl_items)* })
 }
 
 #[proc_macro_attribute]

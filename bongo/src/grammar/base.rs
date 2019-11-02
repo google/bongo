@@ -24,7 +24,7 @@ use {
   std::{
     cmp,
     collections::{BTreeMap, BTreeSet},
-    fmt, ops,
+    ops,
   },
 };
 
@@ -126,62 +126,10 @@ impl ElementTypes for BaseElementTypes {
 }
 
 /// A single element (terminal or non-terminal).
+#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Element<E: ElementTypes> {
   Term(E::Term),
   NonTerm(E::NonTerm),
-}
-
-// Manual definition of common traits
-//
-// Note: This is still required with derive_unbounded, as we do not support enums at this time.
-
-impl<E: ElementTypes> Clone for Element<E> {
-  fn clone(&self) -> Self {
-    match self {
-      Element::Term(t) => Element::Term(t.clone()),
-      Element::NonTerm(nt) => Element::NonTerm(nt.clone()),
-    }
-  }
-}
-
-impl<E: ElementTypes> PartialEq for Element<E> {
-  fn eq(&self, other: &Self) -> bool {
-    match (self, other) {
-      (Element::Term(t1), Element::Term(t2)) => t1 == t2,
-      (Element::NonTerm(nt1), Element::NonTerm(nt2)) => nt1 == nt2,
-      _ => false,
-    }
-  }
-}
-
-impl<E: ElementTypes> Eq for Element<E> {}
-
-impl<E: ElementTypes> Ord for Element<E> {
-  fn cmp(&self, other: &Self) -> cmp::Ordering {
-    match (self, other) {
-      (Element::Term(t1), Element::Term(t2)) => t1.cmp(t2),
-      (Element::NonTerm(nt1), Element::NonTerm(nt2)) => nt1.cmp(nt2),
-      (Element::Term(_), Element::NonTerm(_)) => cmp::Ordering::Less,
-      (Element::NonTerm(_), Element::Term(_)) => cmp::Ordering::Greater,
-    }
-  }
-}
-
-impl<E: ElementTypes> PartialOrd for Element<E> {
-  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl<E: ElementTypes> fmt::Debug for Element<E> {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Element::Term(t) => f.debug_tuple("Element::Term").field(t).finish(),
-      Element::NonTerm(nt) => {
-        f.debug_tuple("Element::NonTerm").field(nt).finish()
-      }
-    }
-  }
 }
 
 impl<E: ElementTypes> Element<E> {
