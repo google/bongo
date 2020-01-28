@@ -4,8 +4,7 @@ edition = "2018"
 name = "bongo"
 version = "0.1.0"
 [dependencies]
-failure = "^0.1.5"
-failure_derive = "^0.1.5"
+snafu = "0.6.2"
 unicode-segmentation = "^1.2.1"
 
 [dependencies.codefmt]

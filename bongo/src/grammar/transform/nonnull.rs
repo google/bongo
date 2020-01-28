@@ -48,16 +48,31 @@
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
 
-use failure::{format_err, Error};
-
 use crate::grammar::{
   build,
-  nullables::{calculate_nullables, GrammarNullableInfo},
+  nullables::{calculate_nullables, GrammarNullableInfo, NullableError},
   Element, ElementTypes, Grammar, ProdKey, ProdRef, ProductionElement,
   RuleBuilder,
 };
 
 use crate::utils::{Name, TreeNode, Void};
+
+use snafu::Snafu;
+
+#[derive(Debug, Snafu)]
+pub enum Error {
+  #[snafu(display("Grammar failed to build"))]
+  GrammarBuildFailure,
+  
+  #[snafu(display("Nullable transform error: {}", source))]
+  Nullable{ source: NullableError },
+}
+
+impl From<NullableError> for Error {
+  fn from(source: NullableError) -> Self {
+    Error::Nullable{ source }
+  }
+}
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
@@ -98,7 +113,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
         }
       });
     }
-  }).map_err(|_| format_err!("Grammar failed to build"))?)
+  }).map_err(|_| Error::GrammarBuildFailure)?)
 }
 
 #[derive(Clone, Debug)]

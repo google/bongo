@@ -17,7 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::grammar::{Element, ElementTypes, Grammar, ProdRef, ProdKey};
 use crate::utils::{TreeNode, TreeValue, Void};
 
-use failure::Error;
+use snafu::Snafu;
 
 #[derive(Clone)]
 struct InternalNullableInfo<'a, E: ElementTypes> {
@@ -106,15 +106,15 @@ impl<E: ElementTypes> NonTermNullableInfo<E> {
   }
 }
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Snafu)]
 pub enum NullableError {
-  #[fail(display = "found nullable ambiguities in grammar")]
+  #[snafu(display("found nullable ambiguities in grammar"))]
   NullableAmbiguity,
 }
 
 pub fn calculate_nullables<E: ElementTypes>(
   g: &Grammar<E>,
-) -> Result<GrammarNullableInfo<E>, Error> {
+) -> Result<GrammarNullableInfo<E>, NullableError> {
   let inner_info = inner_calculate_nullables(g);
 
   // Sanity check outputs.
@@ -123,7 +123,7 @@ pub fn calculate_nullables<E: ElementTypes>(
     if actions_length == 0 {
       panic!("Unexpectedly empty nullable action!")
     } else if actions_length > 1 {
-      return Err(NullableError::NullableAmbiguity.into());
+      return Err(NullableError::NullableAmbiguity);
     }
   }
 
@@ -254,7 +254,6 @@ mod test {
   #[test]
   fn test_ambiguous_nullable_grammar() {
     let g = examples::make_ambiguous_nullable();
-    let nullable_error = calculate_nullables(&g).unwrap_err();
-    assert!(nullable_error.downcast_ref::<NullableError>().is_some());
+    calculate_nullables(&g).unwrap_err();
   }
 }
