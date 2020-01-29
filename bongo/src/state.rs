@@ -45,7 +45,7 @@ impl<'a, E: ElementTypes> ProductionState<'a, E> {
   pub fn from_start(prod: ProdRef<'a, E>) -> Self {
     ProductionState { prod, index: 0 }
   }
-  
+
   pub fn prod(&self) -> ProdRef<'a, E> {
     self.prod
   }

@@ -15,7 +15,7 @@
 pub mod builder;
 
 use crate::pdisplay::LayoutDisplay;
-use crate::utils::{breadth_first_search, Name};
+use crate::utils::{breadth_first_search, Name, OrdKey};
 use codefmt::Layout;
 use std::{
   cmp,
@@ -41,38 +41,18 @@ fn ref_cmp<T>(a: &T, b: &T) -> cmp::Ordering {
 /// constrained by the standard set of derivable operations in order to make
 /// derivations of types that use it simple.
 pub trait ElementTypes:
-  Copy + Clone + Eq + PartialEq + PartialOrd + Ord + std::fmt::Debug + 'static
+  Copy + Clone + Eq + PartialEq + Ord + PartialOrd + fmt::Debug + 'static
 {
   /// The type used to identify each possible terminal.
   ///
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
-  type Term: Clone
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + LayoutDisplay
-    + std::fmt::Debug
-    + 'static;
+  type Term: OrdKey;
 
   // The type used to identify each possible non-terminal.
-  type NonTerm: Clone
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + LayoutDisplay
-    + std::fmt::Debug
-    + 'static;
+  type NonTerm: OrdKey;
 
   // The type used to identify each production.
-  type ActionKey: Clone
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + std::fmt::Debug
-    + 'static;
+  type ActionKey: OrdKey;
 
   type ActionValue: Clone + std::fmt::Debug + 'static;
 }
@@ -89,6 +69,8 @@ impl Terminal {
   }
 }
 
+impl OrdKey for Terminal {}
+
 impl LayoutDisplay for Terminal {
   fn disp(&self) -> codefmt::Layout {
     let name = self.0.str();
@@ -104,6 +86,8 @@ impl NonTerminal {
     NonTerminal(Name::new(s))
   }
 }
+
+impl OrdKey for NonTerminal {}
 
 impl LayoutDisplay for NonTerminal {
   fn disp(&self) -> codefmt::Layout {

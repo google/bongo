@@ -135,7 +135,7 @@ impl BufferRange {
     let mut copy = self.clone();
     let advance_succeeded = copy.advance_n_mut(n).is_some();
     if advance_succeeded {
-      let s = &self.buf.0.text[self.start_index.. copy.start_index];
+      let s = &self.buf.0.text[self.start_index..copy.start_index];
       Some((s, copy))
     } else {
       None

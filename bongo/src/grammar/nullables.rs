@@ -14,7 +14,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::grammar::{Element, ElementTypes, Grammar, ProdRef, ProdKey};
+use crate::grammar::{Element, ElementTypes, Grammar, ProdKey, ProdRef};
 use crate::utils::{TreeNode, TreeValue, Void};
 
 use snafu::Snafu;
@@ -161,10 +161,7 @@ pub fn calculate_nullables<E: ElementTypes>(
       nullable_infos.insert(
         null_nt.clone(),
         NonTermNullableInfo {
-          nullable_action: TreeNode::new(
-            prod.prod_key(),
-            nullable_tree_fields,
-          ),
+          nullable_action: TreeNode::new(prod.prod_key(), nullable_tree_fields),
         },
       );
     }

@@ -14,6 +14,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::pdisplay::LayoutDisplay;
 use codefmt::Layout;
 
 pub mod buffer;
@@ -27,6 +28,19 @@ pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
     }
     curr = next;
   }
+}
+
+/// A trait for ordered keys. Keys must be clonable, fully ordered,
+pub trait OrdKey:
+  Clone
+  + PartialEq
+  + Eq
+  + PartialOrd
+  + Ord
+  + LayoutDisplay
+  + std::fmt::Debug
+  + 'static
+{
 }
 
 /// A refcounted name type, used to avoid duplicating common string values
@@ -62,6 +76,14 @@ impl AsRef<str> for Name {
   }
 }
 
+impl LayoutDisplay for Name {
+  fn disp(&self) -> codefmt::Layout {
+    Layout::text(self.0.as_ref())
+  }
+}
+
+impl OrdKey for Name {}
+
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum TreeValue<L, V> {
   Node(Box<TreeNode<L, V>>),
@@ -92,7 +114,10 @@ impl<L: Ord, V> TreeNode<L, V> {
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum Void {}
 
-pub fn breadth_first_search<T, InitI, StepI, F>(initial: InitI, mut f: F) -> BTreeSet<T>
+pub fn breadth_first_search<T, InitI, StepI, F>(
+  initial: InitI,
+  mut f: F,
+) -> BTreeSet<T>
 where
   T: Ord + Clone,
   InitI: IntoIterator<Item = T>,

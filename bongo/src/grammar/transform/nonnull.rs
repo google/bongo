@@ -55,7 +55,11 @@ use crate::grammar::{
   RuleBuilder,
 };
 
-use crate::utils::{Name, TreeNode, Void};
+use crate::utils::{Name, OrdKey, TreeNode, Void};
+
+use crate::pdisplay::LayoutDisplay;
+
+use codefmt::Layout;
 
 use snafu::Snafu;
 
@@ -63,14 +67,14 @@ use snafu::Snafu;
 pub enum Error {
   #[snafu(display("Grammar failed to build"))]
   GrammarBuildFailure,
-  
+
   #[snafu(display("Nullable transform error: {}", source))]
-  Nullable{ source: NullableError },
+  Nullable { source: NullableError },
 }
 
 impl From<NullableError> for Error {
   fn from(source: NullableError) -> Self {
-    Error::Nullable{ source }
+    Error::Nullable { source }
   }
 }
 
@@ -82,6 +86,14 @@ pub struct ActionKey<E: ElementTypes> {
   action: E::ActionKey,
   nt_nullable_states: Vec<bool>,
 }
+
+impl<E: ElementTypes> LayoutDisplay for ActionKey<E> {
+  fn disp(&self) -> Layout {
+    Layout::text(format!("{:?}", self))
+  }
+}
+
+impl<E: ElementTypes> OrdKey for ActionKey<E> {}
 
 #[derive(Clone, Debug)]
 pub struct ActionValue<E: ElementTypes> {
@@ -101,19 +113,22 @@ pub fn transform_to_nonnull<E: ElementTypes>(
 ) -> Result<Grammar<ElemTypes<E>>, Error> {
   let nullables = calculate_nullables(g)?;
 
-  Ok(build(g.start_nt().clone(), |g_builder| {
-    for (nt, rule) in g.rule_set() {
-      g_builder.add_rule(nt.clone(), |r_builder| {
-        for prod in rule.prods() {
-          if nullables.is_prod_nullable(&prod) {
-            continue;
-          }
+  Ok(
+    build(g.start_nt().clone(), |g_builder| {
+      for (nt, rule) in g.rule_set() {
+        g_builder.add_rule(nt.clone(), |r_builder| {
+          for prod in rule.prods() {
+            if nullables.is_prod_nullable(&prod) {
+              continue;
+            }
 
-          build_nonnull_prods(&nullables, &prod, r_builder);
-        }
-      });
-    }
-  }).map_err(|_| Error::GrammarBuildFailure)?)
+            build_nonnull_prods(&nullables, &prod, r_builder);
+          }
+        });
+      }
+    })
+    .map_err(|_| Error::GrammarBuildFailure)?,
+  )
 }
 
 #[derive(Clone, Debug)]

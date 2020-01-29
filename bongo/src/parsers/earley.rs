@@ -18,11 +18,7 @@
 //! grammar, but a baseline that can be validated against.
 
 use {
-  crate::{
-    parsers::ParseTree,
-    state::ProductionState,
-    ElementTypes,
-  },
+  crate::{parsers::ParseTree, state::ProductionState, ElementTypes},
   std::collections::BTreeMap,
 };
 
