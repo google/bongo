@@ -69,8 +69,6 @@ impl Terminal {
   }
 }
 
-impl OrdKey for Terminal {}
-
 impl LayoutDisplay for Terminal {
   fn disp(&self) -> codefmt::Layout {
     let name = self.0.str();
@@ -86,8 +84,6 @@ impl NonTerminal {
     NonTerminal(Name::new(s))
   }
 }
-
-impl OrdKey for NonTerminal {}
 
 impl LayoutDisplay for NonTerminal {
   fn disp(&self) -> codefmt::Layout {

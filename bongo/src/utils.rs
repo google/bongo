@@ -43,6 +43,8 @@ pub trait OrdKey:
 {
 }
 
+impl<T: Clone + PartialEq + Eq + PartialOrd + Ord + LayoutDisplay + std::fmt::Debug + 'static> OrdKey for T {}
+
 /// A refcounted name type, used to avoid duplicating common string values
 /// throughout an AST.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -81,8 +83,6 @@ impl LayoutDisplay for Name {
     Layout::text(self.0.as_ref())
   }
 }
-
-impl OrdKey for Name {}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub enum TreeValue<L, V> {

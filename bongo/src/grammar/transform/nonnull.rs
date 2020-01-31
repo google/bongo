@@ -55,7 +55,7 @@ use crate::grammar::{
   RuleBuilder,
 };
 
-use crate::utils::{Name, OrdKey, TreeNode, Void};
+use crate::utils::{Name, TreeNode, Void};
 
 use crate::pdisplay::LayoutDisplay;
 
@@ -92,8 +92,6 @@ impl<E: ElementTypes> LayoutDisplay for ActionKey<E> {
     Layout::text(format!("{:?}", self))
   }
 }
-
-impl<E: ElementTypes> OrdKey for ActionKey<E> {}
 
 #[derive(Clone, Debug)]
 pub struct ActionValue<E: ElementTypes> {
