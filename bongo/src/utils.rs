@@ -43,7 +43,18 @@ pub trait OrdKey:
 {
 }
 
-impl<T: Clone + PartialEq + Eq + PartialOrd + Ord + LayoutDisplay + std::fmt::Debug + 'static> OrdKey for T {}
+impl<
+    T: Clone
+      + PartialEq
+      + Eq
+      + PartialOrd
+      + Ord
+      + LayoutDisplay
+      + std::fmt::Debug
+      + 'static,
+  > OrdKey for T
+{
+}
 
 /// A refcounted name type, used to avoid duplicating common string values
 /// throughout an AST.
