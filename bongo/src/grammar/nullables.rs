@@ -17,8 +17,8 @@ use {
     utils::{TreeNode, TreeValue, Void},
   },
   anyhow::Error,
-  std::collections::{BTreeMap, BTreeSet},
   derivative::Derivative,
+  std::collections::{BTreeMap, BTreeSet},
 };
 
 #[derive(Derivative)]
@@ -30,7 +30,7 @@ use {
   Ord(bound = ""),
   Debug(bound = ""),
   PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
 )]
 struct InternalNullableInfo<'a, E: ElementTypes> {
   /// The set of productions that are nullable
@@ -78,10 +78,7 @@ fn inner_calculate_nullables<E: ElementTypes>(
 }
 
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  Debug(bound = ""),
-)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct GrammarNullableInfo<E: ElementTypes> {
   nonterm_info: BTreeMap<E::NonTerm, NonTermNullableInfo<E>>,
 }
@@ -112,10 +109,7 @@ impl<E: ElementTypes> GrammarNullableInfo<E> {
 }
 
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  Debug(bound = ""),
-)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct NonTermNullableInfo<E: ElementTypes> {
   nullable_action: TreeNode<ProdKey<E>, Void>,
 }

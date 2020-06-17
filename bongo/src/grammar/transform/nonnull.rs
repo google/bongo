@@ -56,8 +56,8 @@ use {
     utils::{Name, TreeNode, Void},
   },
   anyhow::{anyhow, Error},
-  std::{collections::BTreeMap, marker::PhantomData},
   derivative::Derivative,
+  std::{collections::BTreeMap, marker::PhantomData},
 };
 
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
@@ -71,7 +71,7 @@ pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
   Ord(bound = ""),
   Debug(bound = ""),
   PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
 )]
 pub struct ActionKey<E: ElementTypes> {
   action: E::ActionKey,
@@ -79,10 +79,7 @@ pub struct ActionKey<E: ElementTypes> {
 }
 
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  Debug(bound = ""),
-)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct ActionValue<E: ElementTypes> {
   parent_value: E::ActionValue,
   nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
@@ -119,10 +116,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
 }
 
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  Debug(bound = ""),
-)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 struct ProdBuildState<E: ElementTypes> {
   elems: Vec<ProductionElement<ElemTypes<E>>>,
   nt_nullable_states: Vec<bool>,

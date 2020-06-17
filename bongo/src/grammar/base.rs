@@ -17,15 +17,15 @@ pub mod builder;
 use {
   crate::{
     pdisplay::LayoutDisplay,
-    utils::{breadth_first_search, Name},
+    utils::{breadth_first_search, Name, OrdKey},
   },
   codefmt::Layout,
+  derivative::Derivative,
   std::{
     cmp,
     collections::{BTreeMap, BTreeSet},
     ops,
   },
-  derivative::Derivative,
 };
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
@@ -47,33 +47,13 @@ pub trait ElementTypes: 'static {
   /// The type used to identify each possible terminal.
   ///
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
-  type Term: Clone
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + LayoutDisplay
-    + std::fmt::Debug
-    + 'static;
+  type Term: OrdKey + LayoutDisplay;
 
   // The type used to identify each possible non-terminal.
-  type NonTerm: Clone
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + LayoutDisplay
-    + std::fmt::Debug
-    + 'static;
+  type NonTerm: OrdKey + LayoutDisplay;
 
   // The type used to identify each production.
-  type ActionKey: Clone
-    + PartialEq
-    + Eq
-    + PartialOrd
-    + Ord
-    + std::fmt::Debug
-    + 'static;
+  type ActionKey: OrdKey;
 
   type ActionValue: Clone + std::fmt::Debug + 'static;
 }
@@ -135,7 +115,7 @@ impl ElementTypes for BaseElementTypes {
   Ord(bound = ""),
   Debug(bound = ""),
   PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
 )]
 pub enum Element<E: ElementTypes> {
   Term(E::Term),
@@ -191,7 +171,7 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
@@ -269,7 +249,7 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 struct ProductionInner<E: ElementTypes> {
   action_key: E::ActionKey,
@@ -323,7 +303,7 @@ impl<E: ElementTypes> LayoutDisplay for ProductionInner<E> {
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 pub struct ProdKey<E: ElementTypes> {
   head: E::NonTerm,
@@ -331,10 +311,7 @@ pub struct ProdKey<E: ElementTypes> {
 }
 
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  Debug(bound = ""),
-)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 struct RuleInner<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<ProductionInner<E>>,
@@ -378,9 +355,7 @@ impl<E: ElementTypes> LayoutDisplay for RuleInner<E> {
 /// Grammars are read-only, and the accessors use the lifetime of the
 /// grammar object.
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-)]
+#[derivative(Clone(bound = ""))]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
   rule_set: BTreeMap<E::NonTerm, RuleInner<E>>,
@@ -510,10 +485,7 @@ impl<E: ElementTypes> Grammar<E> {
 }
 
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  Debug(bound = ""),
-)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct GrammarErrors<E: ElementTypes> {
   unreachable_nonterms: BTreeSet<E::NonTerm>,
   nonterms_without_rules: BTreeSet<E::NonTerm>,
@@ -707,7 +679,7 @@ impl<T> Copy for RefCompare<'_, T> {}
   Ord(bound = ""),
   Debug(bound = ""),
   PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
 )]
 pub struct Rule<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
@@ -748,7 +720,7 @@ impl<'a, E: ElementTypes> Rule<'a, E> {
   Ord(bound = ""),
   Debug(bound = ""),
   PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
 )]
 pub struct Prod<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use {
+  crate::pdisplay::LayoutDisplay,
   codefmt::Layout,
   std::collections::{BTreeMap, BTreeSet},
 };
@@ -30,10 +31,27 @@ pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   }
 }
 
+pub trait OrdKey:
+  Clone + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug + 'static
+{
+}
+
+impl<
+    T: Clone + PartialEq + Eq + PartialOrd + Ord + std::fmt::Debug + 'static,
+  > OrdKey for T
+{
+}
+
 /// A refcounted name type, used to avoid duplicating common string values
 /// throughout an AST.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Name(std::rc::Rc<String>);
+
+impl LayoutDisplay for Name {
+  fn disp(&self) -> codefmt::Layout {
+    codefmt::Layout::text((*self.0).clone())
+  }
+}
 
 impl Name {
   /// Creates a new Name containing the given string.

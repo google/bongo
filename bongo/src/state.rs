@@ -40,7 +40,7 @@ use {
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 pub struct ProdState<'a, E: ElementTypes> {
   /// The production this state is part of.
@@ -100,7 +100,7 @@ impl<'a, E: ElementTypes> LayoutDisplay for ProdState<'a, E> {
     }
     let body = pdisplay::join_layout(layouts, codefmt::Layout::text(" "));
     codefmt::Layout::juxtapose(vec![
-      self.prod.head().disp(),
+      codefmt::Layout::text(format!("{:?}", self.prod.head())),
       codefmt::Layout::text(" => "),
       body,
     ])
