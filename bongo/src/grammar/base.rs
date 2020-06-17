@@ -19,13 +19,13 @@ use {
     pdisplay::LayoutDisplay,
     utils::{breadth_first_search, Name},
   },
-  bongo_helper_derive::derive_unbounded,
   codefmt::Layout,
   std::{
     cmp,
     collections::{BTreeMap, BTreeSet},
     ops,
   },
+  derivative::Derivative,
 };
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
@@ -126,7 +126,17 @@ impl ElementTypes for BaseElementTypes {
 }
 
 /// A single element (terminal or non-terminal).
-#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+  PartialOrd = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum",
+)]
 pub enum Element<E: ElementTypes> {
   Term(E::Term),
   NonTerm(E::NonTerm),
@@ -174,7 +184,15 @@ impl<E: ElementTypes> LayoutDisplay for Element<E> {
 }
 
 /// An element within a production. Includes an optional identifier.
-#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+)]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
   element: Element<E>,
@@ -244,7 +262,15 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
 }
 
 /// A production within a rule.
-#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+)]
 struct ProductionInner<E: ElementTypes> {
   action_key: E::ActionKey,
   elements: Vec<ProductionElement<E>>,
@@ -290,13 +316,25 @@ impl<E: ElementTypes> LayoutDisplay for ProductionInner<E> {
   }
 }
 
-#[derive_unbounded(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+)]
 pub struct ProdKey<E: ElementTypes> {
   head: E::NonTerm,
   action_key: E::ActionKey,
 }
 
-#[derive_unbounded(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  Debug(bound = ""),
+)]
 struct RuleInner<E: ElementTypes> {
   head: E::NonTerm,
   prods: Vec<ProductionInner<E>>,
@@ -339,7 +377,10 @@ impl<E: ElementTypes> LayoutDisplay for RuleInner<E> {
 ///
 /// Grammars are read-only, and the accessors use the lifetime of the
 /// grammar object.
-#[derive_unbounded(Clone)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+)]
 pub struct Grammar<E: ElementTypes> {
   start_symbol: E::NonTerm,
   rule_set: BTreeMap<E::NonTerm, RuleInner<E>>,
@@ -468,7 +509,11 @@ impl<E: ElementTypes> Grammar<E> {
   }
 }
 
-#[derive_unbounded(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  Debug(bound = ""),
+)]
 pub struct GrammarErrors<E: ElementTypes> {
   unreachable_nonterms: BTreeSet<E::NonTerm>,
   nonterms_without_rules: BTreeSet<E::NonTerm>,
@@ -652,7 +697,18 @@ impl<T> Copy for RefCompare<'_, T> {}
 
 // ------------
 
-#[derive_unbounded(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Derivative)]
+#[derivative(
+  Copy(bound = ""),
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+  PartialOrd = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum",
+)]
 pub struct Rule<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   rule: RefCompare<'a, RuleInner<E>>,
@@ -682,7 +738,18 @@ impl<'a, E: ElementTypes> Rule<'a, E> {
 
 // ------------
 
-#[derive_unbounded(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Copy(bound = ""),
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+  PartialOrd = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum",
+)]
 pub struct Prod<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   head: &'a E::NonTerm,

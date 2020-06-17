@@ -17,8 +17,8 @@ use {
     grammar::{Element, ElementTypes, Prod, ProductionElement},
     pdisplay::{self, LayoutDisplay},
   },
-  bongo_helper_derive::derive_unbounded,
   codefmt::Layout,
+  derivative::Derivative,
 };
 
 /// A state of a production within a parse state.
@@ -33,7 +33,15 @@ use {
 ///
 /// This indicates that the head is A, the production is a <b> c, and the
 /// current location is just before the final c.
-#[derive_unbounded(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+)]
 pub struct ProdState<'a, E: ElementTypes> {
   /// The production this state is part of.
   prod: Prod<'a, E>,

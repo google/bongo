@@ -7,9 +7,7 @@ version = "0.1.0"
 thiserror = "1.0"
 anyhow = "1.0.18"
 unicode-segmentation = "^1.2.1"
+derivative = "2.1.1"
 
 [dependencies.codefmt]
 path = "../codefmt"
-
-[dependencies.bongo_helper_derive]
-path = "../bongo_helper_derive"

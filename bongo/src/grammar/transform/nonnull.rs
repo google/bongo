@@ -56,19 +56,33 @@ use {
     utils::{Name, TreeNode, Void},
   },
   anyhow::{anyhow, Error},
-  bongo_helper_derive::derive_unbounded,
   std::{collections::BTreeMap, marker::PhantomData},
+  derivative::Derivative,
 };
 
 pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
 
-#[derive_unbounded(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = ""),
+  PartialOrd = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum",
+)]
 pub struct ActionKey<E: ElementTypes> {
   action: E::ActionKey,
   nt_nullable_states: Vec<bool>,
 }
 
-#[derive_unbounded(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  Debug(bound = ""),
+)]
 pub struct ActionValue<E: ElementTypes> {
   parent_value: E::ActionValue,
   nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
@@ -104,7 +118,11 @@ pub fn transform_to_nonnull<E: ElementTypes>(
   )
 }
 
-#[derive_unbounded(Clone, Debug)]
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  Debug(bound = ""),
+)]
 struct ProdBuildState<E: ElementTypes> {
   elems: Vec<ProductionElement<ElemTypes<E>>>,
   nt_nullable_states: Vec<bool>,

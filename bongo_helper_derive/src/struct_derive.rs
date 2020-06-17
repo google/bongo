@@ -2,10 +2,7 @@ use {
   crate::{struct_clone_expr, GenericsData},
   proc_macro2::{Span, TokenStream},
   quote::{quote, ToTokens},
-  syn::{
-    Fields, Ident, Index, ItemStruct, LitStr,
-    WherePredicate,
-  },
+  syn::{Fields, Ident, Index, ItemStruct, LitStr, WherePredicate},
 };
 
 pub struct ImplData {
