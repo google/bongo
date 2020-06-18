@@ -2,6 +2,5 @@
 
 members = [
     "bongo",
-    "bongo_helper_derive",
     "codefmt",
 ]
