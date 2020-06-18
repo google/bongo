@@ -13,97 +13,23 @@
 // limitations under the License.
 
 pub mod builder;
+mod cmp_wrappers;
+mod element_types;
 
 use {
   crate::{
     pdisplay::LayoutDisplay,
-    utils::{breadth_first_search, Name, OrdKey},
+    utils::{breadth_first_search, Name},
   },
   codefmt::Layout,
   derivative::Derivative,
-  std::{
-    cmp,
-    collections::{BTreeMap, BTreeSet},
-    ops,
-  },
+  std::collections::{BTreeMap, BTreeSet},
 };
 
-fn ref_eq<T>(a: &T, b: &T) -> bool {
-  (a as *const T) == (b as *const T)
-}
-
-fn ref_cmp<T>(a: &T, b: &T) -> cmp::Ordering {
-  (a as *const T).cmp(&(b as *const T))
-}
-
-/// A trait which carries the underlying types for a grammar.
-///
-/// This allows us to specify a family of types at once as a type parameter
-/// instead of forcing us to provide a number of type variables with a long list
-/// of bounds.
-///
-/// This type is not instantiated, and will typically be a zero-sized type.
-pub trait ElementTypes: 'static {
-  /// The type used to identify each possible terminal.
-  ///
-  /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
-  type Term: OrdKey + LayoutDisplay;
-
-  // The type used to identify each possible non-terminal.
-  type NonTerm: OrdKey + LayoutDisplay;
-
-  // The type used to identify each production.
-  type ActionKey: OrdKey;
-
-  type ActionValue: Clone + std::fmt::Debug + 'static;
-}
-
-/// A terminal element.
-///
-/// This is a simple terminal type compatible with `ElementTypes`.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct Terminal(Name);
-
-impl Terminal {
-  pub fn new(s: &str) -> Self {
-    Terminal(Name::new(s))
-  }
-}
-
-impl LayoutDisplay for Terminal {
-  fn disp(&self) -> codefmt::Layout {
-    let name = self.0.str();
-    Layout::text(name)
-  }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct NonTerminal(Name);
-
-impl NonTerminal {
-  pub fn new(s: &str) -> Self {
-    NonTerminal(Name::new(s))
-  }
-}
-
-impl LayoutDisplay for NonTerminal {
-  fn disp(&self) -> codefmt::Layout {
-    Layout::juxtapose(&[
-      Layout::text("<"),
-      Layout::text(self.0.str()),
-      Layout::text(">"),
-    ])
-  }
-}
-
-pub struct BaseElementTypes;
-
-impl ElementTypes for BaseElementTypes {
-  type Term = Terminal;
-  type NonTerm = NonTerminal;
-  type ActionKey = Name;
-  type ActionValue = ();
-}
+pub use cmp_wrappers::{NoCompare, ParentRef, RefCompare};
+pub use element_types::{
+  BaseElementTypes, ElementTypes, NonTerminal, Terminal,
+};
 
 /// A single element (terminal or non-terminal).
 #[derive(Derivative)]
@@ -397,8 +323,8 @@ impl<E: ElementTypes> Grammar<E> {
   /// Returns an iterator over all of the rules for this grammar.
   pub fn rules<'a>(&'a self) -> impl Iterator<Item = Rule<'a, E>> {
     self.rule_set.iter().map(move |(_, rule)| Rule {
-      grammar: ParentRef(self),
-      rule: RefCompare(rule),
+      grammar: ParentRef::new(self),
+      rule: RefCompare::new(rule),
     })
   }
 
@@ -411,8 +337,8 @@ impl<E: ElementTypes> Grammar<E> {
         (
           k,
           Rule {
-            grammar: ParentRef(self),
-            rule: RefCompare(rule),
+            grammar: ParentRef::new(self),
+            rule: RefCompare::new(rule),
           },
         )
       })
@@ -422,8 +348,8 @@ impl<E: ElementTypes> Grammar<E> {
   /// Gets the rule that has the given nonterminal as a head.
   pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<Rule<'a, E>> {
     self.rule_set.get(nt).map(|rule| Rule {
-      grammar: ParentRef(self),
-      rule: RefCompare(rule),
+      grammar: ParentRef::new(self),
+      rule: RefCompare::new(rule),
     })
   }
 
@@ -548,128 +474,6 @@ impl<E: ElementTypes> LayoutDisplay for Grammar<E> {
 
 // ------------
 
-/// A simple deref wrapper that ensures that two references _must_ be the same during
-/// comparison. This ensures that we can't accidentally incorporate refs from different parents together.
-#[derive(Debug)]
-struct ParentRef<'a, T>(&'a T);
-
-impl<'a, T> ParentRef<'a, T> {
-  fn new(r: &'a T) -> Self {
-    ParentRef(r)
-  }
-}
-
-impl<T> cmp::PartialEq for ParentRef<'_, T> {
-  fn eq(&self, other: &Self) -> bool {
-    assert!(ref_eq(self.0, other.0));
-    true
-  }
-}
-
-impl<T> cmp::Eq for ParentRef<'_, T> {}
-
-impl<T> cmp::PartialOrd for ParentRef<'_, T> {
-  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl<T> cmp::Ord for ParentRef<'_, T> {
-  fn cmp(&self, other: &Self) -> cmp::Ordering {
-    assert!(ref_eq(self.0, other.0));
-    cmp::Ordering::Equal
-  }
-}
-
-impl<'a, T> ops::Deref for ParentRef<'a, T> {
-  type Target = &'a T;
-  fn deref(&self) -> &&'a T {
-    &self.0
-  }
-}
-
-impl<T> Clone for ParentRef<'_, T> {
-  fn clone(&self) -> Self {
-    ParentRef(self.0)
-  }
-}
-
-impl<T> Copy for ParentRef<'_, T> {}
-
-// ------------
-
-#[derive(Clone, Copy, Debug)]
-struct NoCompare<T>(T);
-
-impl<T> cmp::PartialEq for NoCompare<T> {
-  fn eq(&self, _: &Self) -> bool {
-    true
-  }
-}
-
-impl<T> cmp::Eq for NoCompare<T> {}
-
-impl<T> cmp::PartialOrd for NoCompare<T> {
-  fn partial_cmp(&self, _: &Self) -> Option<cmp::Ordering> {
-    Some(cmp::Ordering::Equal)
-  }
-}
-
-impl<T> cmp::Ord for NoCompare<T> {
-  fn cmp(&self, _: &Self) -> cmp::Ordering {
-    cmp::Ordering::Equal
-  }
-}
-
-impl<T> ops::Deref for NoCompare<T> {
-  type Target = T;
-  fn deref(&self) -> &T {
-    &self.0
-  }
-}
-
-// ------------
-
-#[derive(Debug)]
-struct RefCompare<'a, T>(&'a T);
-
-impl<T> cmp::PartialEq for RefCompare<'_, T> {
-  fn eq(&self, other: &Self) -> bool {
-    ref_eq(self.0, other.0)
-  }
-}
-
-impl<T> cmp::Eq for RefCompare<'_, T> {}
-
-impl<T> cmp::PartialOrd for RefCompare<'_, T> {
-  fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-    Some(self.cmp(other))
-  }
-}
-
-impl<T> cmp::Ord for RefCompare<'_, T> {
-  fn cmp(&self, other: &Self) -> cmp::Ordering {
-    ref_cmp(self.0, other.0)
-  }
-}
-
-impl<'a, T> ops::Deref for RefCompare<'a, T> {
-  type Target = &'a T;
-  fn deref(&self) -> &&'a T {
-    &self.0
-  }
-}
-
-impl<T> Clone for RefCompare<'_, T> {
-  fn clone(&self) -> Self {
-    RefCompare(self.0)
-  }
-}
-
-impl<T> Copy for RefCompare<'_, T> {}
-
-// ------------
-
 #[derive(Derivative)]
 #[derivative(
   Copy(bound = ""),
@@ -678,7 +482,7 @@ impl<T> Copy for RefCompare<'_, T> {}
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 pub struct Rule<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
@@ -698,8 +502,8 @@ impl<'a, E: ElementTypes> Rule<'a, E> {
       .map(|prod| Prod {
         grammar: self.grammar,
         head: &self.rule.head,
-        prod: RefCompare(prod),
-        action_value: NoCompare(
+        prod: RefCompare::new(prod),
+        action_value: NoCompare::new(
           self.grammar.action_map.get(&prod.action_key).unwrap(),
         ),
       })
@@ -717,7 +521,7 @@ impl<'a, E: ElementTypes> Rule<'a, E> {
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 pub struct Prod<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
