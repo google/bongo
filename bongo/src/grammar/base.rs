@@ -310,6 +310,7 @@ pub struct ProdKey<E: ElementTypes> {
   action_key: E::ActionKey,
 }
 
+/// A concrete raw rule value as stored inside a Grammar struct.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
 struct RuleInner<E: ElementTypes> {
@@ -678,8 +679,6 @@ impl<T> Copy for RefCompare<'_, T> {}
   PartialOrd(bound = ""),
   Ord(bound = ""),
   Debug(bound = ""),
-  PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum"
 )]
 pub struct Rule<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
@@ -719,8 +718,6 @@ impl<'a, E: ElementTypes> Rule<'a, E> {
   PartialOrd(bound = ""),
   Ord(bound = ""),
   Debug(bound = ""),
-  PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum"
 )]
 pub struct Prod<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
