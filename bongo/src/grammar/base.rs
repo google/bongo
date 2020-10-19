@@ -15,6 +15,7 @@
 pub mod builder;
 mod cmp_wrappers;
 mod element_types;
+mod start_grammar;
 
 use {
   crate::{
