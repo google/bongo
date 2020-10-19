@@ -12,14 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use {
-  crate::{
-    grammar::{Element, ElementTypes, Prod, ProductionElement},
-    pdisplay::{self, LayoutDisplay},
-  },
-  codefmt::Layout,
-  derivative::Derivative,
-};
+use crate::grammar::{Element, ElementTypes, Prod, ProductionElement};
 
 /// A state of a production within a parse state.
 ///
@@ -83,26 +76,5 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
       .next()
       .filter(|(e, _)| e.elem() == elem)
       .map(|(_, next)| next)
-  }
-}
-
-impl<'a, E: ElementTypes> LayoutDisplay for ProdState<'a, E> {
-  fn disp(&self) -> Layout {
-    let mut layouts = Vec::new();
-    let (first_slice, second_slice) =
-      self.prod.prod_elements().split_at(self.index);
-    for elem in first_slice {
-      layouts.push(elem.disp());
-    }
-    layouts.push(codefmt::Layout::text("."));
-    for elem in second_slice {
-      layouts.push(elem.disp())
-    }
-    let body = pdisplay::join_layout(layouts, codefmt::Layout::text(" "));
-    codefmt::Layout::juxtapose(vec![
-      codefmt::Layout::text(format!("{:?}", self.prod.head())),
-      codefmt::Layout::text(" => "),
-      body,
-    ])
   }
 }

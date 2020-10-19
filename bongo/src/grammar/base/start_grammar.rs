@@ -1,22 +1,11 @@
-use std::marker::PhantomData;
 use crate::grammar::ElementTypes;
-use crate::pdisplay::LayoutDisplay;
 use crate::grammar::{Grammar, Rule};
-use codefmt::Layout;
+use std::marker::PhantomData;
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub enum StartTerminal<T> {
   EndOfFile,
   Term(T),
-}
-
-impl<T: LayoutDisplay> LayoutDisplay for StartTerminal<T> {
-  fn disp(&self) -> Layout {
-    match self {
-      StartTerminal::EndOfFile => Layout::text("<EOF>"),
-      StartTerminal::Term(t) => t.disp(),
-    }
-  }
 }
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -25,17 +14,8 @@ pub enum StartNonTerminal<NT> {
   NTerm(NT),
 }
 
-impl<NT: LayoutDisplay> LayoutDisplay for StartNonTerminal<NT> {
-  fn disp(&self) -> Layout {
-    match self {
-      StartNonTerminal::Start => Layout::text("<START>"),
-      StartNonTerminal::NTerm(nt) => nt.disp(),
-    }
-  }
-}
-
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""),)]
+#[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct StartElementTypes<E>(PhantomData<E>);
 
 impl<E: ElementTypes> ElementTypes for StartElementTypes<E> {
@@ -51,4 +31,3 @@ impl<E: ElementTypes> Grammar<StartElementTypes<E>> {
     self.get_rule(&StartNonTerminal::Start).unwrap()
   }
 }
-

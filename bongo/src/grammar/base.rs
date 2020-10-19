@@ -18,11 +18,7 @@ mod element_types;
 mod start_grammar;
 
 use {
-  crate::{
-    pdisplay::LayoutDisplay,
-    utils::{breadth_first_search, Name},
-  },
-  codefmt::Layout,
+  crate::utils::{breadth_first_search, Name},
   std::collections::{BTreeMap, BTreeSet},
 };
 
@@ -76,15 +72,6 @@ impl<E: ElementTypes> Element<E> {
     match self {
       Element::Term(t) => Element::Term(t.clone()),
       Element::NonTerm(nt) => Element::NonTerm(nt.clone()),
-    }
-  }
-}
-
-impl<E: ElementTypes> LayoutDisplay for Element<E> {
-  fn disp(&self) -> codefmt::Layout {
-    match self {
-      Element::Term(t) => t.disp(),
-      Element::NonTerm(nt) => nt.disp(),
     }
   }
 }
@@ -145,19 +132,6 @@ impl<E: ElementTypes> ProductionElement<E> {
   }
 }
 
-impl<E: ElementTypes> LayoutDisplay for ProductionElement<E> {
-  fn disp(&self) -> codefmt::Layout {
-    match &self.identifier {
-      Some(name) => Layout::juxtapose(&[
-        name.layout(),
-        Layout::text(": "),
-        self.element.disp(),
-      ]),
-      None => self.element.disp(),
-    }
-  }
-}
-
 impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   fn from(e: Element<E>) -> ProductionElement<E> {
     ProductionElement {
@@ -210,18 +184,6 @@ impl<E: ElementTypes> ProductionInner<E> {
   }
 }
 
-impl<E: ElementTypes> LayoutDisplay for ProductionInner<E> {
-  fn disp(&self) -> Layout {
-    let elements =
-      Layout::wrap(self.elements.iter().map(|x| x.disp()).collect::<Vec<_>>());
-    Layout::juxtapose(&[
-      elements,
-      Layout::text(" => "),
-      Layout::text(format!("{:?}", self.action_key)),
-    ])
-  }
-}
-
 #[derive(Derivative)]
 #[derivative(
   Clone(bound = ""),
@@ -255,14 +217,6 @@ impl<E: ElementTypes> RuleInner<E> {
 
   pub fn prods(&self) -> &Vec<ProductionInner<E>> {
     &self.prods
-  }
-}
-
-impl<E: ElementTypes> LayoutDisplay for RuleInner<E> {
-  fn disp(&self) -> Layout {
-    let prod_layouts: Vec<_> =
-      self.prods.iter().map(|prod| prod.disp()).collect();
-    Layout::stack(prod_layouts)
   }
 }
 
@@ -452,23 +406,6 @@ impl<E: ElementTypes> Grammar<E> {
         .collect(),
     }
     .into_result()
-  }
-}
-
-impl<E: ElementTypes> LayoutDisplay for Grammar<E> {
-  fn disp(&self) -> Layout {
-    let mut stack = Vec::new();
-    for (k, v) in &self.rule_set {
-      let name_layout = if &self.start_symbol == k {
-        Layout::juxtapose(&[Layout::text("*"), k.disp()])
-      } else {
-        k.disp()
-      };
-
-      stack.push(Layout::juxtapose(&[name_layout, Layout::text(":")]));
-      stack.push(Layout::juxtapose(&[Layout::text("  "), v.disp()]));
-    }
-    Layout::stack(stack)
   }
 }
 

@@ -12,11 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use {
-  crate::pdisplay::LayoutDisplay,
-  codefmt::Layout,
-  std::collections::{BTreeMap, BTreeSet},
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub mod buffer;
 
@@ -47,12 +43,6 @@ impl<
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct Name(std::rc::Rc<String>);
 
-impl LayoutDisplay for Name {
-  fn disp(&self) -> codefmt::Layout {
-    codefmt::Layout::text((*self.0).clone())
-  }
-}
-
 impl Name {
   /// Creates a new Name containing the given string.
   pub fn new(s: &(impl AsRef<str> + ?Sized)) -> Self {
@@ -68,10 +58,6 @@ impl Name {
   /// alter any other names.
   pub fn make_mut(&mut self) -> &mut String {
     std::rc::Rc::make_mut(&mut self.0)
-  }
-
-  pub fn layout(&self) -> codefmt::Layout {
-    Layout::text(self.str())
   }
 }
 

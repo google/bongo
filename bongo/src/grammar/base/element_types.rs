@@ -1,10 +1,4 @@
-use {
-  crate::{
-    pdisplay::LayoutDisplay,
-    utils::{Name, OrdKey},
-  },
-  codefmt::Layout,
-};
+use crate::utils::{Name, OrdKey};
 
 /// A trait which carries the underlying types for a grammar.
 ///
@@ -17,10 +11,10 @@ pub trait ElementTypes: 'static {
   /// The type used to identify each possible terminal.
   ///
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
-  type Term: OrdKey + LayoutDisplay;
+  type Term: OrdKey;
 
   // The type used to identify each possible non-terminal.
-  type NonTerm: OrdKey + LayoutDisplay;
+  type NonTerm: OrdKey;
 
   // The type used to identify each production.
   type ActionKey: OrdKey;
@@ -40,29 +34,12 @@ impl Terminal {
   }
 }
 
-impl LayoutDisplay for Terminal {
-  fn disp(&self) -> codefmt::Layout {
-    let name = self.0.str();
-    Layout::text(name)
-  }
-}
-
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct NonTerminal(Name);
 
 impl NonTerminal {
   pub fn new(s: &str) -> Self {
     NonTerminal(Name::new(s))
-  }
-}
-
-impl LayoutDisplay for NonTerminal {
-  fn disp(&self) -> codefmt::Layout {
-    Layout::juxtapose(&[
-      Layout::text("<"),
-      Layout::text(self.0.str()),
-      Layout::text(">"),
-    ])
   }
 }
 

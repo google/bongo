@@ -21,7 +21,6 @@ extern crate derivative;
 
 pub mod grammar;
 pub mod parsers;
-mod pdisplay;
 mod state;
 pub mod utils;
 
@@ -50,7 +49,6 @@ mod tests {
   use super::*;
   use crate::grammar::build;
   use crate::grammar::{BaseElementTypes, NonTerminal, Terminal};
-  use crate::pdisplay::LayoutDisplay;
   use crate::utils::Name;
 
   #[test]
@@ -68,7 +66,7 @@ mod tests {
     })
     .unwrap();
 
-    println!("{}", g.disp().layout(80));
+    println!("{:?}", g);
 
     let ng = NullableGrammar::new(g);
 
