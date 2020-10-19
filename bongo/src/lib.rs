@@ -16,6 +16,9 @@
 
 #![allow(dead_code)]
 
+#[macro_use]
+extern crate derivative;
+
 pub mod grammar;
 pub mod parsers;
 mod pdisplay;

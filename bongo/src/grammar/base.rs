@@ -23,7 +23,6 @@ use {
     utils::{breadth_first_search, Name},
   },
   codefmt::Layout,
-  derivative::Derivative,
   std::collections::{BTreeMap, BTreeSet},
 };
 

@@ -1,6 +1,5 @@
 use std::marker::PhantomData;
 use crate::grammar::ElementTypes;
-use derivative::Derivative;
 use crate::pdisplay::LayoutDisplay;
 use crate::grammar::{Grammar, Rule};
 use codefmt::Layout;
