@@ -17,7 +17,6 @@ use {
     utils::{TreeNode, TreeValue, Void},
   },
   anyhow::Error,
-  derivative::Derivative,
   std::collections::{BTreeMap, BTreeSet},
 };
 
@@ -29,8 +28,6 @@ use {
   PartialOrd(bound = ""),
   Ord(bound = ""),
   Debug(bound = ""),
-  PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum"
 )]
 struct InternalNullableInfo<'a, E: ElementTypes> {
   /// The set of productions that are nullable
