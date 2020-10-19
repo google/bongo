@@ -247,7 +247,7 @@ impl<E: ElementTypes> std::fmt::Debug for Grammar<E> {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut dbg_struct = f.debug_struct("Grammar");
     dbg_struct.field("Terms", &self.get_terminals().collect::<Vec<_>>());
-    unimplemented!()
+    dbg_struct.finish()
   }
 }
 
