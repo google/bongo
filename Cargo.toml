@@ -1,5 +1,11 @@
-[workspace]
+[package]
+authors = ["Brian Chin <brian.chin@gmail.com>"]
+edition = "2018"
+name = "bongo"
+version = "0.1.0"
 
-members = [
-    "bongo",
-]
+[dependencies]
+thiserror = "1.0"
+anyhow = "1.0.18"
+unicode-segmentation = "^1.2.1"
+derivative = "2.1.1"
