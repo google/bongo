@@ -15,7 +15,6 @@
 pub mod builder;
 mod cmp_wrappers;
 mod element_types;
-mod start_grammar;
 
 use {
   crate::utils::{breadth_first_search, Name},
@@ -470,6 +469,10 @@ pub struct Prod<'a, E: ElementTypes> {
 impl<'a, E: ElementTypes> Prod<'a, E> {
   pub fn head(&self) -> &'a E::NonTerm {
     self.head
+  }
+
+  pub fn len(&self) -> usize {
+    self.prod.elements.len()
   }
 
   pub fn prod_elements(&self) -> &'a Vec<ProductionElement<E>> {

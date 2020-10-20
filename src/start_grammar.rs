@@ -1,5 +1,5 @@
 use crate::grammar::ElementTypes;
-use crate::grammar::{Grammar, Rule};
+use crate::grammar::{Grammar, Rule, Prod};
 use std::marker::PhantomData;
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -29,5 +29,11 @@ impl<E: ElementTypes> ElementTypes for StartElementTypes<E> {
 impl<E: ElementTypes> Grammar<StartElementTypes<E>> {
   pub fn start_rule(&self) -> Rule<StartElementTypes<E>> {
     self.get_rule(&StartNonTerminal::Start).unwrap()
+  }
+
+  pub fn start_prod(&self) -> Prod<StartElementTypes<E>> {
+    let prods = self.start_rule().prods();
+    assert_eq!(prods.len(), 1);
+    prods.into_iter().next().unwrap()
   }
 }

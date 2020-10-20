@@ -21,8 +21,9 @@ extern crate derivative;
 
 pub mod grammar;
 pub mod parsers;
-mod state;
+pub mod state;
 pub mod utils;
+pub mod start_grammar;
 
 use crate::grammar::{nullables::GrammarNullableInfo, ElementTypes, Grammar};
 

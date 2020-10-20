@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::grammar::{Element, ElementTypes, Prod, ProductionElement};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// A state of a production within a parse state.
 ///
@@ -35,6 +36,7 @@ use crate::grammar::{Element, ElementTypes, Prod, ProductionElement};
   Ord(bound = ""),
   Debug(bound = "")
 )]
+
 pub struct ProdState<'a, E: ElementTypes> {
   /// The production this state is part of.
   prod: Prod<'a, E>,
@@ -51,14 +53,21 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
   pub fn from_start(prod: Prod<'a, E>) -> Self {
     ProdState { prod, index: 0 }
   }
+
   pub fn prod(&self) -> Prod<'a, E> {
     self.prod
   }
 
+  pub fn next_elem(&self) -> Option<&'a ProductionElement<E>> {
+    self.prod.prod_elements().get(self.index)
+  }
+
   /// Returns the next element after the current index. If it is at the
   /// end, then it reuturns `None`.
-  pub fn next(&self) -> Option<(&'a ProductionElement<E>, ProdState<'a, E>)> {
-    self.prod.prod_elements().get(self.index).map(|prod_elem| {
+  pub fn next_elem_state(
+    &self,
+  ) -> Option<(&'a ProductionElement<E>, ProdState<'a, E>)> {
+    self.next_elem().map(|prod_elem| {
       (
         prod_elem,
         ProdState {
@@ -73,8 +82,103 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
   /// the next element type is elem.
   pub fn advance_if(&self, elem: &Element<E>) -> Option<ProdState<'a, E>> {
     self
-      .next()
+      .next_elem_state()
       .filter(|(e, _)| e.elem() == elem)
       .map(|(_, next)| next)
+  }
+
+  pub fn complete(&self) -> bool {
+    self.prod.len() == self.index
+  }
+}
+
+/// A set of production states.
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  Debug(bound = "")
+)]
+pub struct ProdStateSet<'a, E: ElementTypes> {
+  states: BTreeSet<ProdState<'a, E>>,
+}
+
+impl<'a, E: ElementTypes> ProdStateSet<'a, E> {
+  pub fn new_empty() -> Self {
+    ProdStateSet {
+      states: BTreeSet::new(),
+    }
+  }
+
+  pub fn add(&mut self, state: ProdState<'a, E>) {
+    self.states.insert(state);
+  }
+
+  pub fn from_iter<I>(iter: I) -> Self
+  where
+    I: Iterator<Item = ProdState<'a, E>>,
+  {
+    ProdStateSet {
+      states: iter.collect(),
+    }
+  }
+
+  /// Returns an iterator of pairs of production elements, and the states that are entered after
+  /// that.
+  pub fn nexts(
+    &self,
+  ) -> impl Iterator<Item = (&'a ProductionElement<E>, ProdStateSet<'a, E>)> {
+    let mut result = BTreeMap::new();
+
+    for (k, v) in self.states.iter().filter_map(ProdState::next_elem_state) {
+      result
+        .entry(k)
+        .or_insert_with(|| ProdStateSet::new_empty())
+        .add(v);
+    }
+
+    result.into_iter()
+  }
+
+  /// Given a function that takes the closure of a given prod state, take the closure of all states in this set.
+  pub fn take_closure<F, I>(&mut self, mut close_func: F)
+  where
+    F: FnMut(&ProdState<'a, E>) -> I,
+    I: Iterator<Item = ProdState<'a, E>>,
+  {
+    let mut seen_states = self.states.clone();
+    let mut curr_states = self.states.clone();
+    let mut next_states = BTreeSet::new();
+    loop {
+      for state in curr_states.iter() {
+        for new_state in close_func(&state) {
+          if seen_states.insert(new_state.clone()) {
+            next_states.insert(new_state);
+          }
+        }
+      }
+
+      if next_states.is_empty() {
+        self.states = seen_states;
+        return;
+      }
+
+      curr_states = next_states;
+      next_states = BTreeSet::new();
+    }
+  }
+
+  /// Returns an iterator over those states that are complete.
+  pub fn complete(&self) -> impl Iterator<Item = ProdState<'a, E>> {
+    self
+      .states
+      .iter()
+      .filter(|st| st.complete())
+      .cloned()
+      .collect::<Vec<_>>()
+      .into_iter()
   }
 }

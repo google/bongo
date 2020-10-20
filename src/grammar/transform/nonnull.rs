@@ -55,8 +55,6 @@ use {
     },
     utils::{Name, TreeNode, Void},
   },
-  anyhow::{anyhow, Error},
-  derivative::Derivative,
   std::{collections::BTreeMap, marker::PhantomData},
 };
 
@@ -69,9 +67,7 @@ pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
-  PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum"
+  Debug(bound = "")
 )]
 pub struct ActionKey<E: ElementTypes> {
   action: E::ActionKey,
@@ -94,7 +90,7 @@ impl<E: ElementTypes> ElementTypes for ElemTypes<E> {
 
 pub fn transform_to_nonnull<E: ElementTypes>(
   g: &Grammar<E>,
-) -> Result<Grammar<ElemTypes<E>>, Error> {
+) -> anyhow::Result<Grammar<ElemTypes<E>>> {
   let nullables = calculate_nullables(g)?;
 
   Ok(
@@ -111,7 +107,7 @@ pub fn transform_to_nonnull<E: ElementTypes>(
         });
       }
     })
-    .map_err(|_| anyhow!("Grammar failed to build"))?,
+    .map_err(|_| anyhow::anyhow!("Grammar failed to build"))?,
   )
 }
 
