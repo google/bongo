@@ -225,10 +225,11 @@ mod test {
   use super::*;
   use crate::grammar::examples;
   use crate::grammar::NonTerminal;
+  use crate::start_grammar::wrap_grammar_with_start;
 
   #[test]
   fn test_simple_grammar() {
-    let g = examples::make_simple();
+    let g = wrap_grammar_with_start(examples::make_simple()).unwrap();
     let nullables = calculate_nullables(&g).unwrap();
     assert!(nullables.get_nullable_set().is_empty());
   }

@@ -12,22 +12,66 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use crate::ElementTypes;
 
 mod earley;
+pub mod tree;
+pub mod tree2;
 
-pub trait TokenStream<T, V>: Clone {
-  fn next(&self) -> Option<(T, V, Self)>;
+#[derive(Clone, Copy)]
+pub struct Token<K, T> {
+  kind: K,
+  value: T,
 }
 
-pub enum ParseTree<E: ElementTypes, LeafValue> {
-  Term(E::Term, LeafValue),
-  NonTerminal(E::NonTerm, E::ActionKey, Vec<ParseTree<E, LeafValue>>),
+pub trait TokenStream<K, T>: Clone {
+  fn next(&self) -> Option<(Token<K, T>, Self)>;
 }
 
-pub trait Parser<E: ElementTypes, Leaf> {
-  fn parse<S: TokenStream<E, Leaf>>(
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct VecTokenStream<K, T> {
+  tokens: Arc<Vec<Token<K, T>>>,
+  position: usize,
+}
+
+impl<K, T> VecTokenStream<K, T> {
+  pub fn from_into_iter<C: IntoIterator<Item = Token<K, T>>>(
+    collection: C,
+  ) -> Self {
+    VecTokenStream {
+      tokens: Arc::new(collection.into_iter().collect()),
+      position: 0,
+    }
+  }
+}
+
+impl<K, T> TokenStream<K, T> for VecTokenStream<K, T>
+where
+  K: Clone,
+  T: Clone,
+{
+  fn next(&self) -> Option<(Token<K, T>, Self)> {
+    if self.tokens.len() < self.position {
+      Some((
+        self.tokens[self.position].clone(),
+        VecTokenStream {
+          tokens: self.tokens.clone(),
+          position: self.position + 1,
+        },
+      ))
+    } else {
+      assert_eq!(self.tokens.len(), self.position);
+      None
+    }
+  }
+}
+
+pub trait Parser<E: ElementTypes, T> {
+  fn parse<S: TokenStream<E::Term, T>>(
     &self,
-    stream: &S,
-  ) -> Result<ParseTree<E, Leaf>, Box<dyn std::error::Error>>;
+    stream: S,
+  ) -> anyhow::Result<tree::Node<E, T>>;
 }

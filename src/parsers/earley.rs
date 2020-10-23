@@ -18,22 +18,70 @@
 //! grammar, but a baseline that can be validated against.
 
 use {
-  crate::{parsers::ParseTree, state::ProdState, ElementTypes},
+  crate::{
+    grammar::{Element, Prod, ProductionElement},
+    parsers::tree::{Node, NodeList},
+    state::ProdState,
+    ElementTypes,
+  },
+  im::Vector,
   std::collections::BTreeMap,
 };
 
-struct ParserImpl<'a, E: ElementTypes, Leaf> {
-  states: Vec<EarleyState<'a, E, Leaf>>,
+struct ParserImpl<'a, E: ElementTypes, T> {
+  states: Vec<EarleyState<'a, E, T>>,
 }
 
-struct EarleyState<'a, E: ElementTypes, Leaf> {
-  state: BTreeMap<ProdState<'a, E>, Vec<ParseTree<E, Leaf>>>,
+struct EarleyState<'a, E: ElementTypes, T> {
+  state: BTreeMap<ProdState<'a, E>, Vector<NodeList<E, T>>>,
 }
 
-impl<E: ElementTypes, Leaf> EarleyState<'_, E, Leaf> {
-  fn new() -> Self {
+impl<'a, E: ElementTypes, T> EarleyState<'a, E, T> {
+  pub fn new() -> Self {
     EarleyState {
       state: BTreeMap::new(),
     }
+  }
+
+  fn take_closure(&mut self) {
+    for (prod_state, values) in self.state.iter() {
+      if prod_state.is_complete() {
+        prod_state
+      }
+    }
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.state.is_empty()
+  }
+
+  pub fn add_prod(&mut self, prod: Prod<'a, E>) -> bool {
+    self
+      .state
+      .insert(ProdState::from_start(prod), im::vector![NodeList::new()])
+      .is_none()
+  }
+
+  pub fn nexts<'b: 'a>(&'b self) -> impl Iterator<Item = Element<E>> + 'b {
+    self
+      .state
+      .keys()
+      .filter_map(ProdState::next_elem)
+      .map(ProductionElement::elem)
+      .cloned()
+  }
+
+  pub fn advance_on(&self, elem: &Element<E>, node: &Node<E, T>) -> Self {
+    let mut new_state = BTreeMap::new();
+    for (k, v) in self.state.iter() {
+      if let Some(next_prod_state) = k.advance_if(elem) {
+        let mut new_values = v.clone();
+        for value in new_values.iter_mut() {
+          value.push(node.clone());
+        }
+        new_state.insert(next_prod_state, new_values);
+      }
+    }
+    todo!()
   }
 }

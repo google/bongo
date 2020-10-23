@@ -87,7 +87,7 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
       .map(|(_, next)| next)
   }
 
-  pub fn complete(&self) -> bool {
+  pub fn is_complete(&self) -> bool {
     self.prod.len() == self.index
   }
 }
@@ -176,7 +176,7 @@ impl<'a, E: ElementTypes> ProdStateSet<'a, E> {
     self
       .states
       .iter()
-      .filter(|st| st.complete())
+      .filter(|st| st.is_complete())
       .cloned()
       .collect::<Vec<_>>()
       .into_iter()

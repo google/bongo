@@ -15,6 +15,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod buffer;
+pub mod graph_closure;
 
 pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   let mut curr = start;
