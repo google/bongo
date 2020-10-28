@@ -1,19 +1,50 @@
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, RwLock};
 
 use crate::ElementTypes;
 use im::Vector;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
+// Function to help compare raw reference pointers, instead of contents.
+fn cmp_raw_refs<T>(a: &T, b: &T) -> std::cmp::Ordering {
+  let a_raw = a as *const T;
+  let b_raw = b as *const T;
+
+  a_raw.cmp(&b_raw)
+}
+
+#[derive(Derivative)]
+#[derivative(
+  PartialEq(bound = "T: PartialEq"),
+  Eq(bound = "T: Eq"),
+  PartialOrd(bound = "T: PartialOrd"),
+  Ord(bound = "T: Ord")
+)]
 struct LeafData<E: ElementTypes, T> {
   kind: E::Term,
   value: Arc<T>,
 }
 
+#[derive(Derivative)]
+#[derivative(
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = "")
+)]
 struct BranchData<E: ElementTypes> {
   action: E::ActionKey,
   nodes: Vector<usize>,
 }
 
+#[derive(Derivative)]
+#[derivative(
+  PartialEq(bound = "T: PartialEq"),
+  Eq(bound = "T: Eq"),
+  PartialOrd(bound = "T: PartialOrd"),
+  Ord(bound = "T: Ord"),
+  PartialOrd = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
+)]
 enum NodeContentInner<E: ElementTypes, T> {
   Leaf(LeafData<E, T>),
   Branch(BranchData<E>),
@@ -45,14 +76,19 @@ struct ListData {
 
 struct Inner<E: ElementTypes, T> {
   nodes: Vec<NodeData>,
-  alternatives: Vec<NodeContentInner<E, T>>,
+  alternatives: BTreeMap<Arc<NodeContentInner<E, T>>, usize>,
+  alts_by_id: Vec<Arc<NodeContentInner<E, T>>>,
 }
 
-impl<E: ElementTypes, T> Inner<E, T> {
+impl<E: ElementTypes, T> Inner<E, T>
+where
+  T: Ord,
+{
   pub fn new() -> Self {
     Inner {
       nodes: Vec::new(),
-      alternatives: Vec::new(),
+      alternatives: BTreeMap::new(),
+      alts_by_id: Vec::new(),
     }
   }
 
@@ -65,14 +101,21 @@ impl<E: ElementTypes, T> Inner<E, T> {
   }
 
   pub fn make_alt(&mut self, content: NodeContentInner<E, T>) -> usize {
-    let index = self.alternatives.len();
-    self.alternatives.push(content);
-    index
+    match self.alternatives.get(&content) {
+      Some(index) => *index,
+      None => {
+        let index = self.alts_by_id.len();
+        let arc = Arc::new(content);
+        self.alts_by_id.push(arc.clone());
+        self.alternatives.insert(arc, index);
+        index
+      }
+    }
   }
 
-  pub fn add_node_alt(&mut self, node_index: usize, alt_index: usize) {
+  pub fn add_node_alt(&mut self, node_index: usize, alt_index: usize) -> bool {
     let node_data = self.get_node_mut(node_index);
-    node_data.alternatives.insert(alt_index);
+    node_data.alternatives.insert(alt_index)
   }
 
   pub fn is_same(&self, other: &Self) -> bool {
@@ -96,7 +139,7 @@ impl<E: ElementTypes, T> Inner<E, T> {
   }
 
   pub fn get_alt(&self, index: usize) -> &NodeContentInner<E, T> {
-    self.alternatives.get(index).expect(&format!(
+    self.alts_by_id.get(index).expect(&format!(
       "Invalid index: {} where alts list size is {}",
       index,
       self.alternatives.len()
@@ -104,142 +147,164 @@ impl<E: ElementTypes, T> Inner<E, T> {
   }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
-struct InnerHandle<E: ElementTypes, T>(Weak<RwLock<Inner<E, T>>>);
-
-impl<E: ElementTypes, T> InnerHandle<E, T> {
-  pub fn is_same(&self, other: &Self) -> bool {
-    self.with(|self_inner| {
-      other.with(|other_inner| self_inner.is_same(other_inner))
-    })
-  }
-
-  fn with_upgraded<R, F>(&self, func: F) -> R
-  where
-    F: FnOnce(&Arc<RwLock<Inner<E, T>>>) -> R,
-  {
-    func(
-      &self
-        .0
-        .upgrade()
-        .expect("Lost the TreeHandle for this tree."),
-    )
-  }
-
-  pub fn with<R, F>(&self, func: F) -> R
-  where
-    F: FnOnce(&Inner<E, T>) -> R,
-  {
-    self.with_upgraded(|inner| {
-      let guard = inner.read().unwrap();
-      func(&guard)
-    })
-  }
-
-  pub fn with_mut<R, F>(&self, func: F) -> R
-  where
-    F: FnOnce(&mut Inner<E, T>) -> R,
-  {
-    self.with_upgraded(|inner| {
-      let mut guard = inner.write().unwrap();
-      func(&mut guard)
-    })
-  }
-}
-
 /// The owning object of an AST tree.
 ///
-/// Due to the possibility of alternatives, an AST Tree can have cycles in it.
-/// To avoid memory leaks, this object owns all of the node data. When this
-/// object is dropped, all Node, Alternative, Leaf, and Branch objects that
-/// came from this will panic if any methods are called on them, but may be
-/// safely dropped.
-pub struct TreeHandle<E: ElementTypes, T> {
-  inner: Arc<RwLock<Inner<E, T>>>,
+/// All elements of this tree are created under the lifetime of this tree
+/// owner.
+pub struct TreeOwner<E: ElementTypes, T> {
+  inner: RwLock<Inner<E, T>>,
 }
 
-impl<E: ElementTypes, T> TreeHandle<E, T> {
+impl<E: ElementTypes, T> TreeOwner<E, T>
+where
+  T: Ord,
+{
+  /// Creates a new, empty tree with no nodes.
   pub fn new() -> Self {
-    TreeHandle {
-      inner: Arc::new(RwLock::new(Inner::new())),
+    TreeOwner {
+      inner: RwLock::new(Inner::new()),
     }
   }
 
-  fn inner_handle(&self) -> InnerHandle<E, T> {
-    InnerHandle(Arc::downgrade(&self.inner))
+  /// Returns a TreeHandle for this owner.
+  ///
+  /// This can be used to create new nodes and alternatives.
+  pub fn handle<'a>(&'a self) -> TreeHandle<'a, E, T> {
+    TreeHandle(&self.inner)
+  }
+}
+
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct TreeHandle<'a, E: ElementTypes, T>(&'a RwLock<Inner<E, T>>);
+
+impl<E: ElementTypes, T> std::cmp::Ord for TreeHandle<'_, E, T> {
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    cmp_raw_refs(self.0, other.0)
+  }
+}
+
+impl<E: ElementTypes, T> std::cmp::PartialOrd for TreeHandle<'_, E, T> {
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<E: ElementTypes, T> std::cmp::PartialEq for TreeHandle<'_, E, T> {
+  fn eq(&self, other: &Self) -> bool {
+    matches!(self.cmp(other), std::cmp::Ordering::Equal)
+  }
+}
+
+impl<E: ElementTypes, T> std::cmp::Eq for TreeHandle<'_, E, T> {}
+
+impl<'a, E: ElementTypes, T> TreeHandle<'a, E, T>
+where
+  T: Ord,
+{
+  pub fn make_node(&self) -> Node<'a, E, T> {
+    self.with_mut(|inner| {
+      let index = inner.make_node();
+      Node {
+        index,
+        inner: self.clone(),
+      }
+    })
   }
 
-  pub fn make_node(&self) -> Node<E, T> {
-    let mut guard = self.inner.write().unwrap();
-    let index = guard.make_node();
-    Node {
-      index,
-      inner: self.inner_handle(),
-    }
+  fn make_alt(&self, content: NodeContentInner<E, T>) -> Alternative<'a, E, T> {
+    self.with_mut(|inner| {
+      let index = inner.make_alt(content);
+
+      Alternative {
+        index,
+        inner: self.clone(),
+      }
+    })
   }
 
-  fn make_alt(&self, content: NodeContentInner<E, T>) -> Alternative<E, T> {
-    let mut guard = self.inner.write().unwrap();
-    let index = guard.make_alt(content);
-
-    Alternative {
-      index,
-      inner: self.inner_handle(),
-    }
-  }
-
-  pub fn make_leaf_alt(&self, kind: E::Term, value: T) -> Alternative<E, T> {
+  pub fn make_leaf_alt(&self, kind: E::Term, value: T) -> Alternative<'a, E, T> {
     self.make_alt(NodeContentInner::Leaf(LeafData {
       kind,
       value: Arc::new(value),
     }))
   }
 
-  fn has_same_inner(&self, other: &InnerHandle<E, T>) -> bool {
-    let guard = self.inner.read().unwrap();
-    other.with(|other_inner| guard.is_same(other_inner))
-  }
-
   pub fn make_branch_alt(
     &self,
     action: E::ActionKey,
-    nodes: impl IntoIterator<Item = Node<E, T>>,
+    nodes: impl IntoIterator<Item = Node<'a, E, T>>,
   ) -> Alternative<E, T> {
-    let s_guard = self.inner.read().unwrap();
-    let node_indexes = nodes
-      .into_iter()
-      .inspect(|n| {
-        // Check that all nodes are coming from the same inner instance.
-        assert!(n.inner.with(|n_inner| { s_guard.is_same(n_inner) }));
-      })
-      .map(|n| n.index)
-      .collect();
+    let node_indexes = self.with(|inner| {
+      nodes
+        .into_iter()
+        .inspect(|n| {
+          // Check that all nodes are coming from the same inner instance.
+          assert!(n.inner.with(|n_inner| { inner.is_same(n_inner) }));
+        })
+        .map(|n| n.index)
+        .collect()
+    });
 
     self.make_alt(NodeContentInner::Branch(BranchData {
       action,
       nodes: node_indexes,
     }))
   }
-}
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Node<E: ElementTypes, T> {
-  index: usize,
-  inner: InnerHandle<E, T>,
-}
-
-impl<E: ElementTypes, T> Node<E, T> {
-  pub fn add_alt(&self, alt: &Alternative<E, T>) {
-    assert!(self.inner.is_same(&alt.inner));
-
-    self.inner.with_mut(|inner| {
-      inner.add_node_alt(self.index, alt.index);
+  pub fn is_same(&self, other: &Self) -> bool {
+    self.with(|self_inner| {
+      other.with(|other_inner| self_inner.is_same(other_inner))
     })
   }
 
-  pub fn alts(&self) -> impl Iterator<Item = Alternative<E, T>> {
+  fn with<R, F>(&self, func: F) -> R
+  where
+    F: FnOnce(&Inner<E, T>) -> R,
+  {
+    let guard = self.0.read().unwrap();
+    func(&guard)
+  }
+
+  fn with_mut<R, F>(&self, func: F) -> R
+  where
+    F: FnOnce(&mut Inner<E, T>) -> R,
+  {
+    let mut guard = self.0.write().unwrap();
+    func(&mut guard)
+  }
+}
+
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = "")
+)]
+pub struct Node<'a, E: ElementTypes, T> {
+  index: usize,
+  inner: TreeHandle<'a, E, T>,
+}
+
+impl<'a, E: ElementTypes, T> Node<'a, E, T>
+where
+  T: Ord,
+{
+  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+    self.inner.clone()
+  }
+
+  pub fn add_alt(&self, alt: &Alternative<'a, E, T>) -> bool {
+    assert!(self.inner.is_same(&alt.inner));
+
+    self.inner.with_mut(|inner| {
+      inner.add_node_alt(self.index, alt.index)
+    })
+  }
+
+  pub fn alts(&self) -> impl Iterator<Item = Alternative<'a, E, T>> {
     let alt_indexes = self
       .inner
       .with(|inner| inner.get_node(self.index).alternatives.clone());
@@ -255,14 +320,27 @@ impl<E: ElementTypes, T> Node<E, T> {
 }
 
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Alternative<E: ElementTypes, T> {
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = "")
+)]
+pub struct Alternative<'a, E: ElementTypes, T> {
   index: usize,
-  inner: InnerHandle<E, T>,
+  inner: TreeHandle<'a, E, T>,
 }
 
-impl<E: ElementTypes, T> Alternative<E, T> {
-  pub fn content(&self) -> NodeContent<E, T> {
+impl<'a, E: ElementTypes, T> Alternative<'a, E, T>
+where
+  T: Ord,
+{
+  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+    self.inner.clone()
+  }
+
+  pub fn content(&self) -> NodeContent<'a, E, T> {
     self.inner.with(|inner| match inner.get_alt(self.index) {
       NodeContentInner::Leaf(_) => NodeContent::Leaf(Leaf {
         index: self.index,
@@ -276,12 +354,27 @@ impl<E: ElementTypes, T> Alternative<E, T> {
   }
 }
 
-pub struct Leaf<E: ElementTypes, T> {
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = "")
+)]
+pub struct Leaf<'a, E: ElementTypes, T> {
   index: usize,
-  inner: InnerHandle<E, T>,
+  inner: TreeHandle<'a, E, T>,
 }
 
-impl<E: ElementTypes, T> Leaf<E, T> {
+impl<'a, E: ElementTypes, T> Leaf<'a, E, T>
+where
+  T: Ord,
+{
+  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+    self.inner.clone()
+  }
+
   fn with_leaf<F, R>(&self, func: F) -> R
   where
     F: FnOnce(&LeafData<E, T>) -> R,
@@ -305,12 +398,27 @@ impl<E: ElementTypes, T> Leaf<E, T> {
   }
 }
 
-pub struct Branch<E: ElementTypes, T> {
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = "")
+)]
+pub struct Branch<'a, E: ElementTypes, T> {
   index: usize,
-  inner: InnerHandle<E, T>,
+  inner: TreeHandle<'a, E, T>,
 }
 
-impl<E: ElementTypes, T> Branch<E, T> {
+impl<'a, E: ElementTypes, T> Branch<'a, E, T>
+where
+  T: Ord,
+{
+  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+    self.inner.clone()
+  }
+
   fn with_branch<F, R>(&self, func: F) -> R
   where
     F: FnOnce(&BranchData<E>) -> R,
@@ -329,7 +437,7 @@ impl<E: ElementTypes, T> Branch<E, T> {
     self.with_branch(|branch| branch.action.clone())
   }
 
-  pub fn nodes(&self) -> impl Iterator<Item = Node<E, T>> {
+  pub fn nodes(&self) -> impl Iterator<Item = Node<'a, E, T>> {
     let node_indexes = self.with_branch(|branch| branch.nodes.clone());
 
     node_indexes.into_iter().map({
@@ -342,7 +450,17 @@ impl<E: ElementTypes, T> Branch<E, T> {
   }
 }
 
-pub enum NodeContent<E: ElementTypes, T> {
-  Leaf(Leaf<E, T>),
-  Branch(Branch<E, T>),
+#[derive(Derivative)]
+#[derivative(
+  Clone(bound = ""),
+  PartialEq(bound = ""),
+  Eq(bound = ""),
+  PartialOrd(bound = ""),
+  Ord(bound = ""),
+  PartialOrd = "feature_allow_slow_enum",
+  Ord = "feature_allow_slow_enum"
+)]
+pub enum NodeContent<'a, E: ElementTypes, T> {
+  Leaf(Leaf<'a, E, T>),
+  Branch(Branch<'a, E, T>),
 }
