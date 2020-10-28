@@ -20,7 +20,7 @@
 use {
   crate::{
     grammar::{Element, Grammar, Prod, ProductionElement},
-    parsers::tree2::{Node, TreeHandle},
+    parsers::tree::{Node, TreeHandle},
     state::ProdState,
     ElementTypes,
   },
