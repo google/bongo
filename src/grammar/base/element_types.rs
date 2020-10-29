@@ -13,12 +13,15 @@ pub trait ElementTypes: 'static {
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
   type Term: OrdKey;
 
-  // The type used to identify each possible non-terminal.
+  /// The type used to identify each possible non-terminal.
   type NonTerm: OrdKey;
 
-  // The type used to identify each production.
+  /// The type used to identify each production. A grammar requires that the
+  /// pair of the head nonterminal of a production and its action key are
+  /// unique per production.
   type ActionKey: OrdKey;
 
+  /// A value that annotates each production.
   type ActionValue: Clone + std::fmt::Debug + 'static;
 }
 

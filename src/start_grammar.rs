@@ -46,7 +46,7 @@ impl<E: ElementTypes> Grammar<StartElementTypes<E>> {
   }
 
   pub fn start_prod(&self) -> Prod<StartElementTypes<E>> {
-    let prods = self.start_rule().prods();
+    let prods = self.start_rule().prods().collect::<Vec<_>>();
     assert_eq!(prods.len(), 1);
     prods.into_iter().next().unwrap()
   }

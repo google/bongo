@@ -91,6 +91,7 @@ pub struct ProductionElement<E: ElementTypes> {
 }
 
 impl<E: ElementTypes> ProductionElement<E> {
+  /// Returns a ProductionElement that is annotated with "name".
   pub fn new_with_name(name: Name, e: Element<E>) -> Self {
     ProductionElement {
       identifier: Some(name),
@@ -98,6 +99,7 @@ impl<E: ElementTypes> ProductionElement<E> {
     }
   }
 
+  /// Returns a ProductionElement that takes an optional identifier.
   pub fn new(name: Option<Name>, e: Element<E>) -> Self {
     ProductionElement {
       identifier: name,
@@ -105,6 +107,7 @@ impl<E: ElementTypes> ProductionElement<E> {
     }
   }
 
+  /// Returns an unannotated ProductionElement
   pub fn new_empty(e: Element<E>) -> Self {
     ProductionElement {
       identifier: None,
@@ -112,14 +115,19 @@ impl<E: ElementTypes> ProductionElement<E> {
     }
   }
 
+  // Returns the optional id annotation.
   pub fn id(&self) -> Option<&Name> {
     self.identifier.as_ref()
   }
 
+  // Returns the element.
   pub fn elem(&self) -> &Element<E> {
     &self.element
   }
 
+  /// Clone this element into an element of another ElementTypes instance.
+  /// The `E::Term` and `E::NonTerm` datum types must be the same as those in
+  /// `E2`.
   pub fn clone_as_other<E2>(&self) -> ProductionElement<E2>
   where
     E2: ElementTypes<Term = E::Term, NonTerm = E::NonTerm>,
@@ -140,7 +148,6 @@ impl<E: ElementTypes> From<Element<E>> for ProductionElement<E> {
   }
 }
 
-/// A production within a rule.
 #[derive(Derivative)]
 #[derivative(
   Clone(bound = ""),
@@ -183,6 +190,12 @@ impl<E: ElementTypes> ProductionInner<E> {
   }
 }
 
+/// A key type for production instances.
+///
+/// In order to be able to transform grammars, we need to have a 'static
+/// lifetime key value that allows us to track which production is used. It's
+/// possible we may be able to transform that later, but for now this is simple
+/// enough.
 #[derive(Derivative)]
 #[derivative(
   Clone(bound = ""),
@@ -195,6 +208,18 @@ impl<E: ElementTypes> ProductionInner<E> {
 pub struct ProdKey<E: ElementTypes> {
   head: E::NonTerm,
   action_key: E::ActionKey,
+}
+
+impl<E: ElementTypes> ProdKey<E> {
+  /// Gets the head of this prod key.
+  pub fn head(&self) -> &E::NonTerm {
+    &self.head
+  }
+
+  /// Gets the action_key of this prod key.
+  pub fn action_key(&self) -> &E::ActionKey {
+    &self.action_key
+  }
 }
 
 /// A concrete raw rule value as stored inside a Grammar struct.
@@ -308,7 +333,9 @@ impl<E: ElementTypes> Grammar<E> {
 
   /// Gets an iterator over all productions in the grammar.
   pub fn prods<'a>(&'a self) -> impl Iterator<Item = Prod<'a, E>> {
-    self.rules().flat_map(|rule| rule.prods())
+    self
+      .rules()
+      .flat_map(move |rule| rule.prods().collect::<Vec<_>>())
   }
 
   fn get_elements(&self) -> impl Iterator<Item = &Element<E>> {
@@ -336,7 +363,9 @@ impl<E: ElementTypes> Grammar<E> {
 
   fn rules_without_prods<'a>(&'a self) -> BTreeSet<&'a E::NonTerm> {
     let rules = self.rules();
-    let prodless_rules = rules.into_iter().filter(|r| r.prods().is_empty());
+    let prodless_rules = rules
+      .into_iter()
+      .filter(|r| matches!(r.prods().next(), None));
     let head_iter = prodless_rules.map(|r| r.head());
     head_iter.collect()
   }
@@ -346,7 +375,6 @@ impl<E: ElementTypes> Grammar<E> {
       match self.get_rule(nt) {
         Some(rule) => rule
           .prods()
-          .iter()
           .flat_map(|p| p.elements_iter())
           .filter_map(|e| e.as_nonterm())
           .collect(),
@@ -410,6 +438,14 @@ impl<E: ElementTypes> Grammar<E> {
 
 // ------------
 
+/// A rule within a grammar.
+///
+/// A rule consists of a head nonterminal, and zero or more different possible
+/// productions.
+///
+/// When using rules as keys, collections should not include rules from
+/// different grammars. Rules will panic if compared with rules from other
+/// grammars.
 #[derive(Derivative)]
 #[derivative(
   Copy(bound = ""),
@@ -426,29 +462,32 @@ pub struct Rule<'a, E: ElementTypes> {
 }
 
 impl<'a, E: ElementTypes> Rule<'a, E> {
+  /// Returns the head nonterminal.
   pub fn head(&self) -> &'a E::NonTerm {
     &self.rule.head
   }
 
-  pub fn prods(&self) -> Vec<Prod<'a, E>> {
-    self
-      .rule
-      .prods
-      .iter()
-      .map(|prod| Prod {
-        grammar: self.grammar,
-        head: &self.rule.head,
-        prod: RefCompare::new(prod),
-        action_value: NoCompare::new(
-          self.grammar.action_map.get(&prod.action_key).unwrap(),
-        ),
-      })
-      .collect()
+  /// Returns an iterator over the productions of this rule.
+  pub fn prods<'b>(&'b self) -> impl Iterator<Item = Prod<'a, E>> + 'b {
+    self.rule.prods.iter().map(move |prod| Prod {
+      grammar: self.grammar,
+      head: &self.rule.head,
+      prod: RefCompare::new(prod),
+      action_value: NoCompare::new(
+        self.grammar.action_map.get(&prod.action_key).unwrap(),
+      ),
+    })
   }
 }
 
 // ------------
 
+/// A single production in a grammar.
+///
+/// A production has a head, which is a nonterminal which its reduced to,
+/// A sequence of ProductionElements, indicating the body of the production,
+/// and an action key which gives this production (along with the head) a unique
+/// value.
 #[derive(Derivative)]
 #[derivative(
   Copy(bound = ""),
