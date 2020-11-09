@@ -34,7 +34,6 @@ pub use element_types::{
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
   PartialOrd = "feature_allow_slow_enum",
   Ord = "feature_allow_slow_enum"
 )]
@@ -75,6 +74,15 @@ impl<E: ElementTypes> Element<E> {
   }
 }
 
+impl<E: ElementTypes> std::fmt::Debug for Element<E> {
+  fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    match self {
+      Element::Term(term) => fmt.write_str(&format!("{:?}", term)),
+      Element::NonTerm(nt) => fmt.write_str(&format!("<{:?}>", nt)),
+    }
+  }
+}
+
 /// An element within a production. Includes an optional identifier.
 #[derive(Derivative)]
 #[derivative(
@@ -82,8 +90,7 @@ impl<E: ElementTypes> Element<E> {
   PartialEq(bound = ""),
   Eq(bound = ""),
   PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
+  Ord(bound = "")
 )]
 pub struct ProductionElement<E: ElementTypes> {
   identifier: Option<Name>,
@@ -136,6 +143,15 @@ impl<E: ElementTypes> ProductionElement<E> {
       identifier: self.identifier.clone(),
       element: self.element.clone_as_other(),
     }
+  }
+}
+
+impl<E: ElementTypes> std::fmt::Debug for ProductionElement<E> {
+  fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    if let Some(name) = &self.identifier {
+      fmt.write_str(&format!("{}:", name))?;
+    }
+    std::fmt::Debug::fmt(self.elem(), fmt)
   }
 }
 
@@ -271,6 +287,8 @@ impl<E: ElementTypes> std::fmt::Debug for Grammar<E> {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut dbg_struct = f.debug_struct("Grammar");
     dbg_struct.field("Terms", &self.get_terminals().collect::<Vec<_>>());
+    dbg_struct.field("NonTerms", &self.get_nonterminals().collect::<Vec<_>>());
+    dbg_struct.field("Rules", &self.rules().collect::<Vec<_>>());
     dbg_struct.finish()
   }
 }
@@ -311,31 +329,18 @@ impl<E: ElementTypes> Grammar<E> {
     self
       .rule_set
       .iter()
-      .map(|(k, rule)| {
-        (
-          k,
-          Rule {
-            grammar: ParentRef::new(self),
-            rule: RefCompare::new(rule),
-          },
-        )
-      })
+      .map(|(k, rule)| (k, Rule::new(self, rule)))
       .collect()
   }
 
   /// Gets the rule that has the given nonterminal as a head.
   pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<Rule<'a, E>> {
-    self.rule_set.get(nt).map(|rule| Rule {
-      grammar: ParentRef::new(self),
-      rule: RefCompare::new(rule),
-    })
+    self.rule_set.get(nt).map(|rule| Rule::new(self, rule))
   }
 
   /// Gets an iterator over all productions in the grammar.
   pub fn prods<'a>(&'a self) -> impl Iterator<Item = Prod<'a, E>> {
-    self
-      .rules()
-      .flat_map(move |rule| rule.prods().collect::<Vec<_>>())
+    self.rules().flat_map(move |rule| rule.prods())
   }
 
   fn get_elements(&self) -> impl Iterator<Item = &Element<E>> {
@@ -375,7 +380,7 @@ impl<E: ElementTypes> Grammar<E> {
       match self.get_rule(nt) {
         Some(rule) => rule
           .prods()
-          .flat_map(|p| p.elements_iter())
+          .flat_map(|p| p.elements())
           .filter_map(|e| e.as_nonterm())
           .collect(),
         None => BTreeSet::new(),
@@ -453,8 +458,7 @@ impl<E: ElementTypes> Grammar<E> {
   PartialEq(bound = ""),
   Eq(bound = ""),
   PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
+  Ord(bound = "")
 )]
 pub struct Rule<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
@@ -462,21 +466,41 @@ pub struct Rule<'a, E: ElementTypes> {
 }
 
 impl<'a, E: ElementTypes> Rule<'a, E> {
+  fn new(grammar: &'a Grammar<E>, rule: &'a RuleInner<E>) -> Self {
+    Rule {
+      grammar: ParentRef::new(grammar),
+      rule: RefCompare::new(rule),
+    }
+  }
   /// Returns the head nonterminal.
   pub fn head(&self) -> &'a E::NonTerm {
     &self.rule.head
   }
 
   /// Returns an iterator over the productions of this rule.
-  pub fn prods<'b>(&'b self) -> impl Iterator<Item = Prod<'a, E>> + 'b {
-    self.rule.prods.iter().map(move |prod| Prod {
-      grammar: self.grammar,
-      head: &self.rule.head,
-      prod: RefCompare::new(prod),
-      action_value: NoCompare::new(
-        self.grammar.action_map.get(&prod.action_key).unwrap(),
-      ),
+  pub fn prods(&self) -> impl Iterator<Item = Prod<'a, E>> {
+    let prods = &self.rule.prods;
+    prods.into_iter().map({
+      let grammar = *self.grammar;
+      let head = &self.rule.head;
+      move |prod| {
+        Prod::new(
+          grammar,
+          head,
+          prod,
+          grammar.action_map.get(&prod.action_key).unwrap(),
+        )
+      }
     })
+  }
+}
+
+impl<'a, E: ElementTypes> std::fmt::Debug for Rule<'a, E> {
+  fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let mut dbg_struct = fmt.debug_struct("Rule");
+    dbg_struct.field("head", self.head());
+    dbg_struct.field("prods", &self.prods().collect::<Vec<_>>());
+    dbg_struct.finish()
   }
 }
 
@@ -495,8 +519,7 @@ impl<'a, E: ElementTypes> Rule<'a, E> {
   PartialEq(bound = ""),
   Eq(bound = ""),
   PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
+  Ord(bound = "")
 )]
 pub struct Prod<'a, E: ElementTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
@@ -506,6 +529,19 @@ pub struct Prod<'a, E: ElementTypes> {
 }
 
 impl<'a, E: ElementTypes> Prod<'a, E> {
+  fn new(
+    grammar: &'a Grammar<E>,
+    head: &'a E::NonTerm,
+    prod: &'a ProductionInner<E>,
+    action_value: &'a E::ActionValue,
+  ) -> Self {
+    Prod {
+      grammar: ParentRef::new(grammar),
+      head,
+      prod: RefCompare::new(prod),
+      action_value: NoCompare::new(action_value),
+    }
+  }
   pub fn head(&self) -> &'a E::NonTerm {
     self.head
   }
@@ -518,7 +554,7 @@ impl<'a, E: ElementTypes> Prod<'a, E> {
     &self.prod.elements
   }
 
-  pub fn elements_iter(&self) -> impl Iterator<Item = &'a Element<E>> {
+  pub fn elements(&self) -> impl Iterator<Item = &'a Element<E>> {
     self.prod.elements_iter()
   }
 
@@ -546,5 +582,15 @@ impl<'a, E: ElementTypes> Prod<'a, E> {
       head: self.head().clone(),
       action_key: self.action_key().clone(),
     }
+  }
+}
+
+impl<'a, E: ElementTypes> std::fmt::Debug for Prod<'a, E> {
+
+  fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let mut dbg_struct = fmt.debug_struct("Prod");
+    dbg_struct.field("head", self.head());
+    dbg_struct.field("elems", &self.prod_elements());
+    dbg_struct.finish()
   }
 }

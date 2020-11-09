@@ -21,9 +21,9 @@ extern crate derivative;
 
 pub mod grammar;
 pub mod parsers;
+pub mod start_grammar;
 pub mod state;
 pub mod utils;
-pub mod start_grammar;
 
 use crate::grammar::{nullables::GrammarNullableInfo, ElementTypes, Grammar};
 
@@ -52,12 +52,11 @@ mod tests {
   use crate::grammar::{BaseElementTypes, NonTerminal, Terminal};
   use crate::utils::Name;
 
-  #[test]
-  fn test_grammar_print() {
+  fn base_grammar() -> Grammar<BaseElementTypes> {
     let t_a = Terminal::new("A");
     let nt_x = NonTerminal::new("x");
 
-    let g: Grammar<BaseElementTypes> = build(&nt_x, |gb| {
+    build(&nt_x, |gb| {
       gb.add_rule(&nt_x, |rb| {
         rb.add_prod(Name::new("Recursive"), (), |pb| {
           pb.add_term(&t_a).add_nonterm(&nt_x).add_term(&t_a);
@@ -65,12 +64,24 @@ mod tests {
         .add_prod(Name::new("Empty"), (), |_pb| {});
       });
     })
-    .unwrap();
+    .unwrap()
+  }
 
-    println!("{:?}", g);
+  #[test]
+  fn test_grammar_print() {
+    let g = base_grammar();
 
     let ng = NullableGrammar::new(g);
 
-    assert!(ng.is_nullable(&nt_x));
+    assert!(ng.is_nullable(&NonTerminal::new("x")));
+  }
+
+  #[test]
+  fn test_grammar_nullable() {
+
+    let g = base_grammar();
+    println!("{:#?}", g);
+
+    assert!(false);
   }
 }

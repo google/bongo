@@ -195,7 +195,7 @@ fn is_prod_nullable<E: ElementTypes, V>(
   nullables: &BTreeMap<E::NonTerm, V>,
   prod: &Prod<E>,
 ) -> bool {
-  for elem in prod.elements_iter() {
+  for elem in prod.elements() {
     match elem {
       Element::Term(_) => return false,
       Element::NonTerm(nt) => {

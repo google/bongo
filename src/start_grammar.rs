@@ -2,6 +2,7 @@ use crate::grammar::ElementTypes;
 use crate::grammar::{
   build, Element, Grammar, GrammarErrors, Prod, ProductionElement, Rule,
 };
+use crate::utils::take_only;
 use std::marker::PhantomData;
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -46,9 +47,8 @@ impl<E: ElementTypes> Grammar<StartElementTypes<E>> {
   }
 
   pub fn start_prod(&self) -> Prod<StartElementTypes<E>> {
-    let prods = self.start_rule().prods().collect::<Vec<_>>();
-    assert_eq!(prods.len(), 1);
-    prods.into_iter().next().unwrap()
+    take_only(self.start_rule().prods())
+      .expect("The start rule should only have a single production.")
   }
 }
 

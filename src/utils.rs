@@ -16,6 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 pub mod buffer;
 pub mod graph_closure;
+pub mod fmt;
 
 pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   let mut curr = start;
@@ -39,9 +40,15 @@ impl<
 {
 }
 
+/// Given an iterator, returns the only element in the iterator if it yields
+/// only a single item, otherwise return None.
+pub fn take_only<I: Iterator>(mut iter: I) -> Option<I::Item> {
+  iter.next().and_then(|v| if iter.next().is_some() { None } else { Some(v) })
+}
+
 /// A refcounted name type, used to avoid duplicating common string values
 /// throughout an AST.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Name(std::rc::Rc<String>);
 
 impl Name {
@@ -65,6 +72,18 @@ impl Name {
 impl AsRef<str> for Name {
   fn as_ref(&self) -> &str {
     return self.str();
+  }
+}
+
+impl std::fmt::Debug for Name {
+  fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fmt.write_str(&self.0)
+  }
+}
+
+impl std::fmt::Display for Name {
+  fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fmt.write_str(&self.0)
   }
 }
 
