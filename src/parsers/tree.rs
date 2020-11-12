@@ -14,7 +14,10 @@
 
 use std::sync::{Arc, RwLock};
 
-use crate::ElementTypes;
+use crate::{
+  utils::{change_iter, WasChanged},
+  ElementTypes,
+};
 use im::Vector;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -80,6 +83,49 @@ impl<E: ElementTypes, T> NodeContentInner<E, T> {
   }
 }
 
+struct AltSet<E, T>
+where
+  E: ElementTypes,
+{
+  value_to_id: BTreeMap<Arc<NodeContentInner<E, T>>, usize>,
+  id_to_value: Vec<Arc<NodeContentInner<E, T>>>,
+}
+
+impl<E, T> AltSet<E, T>
+where
+  E: ElementTypes,
+  T: Ord,
+{
+  pub fn new() -> Self {
+    AltSet {
+      value_to_id: BTreeMap::new(),
+      id_to_value: Vec::new(),
+    }
+  }
+
+  pub fn add(&mut self, content: NodeContentInner<E, T>) -> usize {
+    match self.value_to_id.get(&content) {
+      Some(index) => *index,
+      None => {
+        let index = self.id_to_value.len();
+        let arc = Arc::new(content);
+        self.id_to_value.push(arc.clone());
+        self.value_to_id.insert(arc, index);
+        index
+      }
+    }
+  }
+
+  pub fn get(&self, index: usize) -> &NodeContentInner<E, T> {
+    self.id_to_value.get(index).expect(&format!(
+      "Invalid index: {} where alts list size is {}",
+      index,
+      self.id_to_value.len()
+    ))
+  }
+}
+
+#[derive(Clone)]
 struct NodeData {
   alternatives: BTreeSet<usize>,
 }
@@ -90,19 +136,18 @@ struct ListData {
 
 struct Inner<E: ElementTypes, T> {
   nodes: Vec<NodeData>,
-  alternatives: BTreeMap<Arc<NodeContentInner<E, T>>, usize>,
-  alts_by_id: Vec<Arc<NodeContentInner<E, T>>>,
+  alternatives: AltSet<E, T>,
 }
 
-impl<E: ElementTypes, T> Inner<E, T>
+impl<E, T> Inner<E, T>
 where
+  E: ElementTypes,
   T: Ord,
 {
   pub fn new() -> Self {
     Inner {
       nodes: Vec::new(),
-      alternatives: BTreeMap::new(),
-      alts_by_id: Vec::new(),
+      alternatives: AltSet::new(),
     }
   }
 
@@ -115,21 +160,12 @@ where
   }
 
   pub fn make_alt(&mut self, content: NodeContentInner<E, T>) -> usize {
-    match self.alternatives.get(&content) {
-      Some(index) => *index,
-      None => {
-        let index = self.alts_by_id.len();
-        let arc = Arc::new(content);
-        self.alts_by_id.push(arc.clone());
-        self.alternatives.insert(arc, index);
-        index
-      }
-    }
+    self.alternatives.add(content)
   }
 
-  pub fn add_node_alt(&mut self, node_index: usize, alt_index: usize) -> bool {
+  pub fn add_node_alt(&mut self, node_index: usize, alt_index: usize) -> WasChanged {
     let node_data = self.get_node_mut(node_index);
-    node_data.alternatives.insert(alt_index)
+    WasChanged::from_changed(node_data.alternatives.insert(alt_index))
   }
 
   pub fn is_same(&self, other: &Self) -> bool {
@@ -153,11 +189,7 @@ where
   }
 
   pub fn get_alt(&self, index: usize) -> &NodeContentInner<E, T> {
-    self.alts_by_id.get(index).expect(&format!(
-      "Invalid index: {} where alts list size is {}",
-      index,
-      self.alternatives.len()
-    ))
+    self.alternatives.get(index)
   }
 }
 
@@ -226,6 +258,24 @@ where
     })
   }
 
+  pub fn make_leaf_node(&self, kind: E::Term, value: T) -> Node<'a, E, T> {
+    let node = self.make_node();
+    let leaf_alt = self.make_leaf_alt(kind, value);
+    node.add_alt(&leaf_alt);
+    node
+  }
+
+  pub fn make_branch_node(
+    &self,
+    action: E::ActionKey,
+    nodes: impl IntoIterator<Item = Node<'a, E, T>>,
+  ) -> Node<'a, E, T> {
+    let node = self.make_node();
+    let branch_alt = self.make_branch_alt(action, nodes);
+    node.add_alt(&branch_alt);
+    node
+  }
+
   fn make_alt(&self, content: NodeContentInner<E, T>) -> Alternative<'a, E, T> {
     self.with_mut(|inner| {
       let index = inner.make_alt(content);
@@ -237,7 +287,11 @@ where
     })
   }
 
-  pub fn make_leaf_alt(&self, kind: E::Term, value: T) -> Alternative<'a, E, T> {
+  pub fn make_leaf_alt(
+    &self,
+    kind: E::Term,
+    value: T,
+  ) -> Alternative<'a, E, T> {
     self.make_alt(NodeContentInner::Leaf(LeafData {
       kind,
       value: Arc::new(value),
@@ -295,7 +349,7 @@ where
   PartialEq(bound = ""),
   Eq(bound = ""),
   PartialOrd(bound = ""),
-  Ord(bound = "")
+  Ord(bound = ""),
 )]
 pub struct Node<'a, E: ElementTypes, T> {
   index: usize,
@@ -310,12 +364,12 @@ where
     self.inner.clone()
   }
 
-  pub fn add_alt(&self, alt: &Alternative<'a, E, T>) -> bool {
+  pub fn add_alt(&self, alt: &Alternative<'a, E, T>) -> WasChanged {
     assert!(self.inner.is_same(&alt.inner));
 
-    self.inner.with_mut(|inner| {
-      inner.add_node_alt(self.index, alt.index)
-    })
+    self
+      .inner
+      .with_mut(|inner| inner.add_node_alt(self.index, alt.index))
   }
 
   pub fn alts(&self) -> impl Iterator<Item = Alternative<'a, E, T>> {
@@ -330,6 +384,30 @@ where
         inner: inner.clone(),
       }
     })
+  }
+
+  /// Adds all alternatives from node other into this node. Does not modify the other node.
+  pub fn add_all(&self, other: &Node<'a, E, T>) -> WasChanged {
+    assert!(self.inner.is_same(&other.inner));
+
+    self.inner.with_mut(|inner| {
+      let mut changed = false;
+      let other_data = inner.get_node(other.index).clone();
+      change_iter(other_data.alternatives.iter(), |other_alt| {
+        inner.add_node_alt(self.index, *other_alt)
+      })
+    })
+  }
+}
+
+impl<'a, E: ElementTypes, T> Node<'a, E, T>
+where
+  T: Ord + std::fmt::Debug,
+{
+  pub fn to_dot(&self) -> String {
+    let mut vec_cursor = std::io::Cursor::new(Vec::new());
+    dot::render(&DotPrinter::new(self), &mut vec_cursor).unwrap();
+    String::from_utf8(vec_cursor.into_inner()).unwrap()
   }
 }
 
@@ -477,4 +555,184 @@ where
 pub enum NodeContent<'a, E: ElementTypes, T> {
   Leaf(Leaf<'a, E, T>),
   Branch(Branch<'a, E, T>),
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+enum DotNode {
+  Node(usize),
+  Alt(usize),
+}
+
+fn collect_nodes_and_alts<E: ElementTypes, T: Ord>(
+  node: &Node<E, T>,
+) -> (Vec<usize>, Vec<usize>) {
+  let handle = node.handle();
+
+  let mut seen = BTreeSet::new();
+  let mut curr = BTreeSet::new();
+  let mut next = BTreeSet::new();
+
+  curr.insert(DotNode::Node(node.index));
+
+  while !curr.is_empty() {
+    for curr_item in &curr {
+      match curr_item {
+        DotNode::Node(node_id) => handle.with(|inner| {
+          let node_data = inner.get_node(*node_id);
+          for alt_id in &node_data.alternatives {
+            if seen.insert(DotNode::Alt(*alt_id)) {
+              next.insert(DotNode::Alt(*alt_id));
+            }
+          }
+        }),
+        DotNode::Alt(alt_id) => handle.with(|inner| {
+          if let NodeContentInner::Branch(branch_data) = inner.get_alt(*alt_id)
+          {
+            for node_id in &branch_data.nodes {
+              if seen.insert(DotNode::Node(*node_id)) {
+                next.insert(DotNode::Node(*node_id));
+              }
+            }
+          }
+        }),
+      }
+    }
+
+    curr.clear();
+    std::mem::swap(&mut curr, &mut next);
+  }
+
+  let mut nodes = Vec::new();
+  let mut alts = Vec::new();
+
+  for item in seen {
+    match item {
+      DotNode::Node(node_id) => nodes.push(node_id),
+      DotNode::Alt(alt_id) => alts.push(alt_id),
+    }
+  }
+  (nodes, alts)
+}
+
+struct DotPrinter<'a, E, T>
+where
+  E: ElementTypes,
+{
+  handle: TreeHandle<'a, E, T>,
+  nodes: Vec<usize>,
+  alts: Vec<usize>,
+  root_node: usize,
+}
+
+impl<'a, E: ElementTypes, T> DotPrinter<'a, E, T>
+where
+  T: Ord,
+{
+  pub fn new(node: &Node<'a, E, T>) -> Self {
+    let handle = node.handle().clone();
+    let (nodes, alts) = collect_nodes_and_alts(node);
+    DotPrinter {
+      handle,
+      nodes,
+      alts,
+      root_node: node.index,
+    }
+  }
+}
+
+type DotEdge = (DotNode, DotNode);
+
+impl<'a, 'b: 'a, E, T> dot::GraphWalk<'a, DotNode, DotEdge>
+  for DotPrinter<'b, E, T>
+where
+  E: ElementTypes,
+  T: Ord,
+{
+  fn nodes(&'a self) -> dot::Nodes<'a, DotNode> {
+    self
+      .nodes
+      .iter()
+      .copied()
+      .map(DotNode::Node)
+      .chain(self.alts.iter().copied().map(DotNode::Alt))
+      .collect()
+  }
+
+  fn edges(&'a self) -> dot::Edges<'a, DotEdge> {
+    let node_edges = self.nodes.iter().copied().flat_map(|node_id| {
+      self.handle.with(|i| {
+        i.get_node(node_id)
+          .alternatives
+          .iter()
+          .copied()
+          .map(|alt_id| (DotNode::Node(node_id), DotNode::Alt(alt_id)))
+          .collect::<Vec<_>>()
+      })
+    });
+
+    let alt_edges = self.alts.iter().copied().flat_map(|alt_id| {
+      self.handle.with(|i| {
+        if let NodeContentInner::Branch(branch_data) = i.get_alt(alt_id) {
+          branch_data
+            .nodes
+            .iter()
+            .copied()
+            .map(|node_id| (DotNode::Alt(alt_id), DotNode::Node(node_id)))
+            .collect::<Vec<_>>()
+        } else {
+          Vec::new()
+        }
+      })
+    });
+
+    node_edges.chain(alt_edges).collect()
+  }
+
+  fn source(&'a self, edge: &DotEdge) -> DotNode {
+    edge.0
+  }
+
+  fn target(&'a self, edge: &DotEdge) -> DotNode {
+    edge.1
+  }
+}
+
+impl<'a, 'b: 'a, E, T> dot::Labeller<'a, DotNode, DotEdge>
+  for DotPrinter<'b, E, T>
+where
+  E: ElementTypes,
+  T: Ord + std::fmt::Debug,
+{
+  fn graph_id(&'a self) -> dot::Id<'a> {
+    dot::Id::new("G").unwrap()
+  }
+
+  fn node_id(&'a self, n: &DotNode) -> dot::Id<'a> {
+    match n {
+      DotNode::Node(node_id) => dot::Id::new(format!("n{}", node_id)).unwrap(),
+      DotNode::Alt(alt_id) => dot::Id::new(format!("a{}", alt_id)).unwrap(),
+    }
+  }
+
+  fn node_shape(&'a self, node: &DotNode) -> Option<dot::LabelText<'a>> {
+    match node {
+      DotNode::Node(_) => Some(dot::LabelText::label("point")),
+      DotNode::Alt(_) => Some(dot::LabelText::label("box")),
+    }
+  }
+
+  fn node_label(&'a self, node: &DotNode) -> dot::LabelText<'a> {
+    match node {
+      DotNode::Node(_) => dot::LabelText::label(""),
+      DotNode::Alt(alt_id) => self.handle.with(|i| match i.get_alt(*alt_id) {
+        NodeContentInner::Branch(branch_data) => {
+          dot::LabelText::label(format!("{:?}", branch_data.action))
+        }
+        NodeContentInner::Leaf(leaf_data) => dot::LabelText::label(format!(
+          "{:?}({:?})",
+          leaf_data.kind, leaf_data.value
+        )),
+      }),
+    }
+  }
 }

@@ -16,7 +16,7 @@ use std::sync::Arc;
 
 use crate::ElementTypes;
 
-mod earley;
+pub mod earley;
 pub mod tree;
 
 #[derive(Clone, Copy)]

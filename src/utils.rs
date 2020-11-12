@@ -15,8 +15,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod buffer;
-pub mod graph_closure;
 pub mod fmt;
+pub mod graph_closure;
 
 pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   let mut curr = start;
@@ -43,7 +43,9 @@ impl<
 /// Given an iterator, returns the only element in the iterator if it yields
 /// only a single item, otherwise return None.
 pub fn take_only<I: Iterator>(mut iter: I) -> Option<I::Item> {
-  iter.next().and_then(|v| if iter.next().is_some() { None } else { Some(v) })
+  iter
+    .next()
+    .and_then(|v| if iter.next().is_some() { None } else { Some(v) })
 }
 
 /// A refcounted name type, used to avoid duplicating common string values
@@ -146,4 +148,51 @@ where
   }
 
   seen_set
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+pub enum WasChanged {
+  Changed,
+  Unchanged,
+}
+
+impl WasChanged {
+  pub fn from_changed(changed: bool) -> Self {
+    if changed {
+      WasChanged::Changed
+    } else {
+      WasChanged::Unchanged
+    }
+  }
+  pub fn join(self, other: Self) -> Self {
+    match (self, other) {
+      (WasChanged::Changed, _) | (_, WasChanged::Changed) => {
+        WasChanged::Changed
+      }
+      _ => WasChanged::Unchanged,
+    }
+  }
+}
+
+pub fn change_loop<F>(mut func: F)
+where
+  F: FnMut() -> WasChanged,
+{
+  loop {
+    if let WasChanged::Changed = func() {
+      break;
+    }
+  }
+}
+
+pub fn change_iter<I, F>(iter: I, mut func: F) -> WasChanged
+where
+  I: Iterator,
+  F: FnMut(I::Item) -> WasChanged,
+{
+  let mut changed = WasChanged::Unchanged;
+  for item in iter {
+    changed = changed.join(func(item));
+  }
+  changed
 }

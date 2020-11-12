@@ -58,8 +58,12 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
     self.prod
   }
 
-  pub fn next_elem(&self) -> Option<&'a ProductionElement<E>> {
+  pub fn next_prod_elem(&self) -> Option<&'a ProductionElement<E>> {
     self.prod.prod_elements().get(self.index)
+  }
+
+  pub fn next_elem(&self) -> Option<&'a Element<E>> {
+    self.next_prod_elem().map(ProductionElement::elem)
   }
 
   /// Returns the next element after the current index. If it is at the
@@ -67,7 +71,7 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
   pub fn next_elem_state(
     &self,
   ) -> Option<(&'a ProductionElement<E>, ProdState<'a, E>)> {
-    self.next_elem().map(|prod_elem| {
+    self.next_prod_elem().map(|prod_elem| {
       (
         prod_elem,
         ProdState {
