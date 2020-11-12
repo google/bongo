@@ -21,18 +21,15 @@ mod state;
 
 use {
   crate::{
-    grammar::{Element, Grammar, Prod, ProductionElement},
+    grammar::Grammar,
     parsers::{
       tree::{Node, TreeHandle},
       Token,
     },
-    start_grammar::StartElementTypes,
-    state::ProdState,
-    utils::{change_iter, change_loop, WasChanged},
+    utils::{change_iter, change_loop},
     ElementTypes,
   },
-  state::{EarleyState, EarleyStateSet},
-  std::collections::{btree_map, BTreeMap, BTreeSet},
+  state::EarleyStateSet,
 };
 
 pub fn close_state<'a, E, T>(

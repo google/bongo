@@ -391,7 +391,6 @@ where
     assert!(self.inner.is_same(&other.inner));
 
     self.inner.with_mut(|inner| {
-      let mut changed = false;
       let other_data = inner.get_node(other.index).clone();
       change_iter(other_data.alternatives.iter(), |other_alt| {
         inner.add_node_alt(self.index, *other_alt)
