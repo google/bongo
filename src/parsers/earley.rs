@@ -21,19 +21,19 @@ mod state;
 
 use {
   crate::{
-    grammar::Grammar,
     parsers::{
       tree::{Node, TreeHandle},
       Token,
     },
     utils::{change_iter, change_loop},
     ElementTypes,
+    start_grammar::StartGrammar,
   },
   state::EarleyStateSet,
 };
 
 pub fn close_state<'a, E, T>(
-  grammar: &'a Grammar<E>,
+  grammar: &'a StartGrammar<E>,
   tree_handle: &TreeHandle<'a, E, T>,
   prev_states: &[EarleyStateSet<'a, E, T>],
   new_state: &mut EarleyStateSet<'a, E, T>,
@@ -57,10 +57,10 @@ pub fn close_state<'a, E, T>(
 }
 
 pub fn parse<'a, E, T>(
-  grammar: &'a Grammar<E>,
+  grammar: &'a StartGrammar<E>,
   tree_handle: &TreeHandle<'a, E, T>,
   tokens: Vec<Token<E::Term, T>>,
-) -> Node<'a, E, T>
+) -> Option<Node<'a, E, T>>
 where
   E: ElementTypes,
   T: Ord + Clone,
@@ -84,5 +84,6 @@ where
     states.push(new_state);
   }
 
-  todo!("Process final state: {:#?}", states.last().unwrap())
+  let last_state = states.last().unwrap();
+  dbg!(last_state).get_final().cloned()
 }

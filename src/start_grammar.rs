@@ -11,6 +11,22 @@ pub enum StreamTerminal<T> {
   Term(T),
 }
 
+impl<T> StreamTerminal<T>
+where
+  T: Eq,
+{
+  pub fn has_kind(&self, kind: &T) -> bool {
+    match self {
+      StreamTerminal::Term(t) => t == kind,
+      StreamTerminal::EndOfStream => false,
+    }
+  }
+
+  pub fn is_eos(&self) -> bool {
+    matches!(self, StreamTerminal::EndOfStream)
+  }
+}
+
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub enum StartNonTerminal<NT> {
   Start,
@@ -21,6 +37,15 @@ pub enum StartNonTerminal<NT> {
 pub enum StartActionKey<AK> {
   Start,
   ActionKey(AK),
+}
+
+impl<AK> StartActionKey<AK> {
+  pub fn as_base(&self) -> Option<&AK> {
+    match self {
+      StartActionKey::Start => None,
+      StartActionKey::ActionKey(ak) => Some(ak),
+    }
+  }
 }
 
 #[derive(Clone, Debug)]
@@ -41,7 +66,9 @@ impl<E: ElementTypes> ElementTypes for StartElementTypes<E> {
   type ActionValue = StartActionValue<E::ActionValue>;
 }
 
-impl<E: ElementTypes> Grammar<StartElementTypes<E>> {
+pub type StartGrammar<E> = Grammar<StartElementTypes<E>>;
+
+impl<E: ElementTypes> StartGrammar<E> {
   pub fn start_rule(&self) -> Rule<StartElementTypes<E>> {
     self.get_rule(&StartNonTerminal::Start).unwrap()
   }

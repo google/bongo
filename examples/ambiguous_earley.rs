@@ -4,6 +4,7 @@ use bongo::grammar::{
 use bongo::utils::Name;
 use bongo::parsers::tree::TreeOwner;
 use bongo::parsers::earley::parse;
+use bongo::start_grammar::wrap_grammar_with_start;
 
 fn main() {
   let a_nt = NonTerminal::new("A");
@@ -22,9 +23,13 @@ fn main() {
   })
   .unwrap();
 
-  println!("Grammar: {:#?}", g);
+  let g = wrap_grammar_with_start(g).unwrap();
+
+  eprintln!("Grammar: {:#?}", g);
 
   let tree: TreeOwner<_, ()> = TreeOwner::new();
 
-  parse(&g, &tree.handle(), vec![]);
+  let node = parse(&g, &tree.handle(), vec![]).unwrap();
+
+  println!("{}", node.to_dot());
 }

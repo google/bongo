@@ -178,11 +178,7 @@ pub fn change_loop<F>(mut func: F)
 where
   F: FnMut() -> WasChanged,
 {
-  loop {
-    if let WasChanged::Changed = func() {
-      break;
-    }
-  }
+  while let WasChanged::Changed = func() {}
 }
 
 pub fn change_iter<I, F>(iter: I, mut func: F) -> WasChanged
@@ -194,5 +190,6 @@ where
   for item in iter {
     changed = changed.join(func(item));
   }
+
   changed
 }

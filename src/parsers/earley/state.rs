@@ -1,10 +1,11 @@
 use {
   crate::{
-    grammar::{Element, Grammar, Prod},
+    grammar::{Element, Prod},
     parsers::{
       tree::{Node, TreeHandle},
       Token,
     },
+    start_grammar::{StartElementTypes, StartGrammar, StreamTerminal},
     state::ProdState,
     utils::{change_iter, WasChanged},
     ElementTypes,
@@ -22,11 +23,19 @@ use {
   Debug(bound = "")
 )]
 struct EarleyStateKey<'a, E: ElementTypes> {
-  prod_state: ProdState<'a, E>,
+  prod_state: ProdState<'a, StartElementTypes<E>>,
   origin_index: usize,
 }
 
-impl<'a, E: ElementTypes> EarleyStateKey<'a, E> {}
+impl<'a, E: ElementTypes> EarleyStateKey<'a, E> {
+  pub fn is_final_key(&self) -> bool {
+    self
+      .prod_state
+      .next_elem()
+      .and_then(|elem| elem.as_term())
+      .map_or(false, StreamTerminal::is_eos)
+  }
+}
 
 #[derive(Derivative)]
 #[derivative(
@@ -51,7 +60,10 @@ where
   E: ElementTypes,
   T: Ord + Clone,
 {
-  pub fn from_prod_start(prod: Prod<'a, E>, index: usize) -> Self {
+  pub fn from_prod_start(
+    prod: Prod<'a, StartElementTypes<E>>,
+    index: usize,
+  ) -> Self {
     EarleyState {
       key: EarleyStateKey {
         prod_state: ProdState::from_start(prod),
@@ -61,16 +73,17 @@ where
     }
   }
 
-  pub fn prod_state(&self) -> &ProdState<'a, E> {
+  pub fn prod_state(&self) -> &ProdState<'a, StartElementTypes<E>> {
     &self.key.prod_state
   }
 
   pub fn predict(
     &self,
-    grammar: &'a Grammar<E>,
+    grammar: &'a StartGrammar<E>,
     prev_states: &[EarleyStateSet<'a, E, T>],
   ) -> Vec<EarleyState<'a, E, T>> {
     if let Some(Element::NonTerm(nt)) = self.prod_state().next_elem() {
+      eprintln!("Predicting NT {:?} from prod state.", nt);
       let mut predicted = Vec::new();
       if let Some(rule) = grammar.get_rule(nt) {
         for prod in rule.prods() {
@@ -99,7 +112,7 @@ where
       self.prod_state().next_elem_state()
     {
       if let Element::Term(kind) = next_elem.elem() {
-        if kind == &next_token.kind {
+        if kind.has_kind(&next_token.kind) {
           return Some(EarleyState {
             key: EarleyStateKey {
               prod_state: next_prod_state,
@@ -128,7 +141,9 @@ where
     prev_states: &[EarleyStateSet<'a, E, T>],
     curr_state: &EarleyStateSet<'a, E, T>,
   ) -> Vec<EarleyState<'a, E, T>> {
+    eprintln!("Trying to complete prod state {:?}", self.prod_state());
     if self.prod_state().is_complete() {
+      eprintln!("Completing prod state {:?}.", self.prod_state());
       let origin_state = if self.key.origin_index == prev_states.len() {
         curr_state
       } else {
@@ -152,10 +167,18 @@ where
                   .value
                   .iter()
                   .cloned()
-                  .chain(std::iter::once(tree_handle.make_branch_node(
-                    self.prod_state().prod().action_key().clone(),
-                    self.value.iter().cloned(),
-                  )))
+                  .chain(std::iter::once(
+                    tree_handle.make_branch_node(
+                      self
+                        .prod_state()
+                        .prod()
+                        .action_key()
+                        .as_base()
+                        .unwrap()
+                        .clone(),
+                      self.value.iter().cloned(),
+                    ),
+                  ))
                   .collect(),
               })
             }
@@ -187,7 +210,7 @@ where
     }
   }
 
-  pub fn new_start(grammar: &'a Grammar<E>) -> Self {
+  pub fn new_start(grammar: &'a StartGrammar<E>) -> Self {
     let start_nt = grammar.start_nt();
     let start_rule =
       grammar.get_rule(start_nt).expect("Start NT must be valid.");
@@ -251,6 +274,17 @@ where
 
   pub fn is_empty(&self) -> bool {
     self.states.is_empty()
+  }
+
+  pub fn get_final(&self) -> Option<&Node<'a, E, T>> {
+    for (k, v) in &self.states {
+      if k.is_final_key() {
+        assert_eq!(v.len(), 1);
+        return Some(v.get(0).unwrap());
+      }
+    }
+
+    None
   }
 }
 
