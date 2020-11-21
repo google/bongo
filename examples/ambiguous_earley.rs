@@ -1,5 +1,5 @@
 use bongo::grammar::{
-  build, BaseElementTypes, Element, Grammar, NonTerminal, ProductionElement,
+  build, BaseElementTypes, Elem, Grammar, NonTerminal, ProdElement,
 };
 use bongo::utils::Name;
 use bongo::parsers::tree::TreeOwner;
@@ -14,9 +14,9 @@ fn main() {
         .add_prod_with_elems(
           &Name::new("a_recurse"),
           (),
-          vec![ProductionElement::new_with_name(
+          vec![ProdElement::new_with_name(
             Name::new("recurse"),
-            Element::NonTerm(a_nt.clone()),
+            Elem::NonTerm(a_nt.clone()),
           )],
         );
     });

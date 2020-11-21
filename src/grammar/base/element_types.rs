@@ -7,7 +7,7 @@ use crate::utils::{Name, OrdKey};
 /// of bounds.
 ///
 /// This type is not instantiated, and will typically be a zero-sized type.
-pub trait ElementTypes: 'static {
+pub trait ElemTypes: 'static {
   /// The type used to identify each possible terminal.
   ///
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
@@ -48,7 +48,7 @@ impl NonTerminal {
 
 pub struct BaseElementTypes;
 
-impl ElementTypes for BaseElementTypes {
+impl ElemTypes for BaseElementTypes {
   type Term = Terminal;
   type NonTerm = NonTerminal;
   type ActionKey = Name;

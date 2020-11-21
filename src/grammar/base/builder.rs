@@ -14,7 +14,7 @@
 
 use {
   super::{
-    Element, ElementTypes, Grammar, GrammarErrors, Name, ProductionElement,
+    Elem, ElemTypes, Grammar, GrammarErrors, Name, ProdElement,
     ProductionInner, RuleInner,
   },
   std::collections::BTreeMap,
@@ -48,12 +48,12 @@ impl BuilderInto<Name> for &'_ str {
   }
 }
 
-pub struct ProductionBuilder<E: ElementTypes> {
+pub struct ProductionBuilder<E: ElemTypes> {
   action_key: E::ActionKey,
-  elems: Vec<ProductionElement<E>>,
+  elems: Vec<ProdElement<E>>,
 }
 
-impl<E: ElementTypes> ProductionBuilder<E> {
+impl<E: ElemTypes> ProductionBuilder<E> {
   fn new(action_key: E::ActionKey) -> Self {
     ProductionBuilder {
       action_key,
@@ -67,7 +67,7 @@ impl<E: ElementTypes> ProductionBuilder<E> {
   }
 
   pub fn add_term(&mut self, term: impl BuilderInto<E::Term>) -> &mut Self {
-    self.elems.push(ProductionElement::new_empty(Element::Term(
+    self.elems.push(ProdElement::new_empty(Elem::Term(
       term.builder_into(),
     )));
     self
@@ -78,9 +78,9 @@ impl<E: ElementTypes> ProductionBuilder<E> {
     name: impl BuilderInto<Name>,
     term: impl BuilderInto<E::Term>,
   ) -> &mut Self {
-    self.elems.push(ProductionElement::new_with_name(
+    self.elems.push(ProdElement::new_with_name(
       name.builder_into(),
-      Element::Term(term.builder_into()),
+      Elem::Term(term.builder_into()),
     ));
     self
   }
@@ -91,7 +91,7 @@ impl<E: ElementTypes> ProductionBuilder<E> {
   ) -> &mut Self {
     self
       .elems
-      .push(ProductionElement::new_empty(Element::NonTerm(
+      .push(ProdElement::new_empty(Elem::NonTerm(
         nonterm.builder_into(),
       )));
     self
@@ -102,9 +102,9 @@ impl<E: ElementTypes> ProductionBuilder<E> {
     name: impl BuilderInto<Name>,
     nonterm: impl BuilderInto<E::NonTerm>,
   ) -> &mut Self {
-    self.elems.push(ProductionElement::new_with_name(
+    self.elems.push(ProdElement::new_with_name(
       name.builder_into(),
-      Element::NonTerm(nonterm.builder_into()),
+      Elem::NonTerm(nonterm.builder_into()),
     ));
     self
   }
@@ -112,13 +112,13 @@ impl<E: ElementTypes> ProductionBuilder<E> {
 
 // ----------------
 
-pub struct RuleBuilder<'a, E: ElementTypes> {
+pub struct RuleBuilder<'a, E: ElemTypes> {
   action_map: &'a mut BTreeMap<E::ActionKey, E::ActionValue>,
   head: E::NonTerm,
   prods: Vec<ProductionInner<E>>,
 }
 
-impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
+impl<'a, E: ElemTypes> RuleBuilder<'a, E> {
   fn new(
     action_map: &'a mut BTreeMap<E::ActionKey, E::ActionValue>,
     head: E::NonTerm,
@@ -155,7 +155,7 @@ impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
     &mut self,
     action_key: impl BuilderInto<E::ActionKey>,
     action_value: impl BuilderInto<E::ActionValue>,
-    elems: impl BuilderInto<Vec<ProductionElement<E>>>,
+    elems: impl BuilderInto<Vec<ProdElement<E>>>,
   ) -> &mut Self {
     let action_key = action_key.builder_into();
     self
@@ -171,13 +171,13 @@ impl<'a, E: ElementTypes> RuleBuilder<'a, E> {
 
 // ----------------
 
-pub struct GrammarBuilder<E: ElementTypes> {
+pub struct GrammarBuilder<E: ElemTypes> {
   start: E::NonTerm,
   rules: Vec<RuleInner<E>>,
   action_map: BTreeMap<E::ActionKey, E::ActionValue>,
 }
 
-impl<E: ElementTypes> GrammarBuilder<E> {
+impl<E: ElemTypes> GrammarBuilder<E> {
   fn new(start: E::NonTerm) -> Self {
     GrammarBuilder {
       start,
@@ -239,7 +239,7 @@ pub fn build<E>(
   build_fn: impl FnOnce(&mut GrammarBuilder<E>),
 ) -> Result<Grammar<E>, GrammarErrors<E>>
 where
-  E: ElementTypes,
+  E: ElemTypes,
 {
   let mut builder = GrammarBuilder::new(start.builder_into());
   build_fn(&mut builder);

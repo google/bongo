@@ -50,7 +50,7 @@ use {
     grammar::{
       build,
       nullables::{calculate_nullables, GrammarNullableInfo},
-      Element, ElementTypes, Grammar, Prod, ProdKey, ProductionElement,
+      Elem, ElemTypes, Grammar, Prod, ProdKey, ProdElement,
       RuleBuilder,
     },
     utils::{Name, TreeNode, Void},
@@ -58,7 +58,7 @@ use {
   std::{collections::BTreeMap, marker::PhantomData},
 };
 
-pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
+pub struct NonNullElemTypes<E: ElemTypes>(PhantomData<E>);
 
 #[derive(Derivative)]
 #[derivative(
@@ -69,28 +69,28 @@ pub struct ElemTypes<E: ElementTypes>(PhantomData<E>);
   Ord(bound = ""),
   Debug(bound = "")
 )]
-pub struct ActionKey<E: ElementTypes> {
+pub struct ActionKey<E: ElemTypes> {
   action: E::ActionKey,
   nt_nullable_states: Vec<bool>,
 }
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub struct ActionValue<E: ElementTypes> {
+pub struct ActionValue<E: ElemTypes> {
   parent_value: E::ActionValue,
   nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
 }
 
-impl<E: ElementTypes> ElementTypes for ElemTypes<E> {
+impl<E: ElemTypes> ElemTypes for NonNullElemTypes<E> {
   type Term = E::Term;
   type NonTerm = E::NonTerm;
   type ActionKey = ActionKey<E>;
   type ActionValue = ActionValue<E>;
 }
 
-pub fn transform_to_nonnull<E: ElementTypes>(
+pub fn transform_to_nonnull<E: ElemTypes>(
   g: &Grammar<E>,
-) -> anyhow::Result<Grammar<ElemTypes<E>>> {
+) -> anyhow::Result<Grammar<NonNullElemTypes<E>>> {
   let nullables = calculate_nullables(g)?;
 
   Ok(
@@ -113,16 +113,16 @@ pub fn transform_to_nonnull<E: ElementTypes>(
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
-struct ProdBuildState<E: ElementTypes> {
-  elems: Vec<ProductionElement<ElemTypes<E>>>,
+struct ProdBuildState<E: ElemTypes> {
+  elems: Vec<ProdElement<NonNullElemTypes<E>>>,
   nt_nullable_states: Vec<bool>,
   action_args: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
 }
 
-fn build_nonnull_prods<E: ElementTypes>(
+fn build_nonnull_prods<E: ElemTypes>(
   nullable_info: &GrammarNullableInfo<E>,
   prod: &Prod<E>,
-  r_builder: &mut RuleBuilder<ElemTypes<E>>,
+  r_builder: &mut RuleBuilder<NonNullElemTypes<E>>,
 ) {
   let mut curr_build_states = vec![ProdBuildState {
     elems: Vec::new(),
@@ -132,7 +132,7 @@ fn build_nonnull_prods<E: ElementTypes>(
 
   for prod_elem in prod.prod_elements() {
     match &prod_elem.elem() {
-      Element::NonTerm(nt) => {
+      Elem::NonTerm(nt) => {
         match nullable_info.get_nullable_info(nt) {
           Some(info) => {
             // We have to clone all of the current build states.
@@ -165,7 +165,7 @@ fn build_nonnull_prods<E: ElementTypes>(
           }
         }
       }
-      Element::Term(_) => {
+      Elem::Term(_) => {
         for prod_build_state in &mut curr_build_states {
           prod_build_state.elems.push(prod_elem.clone_as_other())
         }

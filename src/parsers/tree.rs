@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::{
   utils::{change_iter, WasChanged},
-  ElementTypes,
+  ElemTypes,
 };
 use im::Vector;
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,7 +36,7 @@ fn cmp_raw_refs<T>(a: &T, b: &T) -> std::cmp::Ordering {
   PartialOrd(bound = "T: PartialOrd"),
   Ord(bound = "T: Ord")
 )]
-struct LeafData<E: ElementTypes, T> {
+struct LeafData<E: ElemTypes, T> {
   kind: E::Term,
   value: Arc<T>,
 }
@@ -48,7 +48,7 @@ struct LeafData<E: ElementTypes, T> {
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-struct BranchData<E: ElementTypes> {
+struct BranchData<E: ElemTypes> {
   action: E::ActionKey,
   nodes: Vector<usize>,
 }
@@ -62,12 +62,12 @@ struct BranchData<E: ElementTypes> {
   PartialOrd = "feature_allow_slow_enum",
   Ord = "feature_allow_slow_enum"
 )]
-enum NodeContentInner<E: ElementTypes, T> {
+enum NodeContentInner<E: ElemTypes, T> {
   Leaf(LeafData<E, T>),
   Branch(BranchData<E>),
 }
 
-impl<E: ElementTypes, T> NodeContentInner<E, T> {
+impl<E: ElemTypes, T> NodeContentInner<E, T> {
   pub fn as_leaf(&self) -> Option<&LeafData<E, T>> {
     match self {
       NodeContentInner::Leaf(leaf) => Some(leaf),
@@ -85,7 +85,7 @@ impl<E: ElementTypes, T> NodeContentInner<E, T> {
 
 struct AltSet<E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
 {
   value_to_id: BTreeMap<Arc<NodeContentInner<E, T>>, usize>,
   id_to_value: Vec<Arc<NodeContentInner<E, T>>>,
@@ -93,7 +93,7 @@ where
 
 impl<E, T> AltSet<E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord,
 {
   pub fn new() -> Self {
@@ -134,14 +134,14 @@ struct ListData {
   nodes: Vector<usize>,
 }
 
-struct Inner<E: ElementTypes, T> {
+struct Inner<E: ElemTypes, T> {
   nodes: Vec<NodeData>,
   alternatives: AltSet<E, T>,
 }
 
 impl<E, T> Inner<E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord,
 {
   pub fn new() -> Self {
@@ -197,11 +197,11 @@ where
 ///
 /// All elements of this tree are created under the lifetime of this tree
 /// owner.
-pub struct TreeOwner<E: ElementTypes, T> {
+pub struct TreeOwner<E: ElemTypes, T> {
   inner: RwLock<Inner<E, T>>,
 }
 
-impl<E: ElementTypes, T> TreeOwner<E, T>
+impl<E: ElemTypes, T> TreeOwner<E, T>
 where
   T: Ord,
 {
@@ -222,29 +222,29 @@ where
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct TreeHandle<'a, E: ElementTypes, T>(&'a RwLock<Inner<E, T>>);
+pub struct TreeHandle<'a, E: ElemTypes, T>(&'a RwLock<Inner<E, T>>);
 
-impl<E: ElementTypes, T> std::cmp::Ord for TreeHandle<'_, E, T> {
+impl<E: ElemTypes, T> std::cmp::Ord for TreeHandle<'_, E, T> {
   fn cmp(&self, other: &Self) -> std::cmp::Ordering {
     cmp_raw_refs(self.0, other.0)
   }
 }
 
-impl<E: ElementTypes, T> std::cmp::PartialOrd for TreeHandle<'_, E, T> {
+impl<E: ElemTypes, T> std::cmp::PartialOrd for TreeHandle<'_, E, T> {
   fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
     Some(self.cmp(other))
   }
 }
 
-impl<E: ElementTypes, T> std::cmp::PartialEq for TreeHandle<'_, E, T> {
+impl<E: ElemTypes, T> std::cmp::PartialEq for TreeHandle<'_, E, T> {
   fn eq(&self, other: &Self) -> bool {
     matches!(self.cmp(other), std::cmp::Ordering::Equal)
   }
 }
 
-impl<E: ElementTypes, T> std::cmp::Eq for TreeHandle<'_, E, T> {}
+impl<E: ElemTypes, T> std::cmp::Eq for TreeHandle<'_, E, T> {}
 
-impl<'a, E: ElementTypes, T> TreeHandle<'a, E, T>
+impl<'a, E: ElemTypes, T> TreeHandle<'a, E, T>
 where
   T: Ord,
 {
@@ -351,12 +351,12 @@ where
   PartialOrd(bound = ""),
   Ord(bound = ""),
 )]
-pub struct Node<'a, E: ElementTypes, T> {
+pub struct Node<'a, E: ElemTypes, T> {
   index: usize,
   inner: TreeHandle<'a, E, T>,
 }
 
-impl<'a, E: ElementTypes, T> Node<'a, E, T>
+impl<'a, E: ElemTypes, T> Node<'a, E, T>
 where
   T: Ord,
 {
@@ -399,7 +399,7 @@ where
   }
 }
 
-impl<'a, E: ElementTypes, T> Node<'a, E, T>
+impl<'a, E: ElemTypes, T> Node<'a, E, T>
 where
   T: Ord + std::fmt::Debug,
 {
@@ -418,12 +418,12 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Alternative<'a, E: ElementTypes, T> {
+pub struct Alternative<'a, E: ElemTypes, T> {
   index: usize,
   inner: TreeHandle<'a, E, T>,
 }
 
-impl<'a, E: ElementTypes, T> Alternative<'a, E, T>
+impl<'a, E: ElemTypes, T> Alternative<'a, E, T>
 where
   T: Ord,
 {
@@ -453,12 +453,12 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Leaf<'a, E: ElementTypes, T> {
+pub struct Leaf<'a, E: ElemTypes, T> {
   index: usize,
   inner: TreeHandle<'a, E, T>,
 }
 
-impl<'a, E: ElementTypes, T> Leaf<'a, E, T>
+impl<'a, E: ElemTypes, T> Leaf<'a, E, T>
 where
   T: Ord,
 {
@@ -497,12 +497,12 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Branch<'a, E: ElementTypes, T> {
+pub struct Branch<'a, E: ElemTypes, T> {
   index: usize,
   inner: TreeHandle<'a, E, T>,
 }
 
-impl<'a, E: ElementTypes, T> Branch<'a, E, T>
+impl<'a, E: ElemTypes, T> Branch<'a, E, T>
 where
   T: Ord,
 {
@@ -551,7 +551,7 @@ where
   PartialOrd = "feature_allow_slow_enum",
   Ord = "feature_allow_slow_enum"
 )]
-pub enum NodeContent<'a, E: ElementTypes, T> {
+pub enum NodeContent<'a, E: ElemTypes, T> {
   Leaf(Leaf<'a, E, T>),
   Branch(Branch<'a, E, T>),
 }
@@ -562,7 +562,7 @@ enum DotNode {
   Alt(usize),
 }
 
-fn collect_nodes_and_alts<E: ElementTypes, T: Ord>(
+fn collect_nodes_and_alts<E: ElemTypes, T: Ord>(
   node: &Node<E, T>,
 ) -> (Vec<usize>, Vec<usize>) {
   let handle = node.handle();
@@ -615,7 +615,7 @@ fn collect_nodes_and_alts<E: ElementTypes, T: Ord>(
 
 struct DotPrinter<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
 {
   handle: TreeHandle<'a, E, T>,
   nodes: Vec<usize>,
@@ -623,7 +623,7 @@ where
   root_node: usize,
 }
 
-impl<'a, E: ElementTypes, T> DotPrinter<'a, E, T>
+impl<'a, E: ElemTypes, T> DotPrinter<'a, E, T>
 where
   T: Ord,
 {
@@ -644,7 +644,7 @@ type DotEdge = (DotNode, DotNode);
 impl<'a, 'b: 'a, E, T> dot::GraphWalk<'a, DotNode, DotEdge>
   for DotPrinter<'b, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord,
 {
   fn nodes(&'a self) -> dot::Nodes<'a, DotNode> {
@@ -699,7 +699,7 @@ where
 impl<'a, 'b: 'a, E, T> dot::Labeller<'a, DotNode, DotEdge>
   for DotPrinter<'b, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord + std::fmt::Debug,
 {
   fn graph_id(&'a self) -> dot::Id<'a> {

@@ -25,15 +25,15 @@ pub mod start_grammar;
 pub mod state;
 pub mod utils;
 
-use crate::grammar::{nullables::GrammarNullableInfo, ElementTypes, Grammar};
+use crate::grammar::{nullables::GrammarNullableInfo, ElemTypes, Grammar};
 
 #[derive(Clone)]
-pub struct NullableGrammar<E: ElementTypes> {
+pub struct NullableGrammar<E: ElemTypes> {
   grammar: Grammar<E>,
   nullables: GrammarNullableInfo<E>,
 }
 
-impl<E: ElementTypes> NullableGrammar<E> {
+impl<E: ElemTypes> NullableGrammar<E> {
   pub fn new(grammar: Grammar<E>) -> Self {
     let nullables =
       crate::grammar::nullables::calculate_nullables(&grammar).unwrap();
@@ -81,7 +81,5 @@ mod tests {
 
     let g = base_grammar();
     println!("{:#?}", g);
-
-    assert!(false);
   }
 }

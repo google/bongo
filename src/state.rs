@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::{Element, ElementTypes, Prod, ProductionElement};
+use crate::grammar::{Elem, ElemTypes, Prod, ProdElement};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A state of a production within a parse state.
@@ -37,7 +37,7 @@ use std::collections::{BTreeMap, BTreeSet};
   Debug(bound = "")
 )]
 
-pub struct ProdState<'a, E: ElementTypes> {
+pub struct ProdState<'a, E: ElemTypes> {
   /// The production this state is part of.
   prod: Prod<'a, E>,
 
@@ -46,7 +46,7 @@ pub struct ProdState<'a, E: ElementTypes> {
   index: usize,
 }
 
-impl<'a, E: ElementTypes> ProdState<'a, E> {
+impl<'a, E: ElemTypes> ProdState<'a, E> {
   /// Create a ProdState from a given NonTerminal and Prod.
   ///
   /// This state's index will be at the start of the production.
@@ -58,19 +58,19 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
     self.prod
   }
 
-  pub fn next_prod_elem(&self) -> Option<&'a ProductionElement<E>> {
+  pub fn next_prod_elem(&self) -> Option<&'a ProdElement<E>> {
     self.prod.prod_elements().get(self.index)
   }
 
-  pub fn next_elem(&self) -> Option<&'a Element<E>> {
-    self.next_prod_elem().map(ProductionElement::elem)
+  pub fn next_elem(&self) -> Option<&'a Elem<E>> {
+    self.next_prod_elem().map(ProdElement::elem)
   }
 
   /// Returns the next element after the current index. If it is at the
   /// end, then it reuturns `None`.
   pub fn next_elem_state(
     &self,
-  ) -> Option<(&'a ProductionElement<E>, ProdState<'a, E>)> {
+  ) -> Option<(&'a ProdElement<E>, ProdState<'a, E>)> {
     self.next_prod_elem().map(|prod_elem| {
       (
         prod_elem,
@@ -84,7 +84,7 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
 
   /// Return Some(state) which is this state advanced if
   /// the next element type is elem.
-  pub fn advance_if(&self, elem: &Element<E>) -> Option<ProdState<'a, E>> {
+  pub fn advance_if(&self, elem: &Elem<E>) -> Option<ProdState<'a, E>> {
     self
       .next_elem_state()
       .filter(|(e, _)| e.elem() == elem)
@@ -110,11 +110,11 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
   Ord(bound = ""),
   Debug(bound = "")
 )]
-pub struct ProdStateSet<'a, E: ElementTypes> {
+pub struct ProdStateSet<'a, E: ElemTypes> {
   states: BTreeSet<ProdState<'a, E>>,
 }
 
-impl<'a, E: ElementTypes> ProdStateSet<'a, E> {
+impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
   pub fn new_empty() -> Self {
     ProdStateSet {
       states: BTreeSet::new(),
@@ -138,7 +138,7 @@ impl<'a, E: ElementTypes> ProdStateSet<'a, E> {
   /// that.
   pub fn nexts(
     &self,
-  ) -> impl Iterator<Item = (&'a ProductionElement<E>, ProdStateSet<'a, E>)> {
+  ) -> impl Iterator<Item = (&'a ProdElement<E>, ProdStateSet<'a, E>)> {
     let mut result = BTreeMap::new();
 
     for (k, v) in self.states.iter().filter_map(ProdState::next_elem_state) {

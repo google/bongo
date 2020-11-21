@@ -8,7 +8,7 @@ use {
     start_grammar::{StartElementTypes, StartGrammar, StreamTerminal},
     state::ProdState,
     utils::{change_iter, WasChanged},
-    ElementTypes,
+    ElemTypes,
   },
   im::Vector,
   std::collections::{btree_map, BTreeMap},
@@ -23,12 +23,12 @@ use {
   PartialOrd(bound = ""),
   Debug(bound = "")
 )]
-struct EarleyStateKey<'a, E: ElementTypes> {
+struct EarleyStateKey<'a, E: ElemTypes> {
   prod_state: ProdState<'a, StartElementTypes<E>>,
   origin_index: usize,
 }
 
-impl<'a, E: ElementTypes> EarleyStateKey<'a, E> {
+impl<'a, E: ElemTypes> EarleyStateKey<'a, E> {
   pub fn is_final_key(&self) -> bool {
     self
       .prod_state
@@ -48,7 +48,7 @@ impl<'a, E: ElementTypes> EarleyStateKey<'a, E> {
 )]
 pub struct EarleyState<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
 {
   key: EarleyStateKey<'a, E>,
   #[derivative(Debug = "ignore")]
@@ -57,7 +57,7 @@ where
 
 impl<'a, E, T> EarleyState<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord + Clone,
 {
   pub fn from_prod_start(
@@ -174,7 +174,7 @@ where
 
 impl<'a, E, T> std::fmt::Debug for EarleyState<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut st = f.debug_struct("EarleyState");
@@ -187,14 +187,14 @@ where
 
 pub struct EarleyStateSet<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
 {
   states: BTreeMap<EarleyStateKey<'a, E>, Vector<Node<'a, E, T>>>,
 }
 
 impl<'a, E, T> EarleyStateSet<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord + Clone,
 {
   pub fn new() -> Self {
@@ -283,7 +283,7 @@ where
 
 impl<'a, E, T> std::fmt::Debug for EarleyStateSet<'a, E, T>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord + Clone,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

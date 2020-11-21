@@ -1,6 +1,6 @@
-use crate::grammar::ElementTypes;
+use crate::grammar::ElemTypes;
 use crate::grammar::{
-  build, Element, Grammar, GrammarErrors, Prod, ProductionElement, Rule,
+  build, Elem, Grammar, GrammarErrors, Prod, ProdElement, Rule,
 };
 use crate::utils::take_only;
 use std::marker::PhantomData;
@@ -58,7 +58,7 @@ pub enum StartActionValue<AV> {
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct StartElementTypes<E>(PhantomData<E>);
 
-impl<E: ElementTypes> ElementTypes for StartElementTypes<E> {
+impl<E: ElemTypes> ElemTypes for StartElementTypes<E> {
   type Term = StreamTerminal<E::Term>;
   type NonTerm = StartNonTerminal<E::NonTerm>;
 
@@ -68,7 +68,7 @@ impl<E: ElementTypes> ElementTypes for StartElementTypes<E> {
 
 pub type StartGrammar<E> = Grammar<StartElementTypes<E>>;
 
-impl<E: ElementTypes> StartGrammar<E> {
+impl<E: ElemTypes> StartGrammar<E> {
   pub fn start_rule(&self) -> Rule<StartElementTypes<E>> {
     self.get_rule(&StartNonTerminal::Start).unwrap()
   }
@@ -79,16 +79,16 @@ impl<E: ElementTypes> StartGrammar<E> {
   }
 }
 
-fn base_elem_to_start_elem<E: ElementTypes>(
-  elem: Element<E>,
-) -> Element<StartElementTypes<E>> {
+fn base_elem_to_start_elem<E: ElemTypes>(
+  elem: Elem<E>,
+) -> Elem<StartElementTypes<E>> {
   match elem {
-    Element::Term(t) => Element::Term(StreamTerminal::Term(t)),
-    Element::NonTerm(nt) => Element::NonTerm(StartNonTerminal::NTerm(nt)),
+    Elem::Term(t) => Elem::Term(StreamTerminal::Term(t)),
+    Elem::NonTerm(nt) => Elem::NonTerm(StartNonTerminal::NTerm(nt)),
   }
 }
 
-pub fn wrap_grammar_with_start<E: ElementTypes>(
+pub fn wrap_grammar_with_start<E: ElemTypes>(
   g: Grammar<E>,
 ) -> Result<Grammar<StartElementTypes<E>>, GrammarErrors<StartElementTypes<E>>>
 {
@@ -113,7 +113,7 @@ pub fn wrap_grammar_with_start<E: ElementTypes>(
               .prod_elements()
               .iter()
               .map(|e| {
-                ProductionElement::new(
+                ProdElement::new(
                   e.id().cloned(),
                   base_elem_to_start_elem(e.elem().clone()),
                 )

@@ -27,7 +27,7 @@ use {
     },
     start_grammar::StartGrammar,
     utils::{change_iter, change_loop},
-    ElementTypes,
+    ElemTypes,
   },
   state::EarleyStateSet,
 };
@@ -38,7 +38,7 @@ pub fn close_state<'a, E, T>(
   prev_states: &[EarleyStateSet<'a, E, T>],
   new_state: &mut EarleyStateSet<'a, E, T>,
 ) where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord + Clone,
 {
   assert!(!new_state.is_empty());
@@ -62,7 +62,7 @@ pub fn parse<'a, E, T>(
   tokens: Vec<Token<E::Term, T>>,
 ) -> Option<Node<'a, E, T>>
 where
-  E: ElementTypes,
+  E: ElemTypes,
   T: Ord + Clone,
 {
   let mut states = vec![];
