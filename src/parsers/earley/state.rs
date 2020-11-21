@@ -44,8 +44,7 @@ impl<'a, E: ElementTypes> EarleyStateKey<'a, E> {
   Eq(bound = ""),
   PartialEq(bound = ""),
   Ord(bound = ""),
-  PartialOrd(bound = ""),
-  Debug(bound = "")
+  PartialOrd(bound = "")
 )]
 pub struct EarleyState<'a, E, T>
 where
@@ -170,6 +169,19 @@ where
     } else {
       Vec::new()
     }
+  }
+}
+
+impl<'a, E, T> std::fmt::Debug for EarleyState<'a, E, T>
+where
+  E: ElementTypes,
+{
+  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    let mut st = f.debug_struct("EarleyState");
+    st.field("prod_state", &self.key.prod_state);
+    st.field("origin_index", &self.key.origin_index);
+    st.field("value_len", &self.value.len());
+    st.finish()
   }
 }
 
