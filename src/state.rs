@@ -94,6 +94,10 @@ impl<'a, E: ElementTypes> ProdState<'a, E> {
   pub fn is_complete(&self) -> bool {
     self.prod.len() == self.index
   }
+
+  pub fn action_key(&self) -> &'a E::ActionKey {
+    self.prod.action_key()
+  }
 }
 
 /// A set of production states.

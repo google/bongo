@@ -1,6 +1,6 @@
 use {
   crate::{
-    grammar::{Element, Prod},
+    grammar::Prod,
     parsers::{
       tree::{Node, TreeHandle},
       Token,
@@ -10,6 +10,7 @@ use {
     utils::{change_iter, WasChanged},
     ElementTypes,
   },
+  im::Vector,
   std::collections::{btree_map, BTreeMap},
 };
 
@@ -52,7 +53,7 @@ where
 {
   key: EarleyStateKey<'a, E>,
   #[derivative(Debug = "ignore")]
-  value: Vec<Node<'a, E, T>>,
+  value: Vector<Node<'a, E, T>>,
 }
 
 impl<'a, E, T> EarleyState<'a, E, T>
@@ -69,7 +70,7 @@ where
         prod_state: ProdState::from_start(prod),
         origin_index: index,
       },
-      value: Vec::new(),
+      value: Vector::new(),
     }
   }
 
@@ -77,30 +78,35 @@ where
     &self.key.prod_state
   }
 
+  pub fn create_next_value(
+    &self,
+    node: Node<'a, E, T>,
+  ) -> Vector<Node<'a, E, T>> {
+    let mut value = self.value.clone();
+    value.push_back(node);
+    value
+  }
+
   pub fn predict(
     &self,
     grammar: &'a StartGrammar<E>,
     prev_states: &[EarleyStateSet<'a, E, T>],
   ) -> Vec<EarleyState<'a, E, T>> {
-    if let Some(Element::NonTerm(nt)) = self.prod_state().next_elem() {
-      eprintln!("Predicting NT {:?} from prod state.", nt);
-      let mut predicted = Vec::new();
-      if let Some(rule) = grammar.get_rule(nt) {
-        for prod in rule.prods() {
-          predicted.push(EarleyState {
-            key: EarleyStateKey {
-              prod_state: ProdState::from_start(prod),
-              origin_index: prev_states.len(),
-            },
-            value: Vec::new(),
-          })
-        }
-      }
-
-      predicted
-    } else {
-      Vec::new()
-    }
+    self
+      .prod_state()
+      .next_elem()
+      .iter()
+      .filter_map(|nt| nt.as_nonterm())
+      .filter_map(|nt| grammar.get_rule(nt))
+      .flat_map(|r| r.prods())
+      .map(|p| EarleyState {
+        key: EarleyStateKey {
+          prod_state: ProdState::from_start(p),
+          origin_index: prev_states.len(),
+        },
+        value: Vector::new(),
+      })
+      .collect()
   }
 
   pub fn scan(
@@ -108,31 +114,21 @@ where
     tree_handle: &TreeHandle<'a, E, T>,
     next_token: &Token<E::Term, T>,
   ) -> Option<EarleyState<'a, E, T>> {
-    if let Some((next_elem, next_prod_state)) =
-      self.prod_state().next_elem_state()
-    {
-      if let Element::Term(kind) = next_elem.elem() {
-        if kind.has_kind(&next_token.kind) {
-          return Some(EarleyState {
-            key: EarleyStateKey {
-              prod_state: next_prod_state,
-              origin_index: self.key.origin_index,
-            },
-            value: self
-              .value
-              .iter()
-              .cloned()
-              .chain(std::iter::once(tree_handle.make_leaf_node(
-                next_token.kind.clone(),
-                next_token.value.clone(),
-              )))
-              .collect(),
-          });
-        }
-      }
-    }
-
-    None
+    self
+      .prod_state()
+      .next_elem_state()
+      .and_then(|(e, ps)| e.elem().as_term().map(move |t| (t, ps)))
+      .filter(|(t, _)| t.has_kind(&next_token.kind))
+      .map(|(_, ps)| EarleyState {
+        key: EarleyStateKey {
+          prod_state: ps,
+          origin_index: self.key.origin_index,
+        },
+        value: self.create_next_value(
+          tree_handle
+            .make_leaf_node(next_token.kind.clone(), next_token.value.clone()),
+        ),
+      })
   }
 
   pub fn complete(
@@ -141,7 +137,6 @@ where
     prev_states: &[EarleyStateSet<'a, E, T>],
     curr_state: &EarleyStateSet<'a, E, T>,
   ) -> Vec<EarleyState<'a, E, T>> {
-    eprintln!("Trying to complete prod state {:?}", self.prod_state());
     if self.prod_state().is_complete() {
       eprintln!("Completing prod state {:?}.", self.prod_state());
       let origin_state = if self.key.origin_index == prev_states.len() {
@@ -150,42 +145,28 @@ where
         &prev_states[self.key.origin_index]
       };
 
-      let mut complete_states = Vec::new();
-
-      for state in origin_state.states() {
-        if let Some((next_elem, next_prod_state)) =
-          state.prod_state().next_elem_state()
-        {
-          if let Element::NonTerm(nt) = next_elem.elem() {
-            if nt == self.prod_state().prod().head() {
-              complete_states.push(EarleyState {
-                key: EarleyStateKey {
-                  prod_state: next_prod_state,
-                  origin_index: state.key.origin_index,
-                },
-                value: state
-                  .value
-                  .iter()
-                  .cloned()
-                  .chain(std::iter::once(
-                    tree_handle.make_branch_node(
-                      self
-                        .prod_state()
-                        .prod()
-                        .action_key()
-                        .as_base()
-                        .unwrap()
-                        .clone(),
-                      self.value.iter().cloned(),
-                    ),
-                  ))
-                  .collect(),
-              })
-            }
-          }
-        }
-      }
-      complete_states
+      origin_state
+        .states()
+        .into_iter()
+        .filter_map(|state| {
+          state
+            .prod_state()
+            .next_elem_state()
+            .map(|(e, ps)| (state, e, ps))
+        })
+        .filter_map(|(st, e, ps)| e.elem().as_nonterm().map(|nt| (st, nt, ps)))
+        .filter(|(_, nt, _)| nt == &self.prod_state().prod().head())
+        .map(|(st, _, ps)| EarleyState {
+          key: EarleyStateKey {
+            prod_state: ps,
+            origin_index: st.key.origin_index,
+          },
+          value: st.create_next_value(tree_handle.make_branch_node(
+            self.prod_state().action_key().as_base().unwrap().clone(),
+            self.value.iter().cloned(),
+          )),
+        })
+        .collect()
     } else {
       Vec::new()
     }
@@ -196,7 +177,7 @@ pub struct EarleyStateSet<'a, E, T>
 where
   E: ElementTypes,
 {
-  states: BTreeMap<EarleyStateKey<'a, E>, Vec<Node<'a, E, T>>>,
+  states: BTreeMap<EarleyStateKey<'a, E>, Vector<Node<'a, E, T>>>,
 }
 
 impl<'a, E, T> EarleyStateSet<'a, E, T>

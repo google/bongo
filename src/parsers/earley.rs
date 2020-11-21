@@ -25,9 +25,9 @@ use {
       tree::{Node, TreeHandle},
       Token,
     },
+    start_grammar::StartGrammar,
     utils::{change_iter, change_loop},
     ElementTypes,
-    start_grammar::StartGrammar,
   },
   state::EarleyStateSet,
 };
@@ -73,11 +73,7 @@ where
   states.push(init_state);
 
   for token in tokens {
-    let mut new_state = if states.is_empty() {
-      EarleyStateSet::new_start(grammar)
-    } else {
-      states.last().unwrap().shift(tree_handle, &token)
-    };
+    let mut new_state = states.last().unwrap().shift(tree_handle, &token);
 
     close_state(grammar, tree_handle, &states, &mut new_state);
 
