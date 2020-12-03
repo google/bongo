@@ -50,10 +50,9 @@ use {
     grammar::{
       build,
       nullables::{calculate_nullables, GrammarNullableInfo},
-      Elem, ElemTypes, Grammar, Prod, ProdKey, ProdElement,
-      RuleBuilder,
+      Elem, ElemTypes, Grammar, Prod, ProdElement, ProdKey, RuleBuilder,
     },
-    utils::{Name, TreeNode, Void},
+    utils::{Name, ToDoc, TreeNode, Void},
   },
   std::{collections::BTreeMap, marker::PhantomData},
 };
@@ -74,11 +73,35 @@ pub struct ActionKey<E: ElemTypes> {
   nt_nullable_states: Vec<bool>,
 }
 
+impl<E: ElemTypes> ToDoc for ActionKey<E> {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    da.nil().append(self.action.to_doc(da))
+  }
+}
+
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
 pub struct ActionValue<E: ElemTypes> {
   parent_value: E::ActionValue,
   nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
+}
+
+impl<E: ElemTypes> ToDoc for ActionValue<E> {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA, ()>
+  where
+    DA::Doc: Clone,
+  {
+    da.nil().append(self.parent_value.to_doc(da))
+  }
 }
 
 impl<E: ElemTypes> ElemTypes for NonNullElemTypes<E> {

@@ -17,14 +17,12 @@ mod cmp_wrappers;
 mod element_types;
 
 use {
-  crate::utils::{breadth_first_search, Name},
+  crate::utils::{breadth_first_search, Name, ToDoc},
   std::collections::{BTreeMap, BTreeSet},
 };
 
 pub use cmp_wrappers::{NoCompare, ParentRef, RefCompare};
-pub use element_types::{
-  BaseElementTypes, ElemTypes, NonTerminal, Terminal,
-};
+pub use element_types::{BaseElementTypes, ElemTypes, NonTerminal, Terminal};
 
 /// A single element (terminal or non-terminal).
 #[derive(Derivative)]
@@ -70,6 +68,21 @@ impl<E: ElemTypes> Elem<E> {
     match self {
       Elem::Term(t) => Elem::Term(t.clone()),
       Elem::NonTerm(nt) => Elem::NonTerm(nt.clone()),
+    }
+  }
+
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    match self {
+      Elem::NonTerm(nt) => {
+        da.text("<").append(nt.to_doc(da)).append(da.text(">"))
+      }
+      Elem::Term(t) => t.to_doc(da),
     }
   }
 }
@@ -144,6 +157,22 @@ impl<E: ElemTypes> ProdElement<E> {
       element: self.element.clone_as_other(),
     }
   }
+
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    let prefix = if let Some(id) = &self.identifier {
+      id.to_doc(da).append(da.text(":").append(da.softline_()))
+    } else {
+      da.nil()
+    };
+
+    prefix.append(self.element.to_doc(da))
+  }
 }
 
 impl<E: ElemTypes> std::fmt::Debug for ProdElement<E> {
@@ -173,17 +202,14 @@ impl<E: ElemTypes> From<Elem<E>> for ProdElement<E> {
   Ord(bound = ""),
   Debug(bound = "")
 )]
-struct ProductionInner<E: ElemTypes> {
+struct ProdInner<E: ElemTypes> {
   action_key: E::ActionKey,
   elements: Vec<ProdElement<E>>,
 }
 
-impl<E: ElemTypes> ProductionInner<E> {
-  fn new(
-    action_key: E::ActionKey,
-    elements: Vec<ProdElement<E>>,
-  ) -> Self {
-    ProductionInner {
+impl<E: ElemTypes> ProdInner<E> {
+  fn new(action_key: E::ActionKey, elements: Vec<ProdElement<E>>) -> Self {
+    ProdInner {
       action_key,
       elements,
     }
@@ -203,6 +229,20 @@ impl<E: ElemTypes> ProductionInner<E> {
 
   pub fn action_key(&self) -> &E::ActionKey {
     &self.action_key
+  }
+
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    if self.elements.is_empty() {
+      da.text("ε")
+    } else {
+      da.intersperse(self.elements.iter().map(|e| e.to_doc(da)), da.softline())
+    }
   }
 }
 
@@ -243,11 +283,11 @@ impl<E: ElemTypes> ProdKey<E> {
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
 struct RuleInner<E: ElemTypes> {
   head: E::NonTerm,
-  prods: Vec<ProductionInner<E>>,
+  prods: Vec<ProdInner<E>>,
 }
 
 impl<E: ElemTypes> RuleInner<E> {
-  pub fn new(head: E::NonTerm, prods: Vec<ProductionInner<E>>) -> Self {
+  pub fn new(head: E::NonTerm, prods: Vec<ProdInner<E>>) -> Self {
     RuleInner { head, prods }
   }
 
@@ -255,8 +295,26 @@ impl<E: ElemTypes> RuleInner<E> {
     &self.head
   }
 
-  pub fn prods(&self) -> &Vec<ProductionInner<E>> {
+  pub fn prods(&self) -> &Vec<ProdInner<E>> {
     &self.prods
+  }
+
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    self
+      .head
+      .to_doc(da)
+      .append(da.text(" =>"))
+      .append(da.softline())
+      .append(da.intersperse(
+        self.prods.iter().map(|prod| prod.to_doc(da)),
+        da.text(" |").append(da.softline()),
+      ))
   }
 }
 
@@ -341,6 +399,11 @@ impl<E: ElemTypes> Grammar<E> {
   /// Gets an iterator over all productions in the grammar.
   pub fn prods<'a>(&'a self) -> impl Iterator<Item = Prod<'a, E>> {
     self.rules().flat_map(move |rule| rule.prods())
+  }
+
+  pub fn to_pretty(&self) -> String {
+    let arena = pretty::Arena::new();
+    format!("{}", self.to_doc(&arena).into_doc().pretty(80))
   }
 
   fn get_elements(&self) -> impl Iterator<Item = &Elem<E>> {
@@ -441,6 +504,38 @@ impl<E: ElemTypes> Grammar<E> {
   }
 }
 
+impl<E: ElemTypes> ToDoc for Grammar<E> {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    let start_entry = da
+      .text("Start =")
+      .group()
+      .append(da.softline())
+      .append(self.start_nt().to_doc(da));
+    let rules_entry = da.text("Rules ").append(
+      da.softline()
+        .append(
+          da.concat(self.rule_set.iter().map(|rule| {
+            rule.1.to_doc(da).append(da.text(";")).append(da.softline())
+          }))
+          .nest(2),
+        )
+        .braces(),
+    );
+
+    da.concat(
+      vec![start_entry, rules_entry]
+        .into_iter()
+        .map(|doc| doc.append(da.text(",")).append(da.softline())),
+    )
+  }
+}
+
 // ------------
 
 /// A rule within a grammar.
@@ -524,7 +619,7 @@ impl<'a, E: ElemTypes> std::fmt::Debug for Rule<'a, E> {
 pub struct Prod<'a, E: ElemTypes> {
   grammar: ParentRef<'a, Grammar<E>>,
   head: &'a E::NonTerm,
-  prod: RefCompare<'a, ProductionInner<E>>,
+  prod: RefCompare<'a, ProdInner<E>>,
   action_value: NoCompare<&'a E::ActionValue>,
 }
 
@@ -532,7 +627,7 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
   fn new(
     grammar: &'a Grammar<E>,
     head: &'a E::NonTerm,
-    prod: &'a ProductionInner<E>,
+    prod: &'a ProdInner<E>,
     action_value: &'a E::ActionValue,
   ) -> Self {
     Prod {
@@ -558,10 +653,7 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
     self.prod.elements_iter()
   }
 
-  pub fn prod_element_at(
-    &self,
-    index: usize,
-  ) -> Option<&'a ProdElement<E>> {
+  pub fn prod_element_at(&self, index: usize) -> Option<&'a ProdElement<E>> {
     self.prod.elements.get(index)
   }
 
@@ -586,7 +678,6 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
 }
 
 impl<'a, E: ElemTypes> std::fmt::Debug for Prod<'a, E> {
-
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut dbg_struct = fmt.debug_struct("Prod");
     dbg_struct.field("head", self.head());

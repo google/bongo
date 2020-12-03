@@ -1,4 +1,4 @@
-use crate::utils::{Name, OrdKey};
+use crate::utils::{Name, OrdKey, ToDoc};
 
 /// A trait which carries the underlying types for a grammar.
 ///
@@ -11,18 +11,18 @@ pub trait ElemTypes: 'static {
   /// The type used to identify each possible terminal.
   ///
   /// Terminals must be cloneable, and must be Ord to be used as a key in a map.
-  type Term: OrdKey;
+  type Term: OrdKey + ToDoc;
 
   /// The type used to identify each possible non-terminal.
-  type NonTerm: OrdKey;
+  type NonTerm: OrdKey + ToDoc;
 
   /// The type used to identify each production. A grammar requires that the
   /// pair of the head nonterminal of a production and its action key are
   /// unique per production.
-  type ActionKey: OrdKey;
+  type ActionKey: OrdKey + ToDoc;
 
   /// A value that annotates each production.
-  type ActionValue: Clone + std::fmt::Debug + 'static;
+  type ActionValue: Clone + std::fmt::Debug + ToDoc + 'static;
 }
 
 /// A terminal element.
@@ -37,12 +37,30 @@ impl Terminal {
   }
 }
 
+impl ToDoc for Terminal {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA> {
+    da.text(self.0.str().to_string())
+  }
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct NonTerminal(Name);
 
 impl NonTerminal {
   pub fn new(s: &str) -> Self {
     NonTerminal(Name::new(s))
+  }
+}
+
+impl ToDoc for NonTerminal {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA> {
+    da.text(self.0.str().to_string())
   }
 }
 

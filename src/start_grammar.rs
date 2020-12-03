@@ -2,7 +2,7 @@ use crate::grammar::ElemTypes;
 use crate::grammar::{
   build, Elem, Grammar, GrammarErrors, Prod, ProdElement, Rule,
 };
-use crate::utils::take_only;
+use crate::utils::{take_only, ToDoc};
 use std::marker::PhantomData;
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -27,10 +27,46 @@ where
   }
 }
 
+impl<T> ToDoc for StreamTerminal<T>
+where
+  T: ToDoc,
+{
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    match self {
+      StreamTerminal::EndOfStream => da.text("<EOS>"),
+      StreamTerminal::Term(t) => t.to_doc(da),
+    }
+  }
+}
+
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub enum StartNonTerminal<NT> {
   Start,
   NTerm(NT),
+}
+
+impl<NT> ToDoc for StartNonTerminal<NT>
+where
+  NT: ToDoc,
+{
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    match self {
+      StartNonTerminal::Start => da.text("<START>"),
+      StartNonTerminal::NTerm(nt) => nt.to_doc(da),
+    }
+  }
 }
 
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -48,10 +84,46 @@ impl<AK> StartActionKey<AK> {
   }
 }
 
+impl<AK> ToDoc for StartActionKey<AK>
+where
+  AK: ToDoc,
+{
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    match self {
+      StartActionKey::Start => da.text("<START>"),
+      StartActionKey::ActionKey(ak) => ak.to_doc(da),
+    }
+  }
+}
+
 #[derive(Clone, Debug)]
 pub enum StartActionValue<AV> {
   Start,
   ActionValue(AV),
+}
+
+impl<AV> ToDoc for StartActionValue<AV>
+where
+  AV: ToDoc,
+{
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA>
+  where
+    DA::Doc: Clone,
+  {
+    match self {
+      StartActionValue::Start => da.text("<START>"),
+      StartActionValue::ActionValue(av) => av.to_doc(da),
+    }
+  }
 }
 
 #[derive(Derivative)]

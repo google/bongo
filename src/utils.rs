@@ -40,6 +40,19 @@ impl<
 {
 }
 
+pub trait ToDoc {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA, ()> where DA::Doc: Clone;
+}
+
+impl ToDoc for () {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(&self, da: &'a DA) -> pretty::DocBuilder<'a, DA> {
+    da.text("()").into()
+  }
+}
+
 /// Given an iterator, returns the only element in the iterator if it yields
 /// only a single item, otherwise return None.
 pub fn take_only<I: Iterator>(mut iter: I) -> Option<I::Item> {
@@ -86,6 +99,12 @@ impl std::fmt::Debug for Name {
 impl std::fmt::Display for Name {
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
     fmt.write_str(&self.0)
+  }
+}
+
+impl ToDoc for Name {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(&self, da: &'a DA) -> pretty::DocBuilder<'a, DA> {
+    da.text(self.str().to_string())
   }
 }
 

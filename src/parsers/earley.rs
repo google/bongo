@@ -81,5 +81,5 @@ where
   }
 
   let last_state = states.last().unwrap();
-  dbg!(last_state).get_final().cloned()
+  last_state.get_final().cloned()
 }

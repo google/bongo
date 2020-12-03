@@ -137,11 +137,11 @@ where
     curr_state: &EarleyStateSet<'a, E, T>,
   ) -> Vec<EarleyState<'a, E, T>> {
     if self.prod_state().is_complete() {
-      eprintln!("Completing prod state {:?}.", self.prod_state());
+      log::trace!("Completing prod state {:?}.", self.prod_state());
       let origin_state = if self.key.origin_index == prev_states.len() {
         curr_state
       } else {
-        &prev_states[self.key.origin_index]
+        &prev_states[self.key.origin_index] 
       };
 
       origin_state
