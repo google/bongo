@@ -25,6 +25,12 @@ pub struct Token<K, T> {
   value: T,
 }
 
+impl<K, T> Token<K, T> {
+  pub fn new(kind: K, value: T) -> Self {
+    Token { kind, value }
+  }
+}
+
 pub trait TokenStream<K, T>: Clone {
   fn next(&self) -> Option<(Token<K, T>, Self)>;
 }
