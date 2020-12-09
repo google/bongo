@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
 
 pub mod buffer;
 pub mod fmt;
@@ -44,11 +44,16 @@ pub trait ToDoc {
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
-  ) -> pretty::DocBuilder<'a, DA, ()> where DA::Doc: Clone;
+  ) -> pretty::DocBuilder<'a, DA, ()>
+  where
+    DA::Doc: Clone;
 }
 
 impl ToDoc for () {
-  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(&self, da: &'a DA) -> pretty::DocBuilder<'a, DA> {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA> {
     da.text("()").into()
   }
 }
@@ -103,7 +108,10 @@ impl std::fmt::Display for Name {
 }
 
 impl ToDoc for Name {
-  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(&self, da: &'a DA) -> pretty::DocBuilder<'a, DA> {
+  fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
+    &self,
+    da: &'a DA,
+  ) -> pretty::DocBuilder<'a, DA> {
     da.text(self.str().to_string())
   }
 }
@@ -169,6 +177,29 @@ where
   seen_set
 }
 
+pub fn merge_value_pairs<K, V>(
+  iter: impl IntoIterator<Item = (K, V)>,
+) -> BTreeMap<K, BTreeSet<V>>
+where
+  K: Ord,
+  V: Ord,
+{
+  let mut result = BTreeMap::new();
+  for (k, v) in iter {
+    match result.entry(k) {
+      btree_map::Entry::Vacant(vac) => {
+        let mut new_set = BTreeSet::new();
+        new_set.insert(v);
+        vac.insert(new_set);
+      }
+      btree_map::Entry::Occupied(mut occ) => {
+        occ.get_mut().insert(v);
+      }
+    }
+  }
+  result
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub enum WasChanged {
   Changed,
@@ -183,6 +214,7 @@ impl WasChanged {
       WasChanged::Unchanged
     }
   }
+
   pub fn join(self, other: Self) -> Self {
     match (self, other) {
       (WasChanged::Changed, _) | (_, WasChanged::Changed) => {
@@ -190,6 +222,10 @@ impl WasChanged {
       }
       _ => WasChanged::Unchanged,
     }
+  }
+
+  pub fn merge(&mut self, other: Self) {
+    *self = self.join(other);
   }
 }
 
@@ -211,4 +247,134 @@ where
   }
 
   changed
+}
+
+pub struct CollectMap<K, V>(BTreeMap<K, BTreeSet<V>>);
+
+impl<K, V> CollectMap<K, V>
+where
+  K: Ord,
+  V: Ord,
+{
+  pub fn new() -> Self {
+    CollectMap(BTreeMap::new())
+  }
+
+  pub fn get(&self, key: &K) -> Option<&BTreeSet<V>> {
+    self.0.get(key)
+  }
+
+  pub fn insert(&mut self, key: K, value: V) -> WasChanged {
+    match self.0.entry(key) {
+      btree_map::Entry::Occupied(mut occ) => {
+        WasChanged::from_changed(occ.get_mut().insert(value))
+      }
+      btree_map::Entry::Vacant(vac) => {
+        let mut new_set = BTreeSet::new();
+        new_set.insert(value);
+        vac.insert(new_set);
+        WasChanged::Changed
+      }
+    }
+  }
+
+  pub fn insert_iter(
+    &mut self,
+    key: K,
+    values: impl IntoIterator<Item = V>,
+  ) -> WasChanged
+  where
+    K: Clone,
+  {
+    match self.0.entry(key) {
+      btree_map::Entry::Occupied(mut occ) => {
+        let set = occ.get_mut();
+        change_iter(values.into_iter(), |val| {
+          WasChanged::from_changed(set.insert(val))
+        })
+      }
+      btree_map::Entry::Vacant(vac) => {
+        let mut val_iter = values.into_iter();
+        match val_iter.next() {
+          Some(init) => {
+            let mut new_set = BTreeSet::new();
+            new_set.insert(init);
+            new_set.extend(val_iter);
+            vac.insert(new_set);
+            WasChanged::Changed
+          }
+
+          None => WasChanged::Unchanged,
+        }
+      }
+    }
+  }
+
+  pub fn insert_from_key_set(
+    &mut self,
+    key: K,
+    src_key: K,
+  ) -> WasChanged where V: Clone {
+    if key == src_key {
+      return WasChanged::Unchanged;
+    }
+
+    let (key, mut value) = match self.0.entry(key) {
+      btree_map::Entry::Occupied(occ) => occ.remove_entry(),
+      btree_map::Entry::Vacant(vac) => (vac.into_key(), BTreeSet::new()),
+    };
+
+    let changed_result = if let Some(src_set) = self.0.get(&src_key) {
+      change_iter(src_set.iter(), |src_value| {
+        WasChanged::from_changed(value.insert(src_value.clone()))
+      })
+    } else {
+      WasChanged::Unchanged
+    };
+
+    self.0.insert(key, value);
+
+    changed_result
+  }
+
+  pub fn into_inner(self) -> BTreeMap<K, BTreeSet<V>> {
+    self.0
+  }
+}
+
+pub trait FixedPointProcessor<K, V> {
+  fn next(&self, key: &K, value: &V) -> Vec<(K, V)>;
+  fn merge(&self, target: &mut V, other: V) -> WasChanged;
+}
+
+pub fn apply_fixed_point<K, V, P: FixedPointProcessor<K, V>>(
+  proc: &P,
+  target: &mut BTreeMap<K, V>,
+) where
+  K: Clone + Ord,
+{
+  let currs = target.keys().cloned().collect::<BTreeSet<_>>();
+  let mut nexts = BTreeSet::new();
+
+  while !currs.is_empty() {
+    for curr in &currs {
+      let curr_val = target
+        .get(curr)
+        .expect("curr must already exist in target.");
+      for (next_k, next_v) in proc.next(curr, curr_val) {
+        match target.entry(next_k) {
+          btree_map::Entry::Vacant(vac) => {
+            nexts.insert(vac.key().clone());
+            vac.insert(next_v);
+          }
+          btree_map::Entry::Occupied(mut occ) => {
+            if matches!(proc.merge(occ.get_mut(), next_v), WasChanged::Changed)
+            {
+              nexts.insert(occ.key().clone());
+            }
+          }
+        }
+      }
+    }
+  }
 }

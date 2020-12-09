@@ -219,7 +219,7 @@ impl<E: ElemTypes> ProdInner<E> {
     &self.elements
   }
 
-  pub fn elements_iter(&self) -> impl Iterator<Item = &Elem<E>> {
+  pub fn elements_iter(&self) -> impl Iterator<Item = &Elem<E>> + Clone {
     self.elements.iter().map(|prod_elem| &prod_elem.element)
   }
 
@@ -649,7 +649,7 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
     &self.prod.elements
   }
 
-  pub fn elements(&self) -> impl Iterator<Item = &'a Elem<E>> {
+  pub fn elements(&self) -> impl Iterator<Item = &'a Elem<E>> + Clone {
     self.prod.elements_iter()
   }
 
@@ -674,6 +674,10 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
       head: self.head().clone(),
       action_key: self.action_key().clone(),
     }
+  }
+
+  pub fn first_elem(&self) -> Option<&'a Elem<E>> {
+    self.prod.elements.first().map(|pe| pe.elem())
   }
 }
 

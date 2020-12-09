@@ -18,6 +18,7 @@ use crate::ElemTypes;
 
 pub mod earley;
 pub mod tree;
+pub mod lalr;
 
 #[derive(Clone, Copy)]
 pub struct Token<K, T> {

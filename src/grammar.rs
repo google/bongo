@@ -18,6 +18,7 @@ mod base;
 pub mod examples;
 pub mod nullables;
 pub mod transform;
+pub mod passes;
 
 pub use base::{
   builder::{build, GrammarBuilder, ProductionBuilder, RuleBuilder},

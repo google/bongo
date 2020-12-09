@@ -27,7 +27,7 @@ use {
   Eq(bound = ""),
   PartialOrd(bound = ""),
   Ord(bound = ""),
-  Debug(bound = ""),
+  Debug(bound = "")
 )]
 struct InternalNullableInfo<'a, E: ElemTypes> {
   /// The set of productions that are nullable
@@ -145,8 +145,8 @@ pub fn calculate_nullables<E: ElemTypes>(
     nullable_action_map.insert(nt, get_only(&info.nullable_actions));
   }
 
-  let mut remaining_nullables: BTreeSet<E::NonTerm> =
-    inner_info.keys().cloned().collect();
+  let mut remaining_nullables =
+    inner_info.keys().cloned().collect::<BTreeSet<_>>();
   let mut nullable_infos: BTreeMap<E::NonTerm, NonTermNullableInfo<E>> =
     BTreeMap::new();
   loop {
