@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::{
   utils::{change_iter, WasChanged},
-  ElemTypes,
+  grammar::ElemTypes,
 };
 use im::Vector;
 use std::collections::{BTreeMap, BTreeSet};

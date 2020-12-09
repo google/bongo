@@ -11,13 +11,37 @@ use std::{
 
 use super::{ElemTypes, Grammar};
 
+pub trait BasePassError {
+  fn as_any(&self) -> &(dyn std::any::Any + 'static);
+  fn as_err(&self) ->&(dyn std::error::Error + 'static);
+}
+
+impl<T> BasePassError for T where T: std::any::Any + std::error::Error + 'static {
+    fn as_any(&self) -> &(dyn Any + 'static) {
+        self
+    }
+
+    fn as_err(&self) ->&(dyn std::error::Error + 'static) {
+        self
+    }
+}
+
+struct BoxPassError(Box<dyn BasePassError>);
+
+
+enum PassError<E, P> where P: Pass<E>, E: ElemTypes {
+  ThisPass(P::Error),
+  PrevPass(Box<dyn BasePassError>)
+}
+
 pub trait Pass<E>
 where
   E: ElemTypes,
 {
   type Value: Any + 'static;
+  type Error;
 
-  fn run_pass<'a>(pass_map: &PassMap<'a, E>) -> Self::Value;
+  fn run_pass<'a>(pass_map: &PassMap<'a, E>) -> Result<Self::Value, Self::Error>;
 }
 
 pub struct PassMap<'a, E>
@@ -43,7 +67,7 @@ where
     &self.grammar
   }
 
-  pub fn get_pass<P>(&self) -> PassValue<E, P>
+  pub fn get_pass<P>(&self) -> Result<PassValue<E, P>, P::Error>
   where
     P: Pass<E> + 'static,
   {
@@ -55,7 +79,7 @@ where
     };
 
     if !contains_key {
-      let value = P::run_pass(self);
+      let value = P::run_pass(self)?;
       let mut guard = self.passes.borrow_mut();
       guard.insert(pass_type, Rc::new(value));
     };
@@ -65,10 +89,10 @@ where
       guard.get(&pass_type).unwrap().clone()
     };
 
-    PassValue {
+    Ok(PassValue {
       value: any_pass_val,
       _phantom: std::marker::PhantomData {},
-    }
+    })
   }
 }
 

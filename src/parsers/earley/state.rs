@@ -1,6 +1,6 @@
 use {
   crate::{
-    grammar::Prod,
+    grammar::{ElemTypes, Prod},
     parsers::{
       tree::{Node, TreeHandle},
       Token,
@@ -8,7 +8,6 @@ use {
     start_grammar::{StartElementTypes, StartGrammar, StreamTerminal},
     state::ProdState,
     utils::{change_iter, WasChanged},
-    ElemTypes,
   },
   im::Vector,
   std::collections::{btree_map, BTreeMap},
@@ -141,7 +140,7 @@ where
       let origin_state = if self.key.origin_index == prev_states.len() {
         curr_state
       } else {
-        &prev_states[self.key.origin_index] 
+        &prev_states[self.key.origin_index]
       };
 
       origin_state

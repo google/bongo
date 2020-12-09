@@ -16,7 +16,6 @@ use {
     grammar::{Elem, ElemTypes, Grammar, Prod, ProdKey},
     utils::{TreeNode, TreeValue, Void},
   },
-  anyhow::Error,
   std::collections::{BTreeMap, BTreeSet},
 };
 
@@ -120,12 +119,12 @@ impl<E: ElemTypes> NonTermNullableInfo<E> {
 #[derive(Debug, thiserror::Error)]
 pub enum NullableError {
   #[error("found nullable ambiguities in grammar")]
-  NullableAmbiguity,
+  Ambiguity,
 }
 
 pub fn calculate_nullables<E: ElemTypes>(
   g: &Grammar<E>,
-) -> Result<GrammarNullableInfo<E>, Error> {
+) -> Result<GrammarNullableInfo<E>, NullableError> {
   let inner_info = inner_calculate_nullables(g);
 
   // Sanity check outputs.
@@ -134,7 +133,7 @@ pub fn calculate_nullables<E: ElemTypes>(
     if actions_length == 0 {
       panic!("Unexpectedly empty nullable action!")
     } else if actions_length > 1 {
-      return Err(NullableError::NullableAmbiguity.into());
+      return Err(NullableError::Ambiguity.into());
     }
   }
 
@@ -264,6 +263,6 @@ mod test {
   fn test_ambiguous_nullable_grammar() {
     let g = examples::make_ambiguous_nullable();
     let nullable_error = calculate_nullables(&g).unwrap_err();
-    assert!(nullable_error.downcast_ref::<NullableError>().is_some());
+    assert!(matches!(nullable_error, NullableError::Ambiguity));
   }
 }

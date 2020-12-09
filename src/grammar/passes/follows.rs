@@ -6,8 +6,14 @@ use crate::{
   utils::CollectMap,
 };
 
-use super::firsts::Firsts;
+use super::firsts::{Firsts, FirstsError};
 use super::Pass;
+
+#[derive(thiserror::Error, Debug)]
+pub enum FollowsError {
+  #[error(transparent)]
+  First(#[from] FirstsError),
+}
 
 pub struct Follows;
 
@@ -16,11 +22,14 @@ where
   E: ElemTypes,
 {
   type Value = BTreeMap<E::NonTerm, BTreeSet<E::Term>>;
+  type Error = FollowsError;
 
-  fn run_pass<'a>(pass_map: &super::PassMap<'a, E>) -> Self::Value {
+  fn run_pass<'a>(
+    pass_map: &super::PassMap<'a, E>,
+  ) -> Result<Self::Value, FollowsError> {
     let gram = pass_map.grammar();
 
-    let firsts = pass_map.get_pass::<Firsts>();
+    let firsts = pass_map.get_pass::<Firsts>()?;
 
     let mut follows = CollectMap::new();
 
@@ -48,10 +57,12 @@ where
       })
     });
 
-    follows
-      .into_inner()
-      .into_iter()
-      .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
-      .collect()
+    Ok(
+      follows
+        .into_inner()
+        .into_iter()
+        .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
+        .collect(),
+    )
   }
 }

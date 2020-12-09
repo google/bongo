@@ -27,7 +27,7 @@ use {
     },
     start_grammar::StartGrammar,
     utils::{change_iter, change_loop},
-    ElemTypes,
+    grammar::ElemTypes,
   },
   state::EarleyStateSet,
 };

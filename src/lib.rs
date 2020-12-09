@@ -25,31 +25,13 @@ pub mod start_grammar;
 pub mod state;
 pub mod utils;
 
-use crate::grammar::{nullables::GrammarNullableInfo, ElemTypes, Grammar};
-
-#[derive(Clone)]
-pub struct NullableGrammar<E: ElemTypes> {
-  grammar: Grammar<E>,
-  nullables: GrammarNullableInfo<E>,
-}
-
-impl<E: ElemTypes> NullableGrammar<E> {
-  pub fn new(grammar: Grammar<E>) -> Self {
-    let nullables =
-      crate::grammar::nullables::calculate_nullables(&grammar).unwrap();
-    NullableGrammar { grammar, nullables }
-  }
-
-  pub fn is_nullable(&self, nt: &E::NonTerm) -> bool {
-    self.nullables.nonterm_info().contains_key(nt)
-  }
-}
-
 #[cfg(test)]
 mod tests {
-  use super::*;
   use crate::grammar::build;
-  use crate::grammar::{BaseElementTypes, NonTerminal, Terminal};
+  use crate::grammar::{
+    passes::{nullable::Nullable, PassMap},
+    BaseElementTypes, Grammar, NonTerminal, Terminal,
+  };
   use crate::utils::Name;
 
   fn base_grammar() -> Grammar<BaseElementTypes> {
@@ -71,14 +53,14 @@ mod tests {
   fn test_grammar_print() {
     let g = base_grammar();
 
-    let ng = NullableGrammar::new(g);
+    let pass_map = PassMap::new(&g);
+    let nullable = pass_map.get_pass::<Nullable>().unwrap();
 
-    assert!(ng.is_nullable(&NonTerminal::new("x")));
+    assert!(nullable.is_nullable(&NonTerminal::new("x")));
   }
 
   #[test]
   fn test_grammar_nullable() {
-
     let g = base_grammar();
     println!("{:#?}", g);
   }

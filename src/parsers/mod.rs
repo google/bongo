@@ -14,7 +14,7 @@
 
 use std::sync::Arc;
 
-use crate::ElemTypes;
+use crate::grammar::ElemTypes;
 
 pub mod earley;
 pub mod tree;

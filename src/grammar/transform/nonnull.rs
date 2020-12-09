@@ -49,7 +49,10 @@ use {
   crate::{
     grammar::{
       build,
-      nullables::{calculate_nullables, GrammarNullableInfo},
+      passes::{
+        nullable::{GrammarNullableInfo, Nullable},
+        PassMap,
+      },
       Elem, ElemTypes, Grammar, Prod, ProdElement, ProdKey, RuleBuilder,
     },
     utils::{Name, ToDoc, TreeNode, Void},
@@ -114,18 +117,19 @@ impl<E: ElemTypes> ElemTypes for NonNullElemTypes<E> {
 pub fn transform_to_nonnull<E: ElemTypes>(
   g: &Grammar<E>,
 ) -> anyhow::Result<Grammar<NonNullElemTypes<E>>> {
-  let nullables = calculate_nullables(g)?;
+  let pass_map = PassMap::new(g);
+  let nullable = pass_map.get_pass::<Nullable>()?;
 
   Ok(
     build(g.start_nt().clone(), |g_builder| {
       for (nt, rule) in g.rule_set() {
         g_builder.add_rule(nt.clone(), |r_builder| {
           for prod in rule.prods() {
-            if nullables.is_prod_nullable(&prod) {
+            if nullable.is_prod_nullable(&prod) {
               continue;
             }
 
-            build_nonnull_prods(&nullables, &prod, r_builder);
+            build_nonnull_prods(&nullable, &prod, r_builder);
           }
         });
       }

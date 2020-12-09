@@ -6,8 +6,14 @@ use crate::{
   utils::CollectMap,
 };
 
-use super::nullable::Nullable;
+use super::nullable::{self, Nullable};
 use super::Pass;
+
+#[derive(thiserror::Error, Debug)]
+pub enum FirstsError {
+  #[error(transparent)]
+  NullableError(#[from] nullable::NullableError),
+}
 
 pub struct Firsts;
 
@@ -16,11 +22,14 @@ where
   E: ElemTypes,
 {
   type Value = BTreeMap<E::NonTerm, BTreeSet<E::Term>>;
+  type Error = FirstsError;
 
-  fn run_pass<'a>(pass_map: &super::PassMap<'a, E>) -> Self::Value {
+  fn run_pass<'a>(
+    pass_map: &super::PassMap<'a, E>,
+  ) -> Result<Self::Value, FirstsError> {
     let gram = pass_map.grammar();
 
-    let nullables = pass_map.get_pass::<Nullable>();
+    let nullables = pass_map.get_pass::<Nullable>()?;
 
     let mut firsts = CollectMap::new();
 
@@ -35,7 +44,7 @@ where
             }
             Elem::NonTerm(nt) => {
               changed.merge(firsts.insert_from_key_set(prod.head(), nt));
-              if !nullables.contains(nt) {
+              if !nullables.is_nullable(nt) {
                 break;
               }
             }
@@ -46,10 +55,12 @@ where
       })
     });
 
-    firsts
-      .into_inner()
-      .into_iter()
-      .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
-      .collect()
+    Ok(
+      firsts
+        .into_inner()
+        .into_iter()
+        .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
+        .collect(),
+    )
   }
 }
