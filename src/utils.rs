@@ -17,6 +17,7 @@ use std::collections::{btree_map, BTreeMap, BTreeSet};
 pub mod buffer;
 pub mod fmt;
 pub mod graph_closure;
+pub mod mergeables;
 
 pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
   let mut curr = start;
@@ -238,7 +239,7 @@ where
 
 pub fn change_iter<I, F>(iter: I, mut func: F) -> WasChanged
 where
-  I: Iterator,
+  I: IntoIterator,
   F: FnMut(I::Item) -> WasChanged,
 {
   let mut changed = WasChanged::Unchanged;
@@ -258,6 +259,10 @@ where
 {
   pub fn new() -> Self {
     CollectMap(BTreeMap::new())
+  }
+
+  pub fn from_seed(seed: BTreeMap<K, BTreeSet<V>>) -> Self {
+    CollectMap(seed)
   }
 
   pub fn get(&self, key: &K) -> Option<&BTreeSet<V>> {
@@ -335,6 +340,10 @@ where
     self.0.insert(key, value);
 
     changed_result
+  }
+
+  pub fn iter(&self) -> impl Iterator<Item = (&K, &BTreeSet<V>)> {
+    self.0.iter()
   }
 
   pub fn into_inner(self) -> BTreeMap<K, BTreeSet<V>> {

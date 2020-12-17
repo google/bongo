@@ -142,7 +142,7 @@ pub type StartGrammar<E> = Grammar<StartElementTypes<E>>;
 
 impl<E: ElemTypes> StartGrammar<E> {
   pub fn start_rule(&self) -> Rule<StartElementTypes<E>> {
-    self.get_rule(&StartNonTerminal::Start).unwrap()
+    self.get_rule(&StartNonTerminal::Start)
   }
 
   pub fn start_prod(&self) -> Prod<StartElementTypes<E>> {

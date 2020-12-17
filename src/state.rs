@@ -58,12 +58,20 @@ impl<'a, E: ElemTypes> ProdState<'a, E> {
     self.prod
   }
 
+  pub fn offset_prod_elem(&self, i: usize) -> Option<&'a ProdElement<E>> {
+    self.prod.prod_elements().get(self.index + i)
+  }
+
+  pub fn offset_elem(&self, i: usize) -> Option<&'a Elem<E>> {
+    self.offset_prod_elem(i).map(ProdElement::elem)
+  }
+
   pub fn next_prod_elem(&self) -> Option<&'a ProdElement<E>> {
-    self.prod.prod_elements().get(self.index)
+    self.offset_prod_elem(0)
   }
 
   pub fn next_elem(&self) -> Option<&'a Elem<E>> {
-    self.next_prod_elem().map(ProdElement::elem)
+    self.offset_elem(0)
   }
 
   /// Returns the next element after the current index. If it is at the

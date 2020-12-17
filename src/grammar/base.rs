@@ -392,8 +392,15 @@ impl<E: ElemTypes> Grammar<E> {
   }
 
   /// Gets the rule that has the given nonterminal as a head.
-  pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<Rule<'a, E>> {
+  pub fn try_get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<Rule<'a, E>> {
     self.rule_set.get(nt).map(|rule| Rule::new(self, rule))
+  }
+
+  /// Gets the rule that has the given nonterminal as a head.
+  pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Rule<'a, E> {
+    self
+      .try_get_rule(nt)
+      .expect("An NT rule exists in the grammar.")
   }
 
   /// Gets an iterator over all productions in the grammar.
@@ -440,14 +447,12 @@ impl<E: ElemTypes> Grammar<E> {
 
   fn reachable_nonterms(&self) -> BTreeSet<&E::NonTerm> {
     breadth_first_search(std::iter::once(&self.start_symbol), |nt| {
-      match self.get_rule(nt) {
-        Some(rule) => rule
-          .prods()
-          .flat_map(|p| p.elements())
-          .filter_map(|e| e.as_nonterm())
-          .collect(),
-        None => BTreeSet::new(),
-      }
+      self
+        .get_rule(nt)
+        .prods()
+        .flat_map(|p| p.elements())
+        .filter_map(|e| e.as_nonterm())
+        .collect::<BTreeSet<_>>()
     })
   }
 

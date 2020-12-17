@@ -1,27 +1,34 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map, BTreeMap, BTreeSet};
 
-use crate::{grammar::{Elem, ElemTypes, Grammar}, state::ProdState, utils::{WasChanged, change_iter, change_loop, CollectMap}};
+use crate::{
+  grammar::{
+    passes::{firsts::Firsts, PassMap},
+    Elem, ElemTypes,
+  },
+  state::ProdState,
+  utils::{change_iter, change_loop, CollectMap},
+};
 
-fn first_set<'a, E: ElemTypes>(gram: &'a Grammar<E>) -> BTreeMap<&'a E::NonTerm, BTreeSet<&'a E::Term>> {
-  let mut first_map = CollectMap::new();
-  change_loop(|| {
-    change_iter(gram.prods(), |prod| {
-      if let Some(first) = prod.first_elem() {
-        match first {
-          Elem::NonTerm(nt) => {
-            first_map.insert_iter(prod.head(), first_map.get(&nt).unwrap().clone())
-          }
-          Elem::Term(t) => {
-            first_map.insert(prod.head(), t)
-          }
-        }
-      } else {
-        WasChanged::Unchanged
+fn shuffle_iter<K, V>(
+  iter: impl Iterator<Item = (K, V)>,
+) -> impl Iterator<Item = (K, BTreeSet<V>)>
+where
+  K: Ord,
+  V: Ord,
+{
+  let mut result = BTreeMap::new();
+  for (k, v) in iter {
+    match result.entry(k) {
+      btree_map::Entry::Vacant(vac) => {
+        vac.insert(std::iter::once(v).collect::<BTreeSet<_>>());
       }
-    })
-  });
-  
-  first_map.into_inner()
+      btree_map::Entry::Occupied(mut occ) => {
+        occ.get_mut().insert(v);
+      }
+    }
+  }
+
+  result.into_iter()
 }
 
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
@@ -36,6 +43,63 @@ impl<'a, E> ParseState<'a, E>
 where
   E: ElemTypes,
 {
+  pub fn from_prod_lookahead(
+    passes: &PassMap<'a, E>,
+    items: impl IntoIterator<Item = (ProdState<'a, E>, BTreeSet<E::Term>)>,
+  ) -> anyhow::Result<Self> {
+    let firsts = passes.get_pass::<Firsts>()?;
+    let mut prods = CollectMap::from_seed(items.into_iter().collect());
+
+    change_loop(|| {
+      let mut new_expansions = Vec::new();
+      for (prod, la) in prods.iter() {
+        if let Some(Elem::NonTerm(nt)) = prod.next_elem() {
+          let new_la = match prod.offset_elem(1) {
+            Some(Elem::NonTerm(nt)) => firsts.get(nt).unwrap().clone(),
+            Some(Elem::Term(t)) => std::iter::once(t.clone()).collect(),
+            None => la.clone(),
+          };
+
+          new_expansions.push((nt, new_la));
+        }
+      }
+
+      change_iter(new_expansions, |(nt, new_la)| {
+        change_iter(
+          passes
+            .grammar()
+            .get_rule(nt)
+            .prods()
+            .map(|p| ProdState::from_start(p)),
+          |ps| prods.insert_iter(ps, new_la.iter().cloned()),
+        )
+      })
+    });
+
+    Ok(ParseState {
+      prods: prods.into_inner(),
+    })
+  }
+
+  pub fn shift_actions(
+    &self,
+    passes: &PassMap<'a, E>,
+  ) -> anyhow::Result<BTreeMap<E::Term, ParseState<'a, E>>> {
+    let iter = self
+      .prods
+      .iter()
+      .filter_map(|(p, la)| p.next_elem_state().map(|(e, ps)| (e, ps, la)))
+      .filter_map(|(e, ps, la)| {
+        e.elem().as_term().map(|t| (t, (ps, la.clone())))
+      });
+    shuffle_iter(iter)
+      .map(|(t, next_elems)| {
+        ParseState::from_prod_lookahead(passes, next_elems)
+          .map(|ps| (t.clone(), ps))
+      })
+      .collect::<Result<_, _>>()
+  }
+
   pub fn reducable_actions<'b>(
     &'b self,
   ) -> impl Iterator<Item = &'b E::ActionKey> {

@@ -95,7 +95,7 @@ where
       .next_elem()
       .iter()
       .filter_map(|nt| nt.as_nonterm())
-      .filter_map(|nt| grammar.get_rule(nt))
+      .filter_map(|nt| grammar.try_get_rule(nt))
       .flat_map(|r| r.prods())
       .map(|p| EarleyState {
         key: EarleyStateKey {
@@ -204,8 +204,7 @@ where
 
   pub fn new_start(grammar: &'a StartGrammar<E>) -> Self {
     let start_nt = grammar.start_nt();
-    let start_rule =
-      grammar.get_rule(start_nt).expect("Start NT must be valid.");
+    let start_rule = grammar.get_rule(start_nt);
     EarleyStateSet::from_states(
       start_rule
         .prods()
