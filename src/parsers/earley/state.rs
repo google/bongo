@@ -1,5 +1,5 @@
 //! Provides base data structures to represent and work with Earley states.
-//! 
+//!
 //! Earley states consist of a set of production states.
 
 use {

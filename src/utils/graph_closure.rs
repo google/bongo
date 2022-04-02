@@ -19,9 +19,6 @@ pub struct GraphBase<K, V> {
   elems: BTreeMap<K, V>,
 }
 
-
-
 impl<K, V> GraphBase<K, V> {
-  fn closure(&mut self) {
-  }
+  fn closure(&mut self) {}
 }

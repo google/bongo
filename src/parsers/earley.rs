@@ -21,13 +21,13 @@ mod state;
 
 use {
   crate::{
+    grammar::ElemTypes,
     parsers::{
       tree::{Node, TreeHandle},
       Token,
     },
     start_grammar::StartGrammar,
     utils::{change_iter, change_loop},
-    grammar::ElemTypes,
   },
   state::EarleyStateSet,
 };

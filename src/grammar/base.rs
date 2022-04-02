@@ -656,7 +656,7 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
   pub fn num_elements(&self) -> usize {
     self.prod_elements().len()
   }
-  
+
   /// Returns an iterator over the elements of this production, without any identifiers.
   pub fn elements(&self) -> impl Iterator<Item = &'a Elem<E>> + Clone {
     self.prod.elements_iter()

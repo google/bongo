@@ -15,8 +15,8 @@
 use std::sync::{Arc, RwLock};
 
 use crate::{
-  utils::{change_iter, WasChanged},
   grammar::ElemTypes,
+  utils::{change_iter, WasChanged},
 };
 use im::Vector;
 use std::collections::{BTreeMap, BTreeSet};
@@ -163,7 +163,11 @@ where
     self.alternatives.add(content)
   }
 
-  pub fn add_node_alt(&mut self, node_index: usize, alt_index: usize) -> WasChanged {
+  pub fn add_node_alt(
+    &mut self,
+    node_index: usize,
+    alt_index: usize,
+  ) -> WasChanged {
     let node_data = self.get_node_mut(node_index);
     WasChanged::from_changed(node_data.alternatives.insert(alt_index))
   }
@@ -349,7 +353,7 @@ where
   PartialEq(bound = ""),
   Eq(bound = ""),
   PartialOrd(bound = ""),
-  Ord(bound = ""),
+  Ord(bound = "")
 )]
 pub struct Node<'a, E: ElemTypes, T> {
   index: usize,

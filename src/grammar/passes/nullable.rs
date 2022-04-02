@@ -15,7 +15,9 @@ where
   type Value = nullables::GrammarNullableInfo<E>;
   type Error = nullables::NullableError;
 
-  fn run_pass<'a>(pass_map: &super::PassMap<'a, E>) -> Result<Self::Value, Self::Error> {
+  fn run_pass<'a>(
+    pass_map: &super::PassMap<'a, E>,
+  ) -> Result<Self::Value, Self::Error> {
     nullables::calculate_nullables(pass_map.grammar())
   }
 }

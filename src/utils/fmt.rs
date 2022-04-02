@@ -94,7 +94,7 @@ where
 
 pub fn struct_fmt<N, C, K, V>(name: N, items: C) -> impl Debug
 where
-  N: AsRef<str>, 
+  N: AsRef<str>,
   C: IntoIterator<Item = (K, V)> + Clone,
   K: AsRef<str>,
   V: Debug,

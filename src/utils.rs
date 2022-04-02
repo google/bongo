@@ -315,11 +315,10 @@ where
     }
   }
 
-  pub fn insert_from_key_set(
-    &mut self,
-    key: K,
-    src_key: K,
-  ) -> WasChanged where V: Clone {
+  pub fn insert_from_key_set(&mut self, key: K, src_key: K) -> WasChanged
+  where
+    V: Clone,
+  {
     if key == src_key {
       return WasChanged::Unchanged;
     }

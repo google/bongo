@@ -14,8 +14,8 @@
 
 use {
   super::{
-    Elem, ElemTypes, Grammar, GrammarErrors, Name, ProdElement,
-    ProdInner, RuleInner,
+    Elem, ElemTypes, Grammar, GrammarErrors, Name, ProdElement, ProdInner,
+    RuleInner,
   },
   std::collections::BTreeMap,
 };
@@ -67,9 +67,9 @@ impl<E: ElemTypes> ProductionBuilder<E> {
   }
 
   pub fn add_term(&mut self, term: impl BuilderInto<E::Term>) -> &mut Self {
-    self.elems.push(ProdElement::new_empty(Elem::Term(
-      term.builder_into(),
-    )));
+    self
+      .elems
+      .push(ProdElement::new_empty(Elem::Term(term.builder_into())));
     self
   }
 
@@ -89,11 +89,9 @@ impl<E: ElemTypes> ProductionBuilder<E> {
     &mut self,
     nonterm: impl BuilderInto<E::NonTerm>,
   ) -> &mut Self {
-    self
-      .elems
-      .push(ProdElement::new_empty(Elem::NonTerm(
-        nonterm.builder_into(),
-      )));
+    self.elems.push(ProdElement::new_empty(Elem::NonTerm(
+      nonterm.builder_into(),
+    )));
     self
   }
 

@@ -17,8 +17,8 @@ use std::sync::Arc;
 use crate::grammar::ElemTypes;
 
 pub mod earley;
-pub mod tree;
 pub mod lalr;
+pub mod tree;
 
 #[derive(Clone, Copy)]
 pub struct Token<K, T> {
