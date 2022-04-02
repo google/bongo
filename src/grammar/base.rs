@@ -615,7 +615,6 @@ impl<'a, E: ElemTypes> std::fmt::Debug for Rule<'a, E> {
 #[derive(Derivative)]
 #[derivative(
   Copy(bound = ""),
-  Clone(bound = ""),
   PartialEq(bound = ""),
   Eq(bound = ""),
   PartialOrd(bound = ""),
@@ -695,6 +694,17 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
   /// the production is empty.
   pub fn first_elem(&self) -> Option<&'a Elem<E>> {
     self.prod.elements.first().map(|pe| pe.elem())
+  }
+}
+
+impl<'a, E: ElemTypes> Clone for Prod<'a, E> {
+  fn clone(&self) -> Self {
+    Prod {
+      grammar: self.grammar.clone(),
+      head: self.head,
+      prod: self.prod.clone(),
+      action_value: self.action_value.clone(),
+    }
   }
 }
 
