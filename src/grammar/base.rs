@@ -642,38 +642,48 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
       action_value: NoCompare::new(action_value),
     }
   }
+
+  /// Returns the head of this production.
   pub fn head(&self) -> &'a E::NonTerm {
     self.head
   }
 
-  pub fn len(&self) -> usize {
-    self.prod.elements.len()
-  }
-
+  /// Returns the elements of this production, including any identifiers of the production.
   pub fn prod_elements(&self) -> &'a Vec<ProdElement<E>> {
     &self.prod.elements
   }
 
+  /// Returns the number of elements in this production.
+  pub fn num_elements(&self) -> usize {
+    self.prod_elements().len()
+  }
+  
+  /// Returns an iterator over the elements of this production, without any identifiers.
   pub fn elements(&self) -> impl Iterator<Item = &'a Elem<E>> + Clone {
     self.prod.elements_iter()
   }
 
+  /// Returns the prod element at a given index. Panics on out-of-bounds access.
   pub fn prod_element_at(&self, index: usize) -> Option<&'a ProdElement<E>> {
     self.prod.elements.get(index)
   }
 
+  /// Returns the element at a given index. Panics on out-of-bounds access.
   pub fn element_at(&self, index: usize) -> Option<&'a Elem<E>> {
     self.prod.element_at(index)
   }
 
+  /// Returns the action key of this production.
   pub fn action_key(&self) -> &'a E::ActionKey {
     self.prod.action_key()
   }
 
+  /// Returns the action value of this production.
   pub fn action_value(&self) -> &'a E::ActionValue {
     *self.action_value
   }
 
+  /// Returns the `ProdKey` of this production.
   pub fn prod_key(&self) -> ProdKey<E> {
     ProdKey {
       head: self.head().clone(),
@@ -681,6 +691,8 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
     }
   }
 
+  /// Returns a `Some` containing the first element of this production, or None if
+  /// the production is empty.
   pub fn first_elem(&self) -> Option<&'a Elem<E>> {
     self.prod.elements.first().map(|pe| pe.elem())
   }

@@ -49,6 +49,51 @@ mod tests {
     .unwrap()
   }
 
+  fn create_arithmetic_grammar() -> Grammar<BaseElementTypes> {
+    let t_add = Terminal::new("+");
+    let t_sub = Terminal::new("-");
+    let t_mul = Terminal::new("*");
+    let t_div = Terminal::new("/");
+    let t_lparen = Terminal::new("(");
+    let t_rparen = Terminal::new(")");
+    let t_num = Terminal::new("num");
+
+    let nt_expr = NonTerminal::new("expr");
+
+    build(&nt_expr, |gb| {
+      gb.add_rule(&nt_expr, |rb| {
+        rb.add_prod(Name::new("Number"), (), |pb| {
+          pb.add_term(&t_num);
+        })
+        .add_prod(Name::new("Paren"), (), |pb| {
+          pb.add_term(&t_lparen)
+            .add_nonterm(&nt_expr)
+            .add_term(&t_rparen);
+        });
+
+        let mut add_binop = |name, op| {
+          rb.add_prod(name, (), |pb| {
+            pb.add_nonterm(&nt_expr).add_term(op).add_nonterm(&nt_expr);
+          });
+        };
+
+        add_binop("Add", &t_add);
+        add_binop("Sub", &t_sub);
+        add_binop("Mul", &t_mul);
+        add_binop("Div", &t_div);
+      });
+    })
+    .unwrap()
+  }
+
+  #[test]
+  fn test_arithemtic_grammar() {
+    let grammar = create_arithmetic_grammar();
+    let pass_map = PassMap::new(&grammar);
+    let nullable = pass_map.get_pass::<Nullable>().unwrap();
+    assert!(!nullable.is_nullable(grammar.start_nt()));
+  }
+
   #[test]
   fn test_grammar_print() {
     let g = base_grammar();
