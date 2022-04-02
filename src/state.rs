@@ -100,7 +100,7 @@ impl<'a, E: ElemTypes> ProdState<'a, E> {
   }
 
   pub fn is_complete(&self) -> bool {
-    self.prod.len() == self.index
+    self.prod.num_elements() == self.index
   }
 
   pub fn action_key(&self) -> &'a E::ActionKey {
