@@ -22,7 +22,7 @@ pub trait ElemTypes: 'static {
   type ActionKey: OrdKey + ToDoc;
 
   /// A value that annotates each production.
-  /// 
+  ///
   /// This is useful for passing information between multiple derived grammars, such
   /// as passing nullability information about a previous layer's action key.
   type ActionValue: Clone + std::fmt::Debug + ToDoc + 'static;

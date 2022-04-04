@@ -13,7 +13,10 @@
 // limitations under the License.
 
 use crate::grammar::{Elem, ElemTypes, Prod, ProdElement};
-use std::{collections::{BTreeMap, BTreeSet}, iter::FromIterator};
+use std::{
+  collections::{BTreeMap, BTreeSet},
+  iter::FromIterator,
+};
 
 /// A state of a production within a parse state.
 ///
@@ -122,7 +125,7 @@ pub struct ProdStateSet<'a, E: ElemTypes> {
   states: BTreeSet<ProdState<'a, E>>,
 }
 
-impl <'a, E: ElemTypes> FromIterator<ProdState<'a, E>> for ProdStateSet<'a, E> {
+impl<'a, E: ElemTypes> FromIterator<ProdState<'a, E>> for ProdStateSet<'a, E> {
   fn from_iter<T: IntoIterator<Item = ProdState<'a, E>>>(iter: T) -> Self {
     ProdStateSet {
       states: iter.into_iter().collect(),

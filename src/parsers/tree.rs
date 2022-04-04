@@ -117,11 +117,13 @@ where
   }
 
   pub fn get(&self, index: usize) -> &NodeContentInner<E, T> {
-    self.id_to_value.get(index).unwrap_or_else(|| panic!(
-      "Invalid index: {} where alts list size is {}",
-      index,
-      self.id_to_value.len()
-    ))
+    self.id_to_value.get(index).unwrap_or_else(|| {
+      panic!(
+        "Invalid index: {} where alts list size is {}",
+        index,
+        self.id_to_value.len()
+      )
+    })
   }
 }
 
@@ -177,11 +179,13 @@ where
   }
 
   pub fn get_node(&self, index: usize) -> &NodeData {
-    self.nodes.get(index).unwrap_or_else(|| panic!(
-      "Invalid index: {} where nodes list size is {}",
-      index,
-      self.nodes.len(),
-    ))
+    self.nodes.get(index).unwrap_or_else(|| {
+      panic!(
+        "Invalid index: {} where nodes list size is {}",
+        index,
+        self.nodes.len(),
+      )
+    })
   }
 
   pub fn get_node_mut(&mut self, index: usize) -> &mut NodeData {

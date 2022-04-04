@@ -46,7 +46,7 @@ where
 }
 
 /// A unique placeholder type to represent the value of a pass that hasn't completed.
-/// 
+///
 /// This helps us avoid accidental infinite recursion in the case where a pass depends on itself (directly or indirectly).
 struct NoCurrentValue;
 
@@ -130,10 +130,6 @@ where
         .clone()
     };
 
-    Ok(
-      any_pass_ref
-        .downcast::<P>()
-        .expect("type already verified"),
-    )
+    Ok(any_pass_ref.downcast::<P>().expect("type already verified"))
   }
 }
