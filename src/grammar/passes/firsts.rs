@@ -25,11 +25,11 @@ where
   type Error = FirstsError;
 
   fn run_pass(
-    pass_map: &super::PassContext<E>,
+    pass_context: &super::PassContext<E>,
   ) -> Result<Self::Value, FirstsError> {
-    let gram = pass_map.grammar();
+    let gram = pass_context.grammar();
 
-    let nullables = pass_map.get_pass::<Nullable>()?;
+    let nullables = pass_context.get_pass::<Nullable>()?;
 
     let mut firsts = CollectMap::new();
 

@@ -84,7 +84,7 @@ where
 
   /// Returns the result of the given pass. Computes it if it hasn't been computed yet. Passes can
   /// depend on other passes.
-  pub fn get_pass<P>(&self) -> Result<PassValue<E, P>, P::Error>
+  pub fn get_pass<P>(&self) -> Result<Rc<P::Value>, P::Error>
   where
     P: Pass<E> + 'static,
   {
@@ -101,53 +101,11 @@ where
       guard.insert(pass_type, Rc::new(value));
     };
 
-    let any_pass_val = {
+    let any_pass_ref = {
       let guard = self.passes.borrow();
-      guard.get(&pass_type).unwrap().clone()
+      guard.get(&pass_type).expect("existence already checked").clone()
     };
 
-    Ok(PassValue {
-      value: any_pass_val,
-      _phantom: std::marker::PhantomData {},
-    })
-  }
-}
-
-/// The result of a pass. Acts as a smart pointer to the underlying value.
-pub struct PassValue<'a, E, P>
-where
-  E: ElemTypes,
-  P: Pass<E>,
-{
-  value: Rc<dyn Any + 'static>,
-  _phantom: std::marker::PhantomData<&'a P::Value>,
-}
-
-impl<'a, E, P> Clone for PassValue<'a, E, P>
-where
-  E: ElemTypes,
-  P: Pass<E>,
-{
-  fn clone(&self) -> Self {
-    PassValue {
-      value: self.value.clone(),
-      _phantom: std::marker::PhantomData {},
-    }
-  }
-}
-
-impl<'a, E, P> std::ops::Deref for PassValue<'a, E, P>
-where
-  E: ElemTypes,
-  P: Pass<E>,
-{
-  type Target = P::Value;
-
-  fn deref(&self) -> &Self::Target {
-    self
-      .value
-      .as_ref()
-      .downcast_ref::<P::Value>()
-      .expect("Value must have correct downcast type")
+    Ok(any_pass_ref.downcast::<P::Value>().expect("type already verified"))
   }
 }
