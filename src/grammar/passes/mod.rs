@@ -42,7 +42,10 @@ where
 {
   ThisPass(P::Error),
   PrevPass(Box<dyn BasePassError>),
+  RecursionDetected,
 }
+
+struct NoCurrentValue;
 
 pub trait Pass<E>
 where
@@ -51,9 +54,7 @@ where
   type Value: Any + 'static;
   type Error;
 
-  fn run_pass(
-    pass_map: &PassContext<E>,
-  ) -> Result<Self::Value, Self::Error>;
+  fn run_pass(pass_map: &PassContext<E>) -> Result<Self::Value, Self::Error>;
 }
 
 /// A map from passes to their associated results.
@@ -92,10 +93,27 @@ where
 
     let contains_key = {
       let guard = self.passes.borrow();
-      guard.contains_key(&pass_type)
+      match guard.get(&pass_type) {
+        // Check if we already have the result.
+        //
+        Some(pass) => {
+          if pass.downcast_ref::<NoCurrentValue>().is_some() {
+            panic!("Detected recursive loop in pass dependencies.")
+          } else {
+            true
+          }
+        }
+        None => false,
+      }
     };
 
     if !contains_key {
+      {
+        // Insert a NoCurrentRef as the current value to mark it as in process. This
+        // helps us avoid infinite recursion.
+        let mut guard = self.passes.borrow_mut();
+        guard.insert(pass_type, Rc::new(NoCurrentValue));
+      }
       let value = P::run_pass(self)?;
       let mut guard = self.passes.borrow_mut();
       guard.insert(pass_type, Rc::new(value));
@@ -103,9 +121,16 @@ where
 
     let any_pass_ref = {
       let guard = self.passes.borrow();
-      guard.get(&pass_type).expect("existence already checked").clone()
+      guard
+        .get(&pass_type)
+        .expect("existence already checked")
+        .clone()
     };
 
-    Ok(any_pass_ref.downcast::<P::Value>().expect("type already verified"))
+    Ok(
+      any_pass_ref
+        .downcast::<P::Value>()
+        .expect("type already verified"),
+    )
   }
 }
