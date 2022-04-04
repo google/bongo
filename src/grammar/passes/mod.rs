@@ -45,16 +45,19 @@ where
   RecursionDetected,
 }
 
+/// A unique placeholder type to represent the value of a pass that hasn't completed.
+/// 
+/// This helps us avoid accidental infinite recursion in the case where a pass depends on itself (directly or indirectly).
 struct NoCurrentValue;
 
-pub trait Pass<E>
+/// A
+pub trait Pass<E>: Any + Sized + 'static
 where
   E: ElemTypes,
 {
-  type Value: Any + 'static;
-  type Error;
+  type Error: std::error::Error + 'static;
 
-  fn run_pass(pass_map: &PassContext<E>) -> Result<Self::Value, Self::Error>;
+  fn run_pass(pass_map: &PassContext<E>) -> Result<Self, Self::Error>;
 }
 
 /// A map from passes to their associated results.
@@ -85,7 +88,7 @@ where
 
   /// Returns the result of the given pass. Computes it if it hasn't been computed yet. Passes can
   /// depend on other passes.
-  pub fn get_pass<P>(&self) -> Result<Rc<P::Value>, P::Error>
+  pub fn get_pass<P>(&self) -> Result<Rc<P>, P::Error>
   where
     P: Pass<E> + 'static,
   {
@@ -129,7 +132,7 @@ where
 
     Ok(
       any_pass_ref
-        .downcast::<P::Value>()
+        .downcast::<P>()
         .expect("type already verified"),
     )
   }

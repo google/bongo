@@ -118,7 +118,7 @@ pub fn transform_to_nonnull<E: ElemTypes>(
   g: &Grammar<E>,
 ) -> anyhow::Result<Grammar<NonNullElemTypes<E>>> {
   let pass_map = PassContext::new(g);
-  let nullable = pass_map.get_pass::<Nullable>()?;
+  let nullable = pass_map.get_pass::<Nullable<E>>()?;
 
   build(g.start_nt().clone(), |g_builder| {
     for (nt, rule) in g.rule_set() {
@@ -128,7 +128,7 @@ pub fn transform_to_nonnull<E: ElemTypes>(
             continue;
           }
 
-          build_nonnull_prods(&nullable, &prod, r_builder);
+          build_nonnull_prods(nullable.get_nullable_info(), &prod, r_builder);
         }
       });
     }

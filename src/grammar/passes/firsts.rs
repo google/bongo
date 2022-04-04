@@ -15,21 +15,29 @@ pub enum FirstsError {
   NullableError(#[from] nullable::NullableError),
 }
 
-pub struct Firsts;
+pub struct Firsts<E: ElemTypes>(BTreeMap<E::NonTerm, BTreeSet<E::Term>>);
 
-impl<E> Pass<E> for Firsts
+impl<E> Firsts<E>
 where
   E: ElemTypes,
 {
-  type Value = BTreeMap<E::NonTerm, BTreeSet<E::Term>>;
+  pub fn get(&self, nt: &E::NonTerm) -> Option<&BTreeSet<E::Term>> {
+    self.0.get(nt)
+  }
+}
+
+impl<E> Pass<E> for Firsts<E>
+where
+  E: ElemTypes,
+{
   type Error = FirstsError;
 
   fn run_pass(
     pass_context: &super::PassContext<E>,
-  ) -> Result<Self::Value, FirstsError> {
+  ) -> Result<Self, FirstsError> {
     let gram = pass_context.grammar();
 
-    let nullables = pass_context.get_pass::<Nullable>()?;
+    let nullables = pass_context.get_pass::<Nullable<E>>()?;
 
     let mut firsts = CollectMap::new();
 
@@ -55,12 +63,12 @@ where
       })
     });
 
-    Ok(
+    Ok(Firsts(
       firsts
         .into_inner()
         .into_iter()
         .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
         .collect(),
-    )
+    ))
   }
 }

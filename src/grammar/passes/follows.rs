@@ -15,21 +15,18 @@ pub enum FollowsError {
   First(#[from] FirstsError),
 }
 
-pub struct Follows;
+pub struct Follows<E: ElemTypes>(BTreeMap<E::NonTerm, BTreeSet<E::Term>>);
 
-impl<E> Pass<E> for Follows
+impl<E> Pass<E> for Follows<E>
 where
   E: ElemTypes,
 {
-  type Value = BTreeMap<E::NonTerm, BTreeSet<E::Term>>;
   type Error = FollowsError;
 
-  fn run_pass(
-    pass_map: &super::PassContext<E>,
-  ) -> Result<Self::Value, FollowsError> {
+  fn run_pass(pass_map: &super::PassContext<E>) -> Result<Self, FollowsError> {
     let gram = pass_map.grammar();
 
-    let firsts = pass_map.get_pass::<Firsts>()?;
+    let firsts = pass_map.get_pass::<Firsts<E>>()?;
 
     let mut follows = CollectMap::new();
 
@@ -57,12 +54,12 @@ where
       })
     });
 
-    Ok(
+    Ok(Follows(
       follows
         .into_inner()
         .into_iter()
         .map(|(k, v)| (k.clone(), v.into_iter().cloned().collect()))
         .collect(),
-    )
+    ))
   }
 }

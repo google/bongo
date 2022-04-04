@@ -90,7 +90,7 @@ mod tests {
   fn test_arithemtic_grammar() {
     let grammar = create_arithmetic_grammar();
     let pass_map = PassContext::new(&grammar);
-    let nullable = pass_map.get_pass::<Nullable>().unwrap();
+    let nullable = pass_map.get_pass::<Nullable<_>>().unwrap();
     assert!(!nullable.is_nullable(grammar.start_nt()));
   }
 
@@ -99,7 +99,7 @@ mod tests {
     let g = base_grammar();
 
     let pass_map = PassContext::new(&g);
-    let nullable = pass_map.get_pass::<Nullable>().unwrap();
+    let nullable = pass_map.get_pass::<Nullable<_>>().unwrap();
 
     assert!(nullable.is_nullable(&NonTerminal::new("x")));
   }

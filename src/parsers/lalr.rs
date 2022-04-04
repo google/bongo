@@ -47,7 +47,7 @@ where
     passes: &PassContext<'a, E>,
     items: impl IntoIterator<Item = (ProdState<'a, E>, BTreeSet<E::Term>)>,
   ) -> anyhow::Result<Self> {
-    let firsts = passes.get_pass::<Firsts>()?;
+    let firsts = passes.get_pass::<Firsts<E>>()?;
     let mut prods = CollectMap::from_seed(items.into_iter().collect());
 
     change_loop(|| {
