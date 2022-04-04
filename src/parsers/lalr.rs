@@ -2,7 +2,7 @@ use std::collections::{btree_map, BTreeMap, BTreeSet};
 
 use crate::{
   grammar::{
-    passes::{firsts::Firsts, PassMap},
+    passes::{firsts::Firsts, PassContext},
     Elem, ElemTypes,
   },
   state::ProdState,
@@ -44,7 +44,7 @@ where
   E: ElemTypes,
 {
   pub fn from_prod_lookahead(
-    passes: &PassMap<'a, E>,
+    passes: &PassContext<'a, E>,
     items: impl IntoIterator<Item = (ProdState<'a, E>, BTreeSet<E::Term>)>,
   ) -> anyhow::Result<Self> {
     let firsts = passes.get_pass::<Firsts>()?;
@@ -83,7 +83,7 @@ where
 
   pub fn shift_actions(
     &self,
-    passes: &PassMap<'a, E>,
+    passes: &PassContext<'a, E>,
   ) -> anyhow::Result<BTreeMap<E::Term, ParseState<'a, E>>> {
     let iter = self
       .prods

@@ -1,3 +1,7 @@
+//! A pass is a type of query over the grammar that may be depended on by other passes.
+//! This allows us to build each different type of pass in isolation, and then combine them
+//! with automatic dependency resolution.
+
 pub mod firsts;
 pub mod follows;
 pub mod nullable;
@@ -48,12 +52,12 @@ where
   type Error;
 
   fn run_pass(
-    pass_map: &PassMap<E>,
+    pass_map: &PassContext<E>,
   ) -> Result<Self::Value, Self::Error>;
 }
 
 /// A map from passes to their associated results.
-pub struct PassMap<'a, E>
+pub struct PassContext<'a, E>
 where
   E: ElemTypes,
 {
@@ -61,13 +65,13 @@ where
   passes: RefCell<BTreeMap<TypeId, Rc<dyn Any + 'static>>>,
 }
 
-impl<'a, E> PassMap<'a, E>
+impl<'a, E> PassContext<'a, E>
 where
   E: ElemTypes,
 {
   // Create a new pass map, where passes derive from the given grammar and other passes.
   pub fn new(grammar: &'a Grammar<E>) -> Self {
-    PassMap {
+    PassContext {
       grammar,
       passes: RefCell::new(BTreeMap::new()),
     }

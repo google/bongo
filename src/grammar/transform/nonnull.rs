@@ -51,7 +51,7 @@ use {
       build,
       passes::{
         nullable::{GrammarNullableInfo, Nullable},
-        PassMap,
+        PassContext,
       },
       Elem, ElemTypes, Grammar, Prod, ProdElement, ProdKey, RuleBuilder,
     },
@@ -117,7 +117,7 @@ impl<E: ElemTypes> ElemTypes for NonNullElemTypes<E> {
 pub fn transform_to_nonnull<E: ElemTypes>(
   g: &Grammar<E>,
 ) -> anyhow::Result<Grammar<NonNullElemTypes<E>>> {
-  let pass_map = PassMap::new(g);
+  let pass_map = PassContext::new(g);
   let nullable = pass_map.get_pass::<Nullable>()?;
 
   build(g.start_nt().clone(), |g_builder| {

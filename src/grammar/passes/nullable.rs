@@ -16,7 +16,7 @@ where
   type Error = nullables::NullableError;
 
   fn run_pass(
-    pass_map: &super::PassMap<E>,
+    pass_map: &super::PassContext<E>,
   ) -> Result<Self::Value, Self::Error> {
     nullables::calculate_nullables(pass_map.grammar())
   }
@@ -26,13 +26,13 @@ where
 mod test {
   use super::*;
   use crate::grammar::NonTerminal;
-  use crate::grammar::{examples, passes::PassMap};
+  use crate::grammar::{examples, passes::PassContext};
   use crate::start_grammar::wrap_grammar_with_start;
 
   #[test]
   fn test_simple_grammar() {
     let g = wrap_grammar_with_start(examples::make_simple()).unwrap();
-    let pass_map = PassMap::new(&g);
+    let pass_map = PassContext::new(&g);
     let nullables = pass_map.get_pass::<Nullable>().unwrap();
     assert!(nullables.get_nullable_set().is_empty());
   }
@@ -40,7 +40,7 @@ mod test {
   #[test]
   fn test_simple_nullable_grammar() {
     let g = examples::make_simple_nullable();
-    let pass_map = PassMap::new(&g);
+    let pass_map = PassContext::new(&g);
     let nullables = pass_map.get_pass::<Nullable>().unwrap();
     assert!(nullables.is_nullable(&NonTerminal::new("start")));
     assert!(nullables.is_nullable(&NonTerminal::new("a")));
@@ -51,7 +51,7 @@ mod test {
   #[test]
   fn test_paren_grammar() {
     let g = examples::make_paren();
-    let pass_map = PassMap::new(&g);
+    let pass_map = PassContext::new(&g);
     let nullables = pass_map.get_pass::<Nullable>().unwrap();
     assert!(nullables.is_nullable(&NonTerminal::new("expr_list")));
   }

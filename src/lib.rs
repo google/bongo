@@ -29,7 +29,7 @@ pub mod utils;
 mod tests {
   use crate::grammar::build;
   use crate::grammar::{
-    passes::{nullable::Nullable, PassMap},
+    passes::{nullable::Nullable, PassContext},
     BaseElementTypes, Grammar, NonTerminal, Terminal,
   };
   use crate::utils::Name;
@@ -89,7 +89,7 @@ mod tests {
   #[test]
   fn test_arithemtic_grammar() {
     let grammar = create_arithmetic_grammar();
-    let pass_map = PassMap::new(&grammar);
+    let pass_map = PassContext::new(&grammar);
     let nullable = pass_map.get_pass::<Nullable>().unwrap();
     assert!(!nullable.is_nullable(grammar.start_nt()));
   }
@@ -98,7 +98,7 @@ mod tests {
   fn test_grammar_print() {
     let g = base_grammar();
 
-    let pass_map = PassMap::new(&g);
+    let pass_map = PassContext::new(&g);
     let nullable = pass_map.get_pass::<Nullable>().unwrap();
 
     assert!(nullable.is_nullable(&NonTerminal::new("x")));

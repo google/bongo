@@ -25,7 +25,7 @@ where
   type Error = FollowsError;
 
   fn run_pass(
-    pass_map: &super::PassMap<E>,
+    pass_map: &super::PassContext<E>,
   ) -> Result<Self::Value, FollowsError> {
     let gram = pass_map.grammar();
 
