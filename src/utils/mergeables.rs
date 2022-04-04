@@ -154,6 +154,14 @@ pub struct MergableMap<K, V> {
   map: BTreeMap<K, V>,
 }
 
+impl<K, V> Default for MergableMap<K, V> {
+  fn default() -> Self {
+    MergableMap {
+      map: BTreeMap::new(),
+    }
+  }
+}
+
 impl<K, V> MergableMap<K, V>
 where
   K: Ord,

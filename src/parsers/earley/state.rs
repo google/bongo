@@ -195,6 +195,14 @@ where
   states: BTreeMap<EarleyStateKey<'a, E>, Vector<Node<'a, E, T>>>,
 }
 
+impl<E: ElemTypes, T> Default for EarleyStateSet<'_, E, T> {
+  fn default() -> Self {
+    EarleyStateSet {
+      states: BTreeMap::new(),
+    }
+  }
+}
+
 impl<'a, E, T> EarleyStateSet<'a, E, T>
 where
   E: ElemTypes,

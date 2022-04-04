@@ -117,7 +117,7 @@ where
   }
 
   pub fn get(&self, index: usize) -> &NodeContentInner<E, T> {
-    self.id_to_value.get(index).expect(&format!(
+    self.id_to_value.get(index).unwrap_or_else(|| panic!(
       "Invalid index: {} where alts list size is {}",
       index,
       self.id_to_value.len()
@@ -173,11 +173,11 @@ where
   }
 
   pub fn is_same(&self, other: &Self) -> bool {
-    (self as *const Inner<E, T>) == (other as *const Inner<E, T>)
+    std::ptr::eq(self, other)
   }
 
   pub fn get_node(&self, index: usize) -> &NodeData {
-    self.nodes.get(index).expect(&format!(
+    self.nodes.get(index).unwrap_or_else(|| panic!(
       "Invalid index: {} where nodes list size is {}",
       index,
       self.nodes.len(),
@@ -186,10 +186,12 @@ where
 
   pub fn get_node_mut(&mut self, index: usize) -> &mut NodeData {
     let nodes_len = self.nodes.len();
-    self.nodes.get_mut(index).expect(&format!(
-      "Invalid index: {} where nodes list size is {}",
-      index, nodes_len,
-    ))
+    self.nodes.get_mut(index).unwrap_or_else(|| {
+      panic!(
+        "Invalid index: {} where nodes list size is {}",
+        index, nodes_len,
+      )
+    })
   }
 
   pub fn get_alt(&self, index: usize) -> &NodeContentInner<E, T> {
@@ -203,6 +205,17 @@ where
 /// owner.
 pub struct TreeOwner<E: ElemTypes, T> {
   inner: RwLock<Inner<E, T>>,
+}
+
+impl<E: ElemTypes, T> Default for TreeOwner<E, T>
+where
+  T: Ord,
+{
+  fn default() -> Self {
+    TreeOwner {
+      inner: RwLock::new(Inner::new()),
+    }
+  }
 }
 
 impl<E: ElemTypes, T> TreeOwner<E, T>
@@ -219,7 +232,7 @@ where
   /// Returns a TreeHandle for this owner.
   ///
   /// This can be used to create new nodes and alternatives.
-  pub fn handle<'a>(&'a self) -> TreeHandle<'a, E, T> {
+  pub fn handle(&self) -> TreeHandle<E, T> {
     TreeHandle(&self.inner)
   }
 }

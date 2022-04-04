@@ -100,9 +100,7 @@ where
       .collect::<Result<_, _>>()
   }
 
-  pub fn reducable_actions<'b>(
-    &'b self,
-  ) -> impl Iterator<Item = &'b E::ActionKey> {
+  pub fn reducable_actions(&self) -> impl Iterator<Item = &E::ActionKey> {
     self.prods.keys().filter_map(|prod| {
       if prod.is_complete() {
         Some(prod.action_key())

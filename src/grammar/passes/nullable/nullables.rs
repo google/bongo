@@ -128,12 +128,12 @@ pub fn calculate_nullables<E: ElemTypes>(
   let inner_info = inner_calculate_nullables(g);
 
   // Sanity check outputs.
-  for (_, info) in &inner_info {
+  for info in inner_info.values() {
     let actions_length = info.nullable_actions.len();
     if actions_length == 0 {
       panic!("Unexpectedly empty nullable action!")
     } else if actions_length > 1 {
-      return Err(NullableError::Ambiguity.into());
+      return Err(NullableError::Ambiguity);
     }
   }
 
@@ -180,7 +180,7 @@ pub fn calculate_nullables<E: ElemTypes>(
       remaining_nullables.remove(nt);
     });
 
-    if remaining_nullables.len() == 0 {
+    if remaining_nullables.is_empty() {
       break;
     }
   }

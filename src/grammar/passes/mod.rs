@@ -47,8 +47,8 @@ where
   type Value: Any + 'static;
   type Error;
 
-  fn run_pass<'a>(
-    pass_map: &PassMap<'a, E>,
+  fn run_pass(
+    pass_map: &PassMap<E>,
   ) -> Result<Self::Value, Self::Error>;
 }
 
@@ -75,7 +75,7 @@ where
 
   /// Returns the underlying grammar.
   pub fn grammar(&self) -> &'a Grammar<E> {
-    &self.grammar
+    self.grammar
   }
 
   /// Returns the result of the given pass. Computes it if it hasn't been computed yet. Passes can

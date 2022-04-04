@@ -1,3 +1,13 @@
+//! Traditionally grammars are defined in terms of a start symbol, with a special non-terminal
+//! being defined such as:
+//!
+//! S' -> S <EOS>
+//!
+//! where <EOS> is a unique end-of-stream value. This allows the <EOS> terminal to be used in various passes over the grammar, such as in
+//! lookahead generation. Since we want to deal with an arbitrary grammar, we create a grammar
+//! wrapper type that introduces the special `Start` non-terminal, and the `EndOfStream` terminal.
+//! Passes may then take these into account when generation their representations.
+
 use crate::grammar::ElemTypes;
 use crate::grammar::{
   build, Elem, Grammar, GrammarErrors, Prod, ProdElement, Rule,
@@ -5,6 +15,7 @@ use crate::grammar::{
 use crate::utils::{take_only, ToDoc};
 use std::marker::PhantomData;
 
+/// A terminal wrapper type that adds the special `EndOfStream` terminal.
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub enum StreamTerminal<T> {
   EndOfStream,
@@ -26,7 +37,6 @@ where
     matches!(self, StreamTerminal::EndOfStream)
   }
 }
-
 impl<T> ToDoc for StreamTerminal<T>
 where
   T: ToDoc,
@@ -45,6 +55,7 @@ where
   }
 }
 
+/// A non-terminal wrapper type that adds the special `Start` non-terminal.
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
 pub enum StartNonTerminal<NT> {
   Start,

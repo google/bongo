@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::grammar::{Elem, ElemTypes, Prod, ProdElement};
-use std::collections::{BTreeMap, BTreeSet};
+use std::{collections::{BTreeMap, BTreeSet}, iter::FromIterator};
 
 /// A state of a production within a parse state.
 ///
@@ -122,6 +122,14 @@ pub struct ProdStateSet<'a, E: ElemTypes> {
   states: BTreeSet<ProdState<'a, E>>,
 }
 
+impl <'a, E: ElemTypes> FromIterator<ProdState<'a, E>> for ProdStateSet<'a, E> {
+  fn from_iter<T: IntoIterator<Item = ProdState<'a, E>>>(iter: T) -> Self {
+    ProdStateSet {
+      states: iter.into_iter().collect(),
+    }
+  }
+}
+
 impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
   pub fn new_empty() -> Self {
     ProdStateSet {
@@ -131,15 +139,6 @@ impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
 
   pub fn add(&mut self, state: ProdState<'a, E>) {
     self.states.insert(state);
-  }
-
-  pub fn from_iter<I>(iter: I) -> Self
-  where
-    I: Iterator<Item = ProdState<'a, E>>,
-  {
-    ProdStateSet {
-      states: iter.collect(),
-    }
   }
 
   /// Returns an iterator of pairs of production elements, and the states that are entered after
@@ -170,7 +169,7 @@ impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
     let mut next_states = BTreeSet::new();
     loop {
       for state in curr_states.iter() {
-        for new_state in close_func(&state) {
+        for new_state in close_func(state) {
           if seen_states.insert(new_state.clone()) {
             next_states.insert(new_state);
           }

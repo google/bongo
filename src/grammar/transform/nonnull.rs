@@ -120,22 +120,20 @@ pub fn transform_to_nonnull<E: ElemTypes>(
   let pass_map = PassMap::new(g);
   let nullable = pass_map.get_pass::<Nullable>()?;
 
-  Ok(
-    build(g.start_nt().clone(), |g_builder| {
-      for (nt, rule) in g.rule_set() {
-        g_builder.add_rule(nt.clone(), |r_builder| {
-          for prod in rule.prods() {
-            if nullable.is_prod_nullable(&prod) {
-              continue;
-            }
-
-            build_nonnull_prods(&nullable, &prod, r_builder);
+  build(g.start_nt().clone(), |g_builder| {
+    for (nt, rule) in g.rule_set() {
+      g_builder.add_rule(nt.clone(), |r_builder| {
+        for prod in rule.prods() {
+          if nullable.is_prod_nullable(&prod) {
+            continue;
           }
-        });
-      }
-    })
-    .map_err(|_| anyhow::anyhow!("Grammar failed to build"))?,
-  )
+
+          build_nonnull_prods(&nullable, &prod, r_builder);
+        }
+      });
+    }
+  })
+  .map_err(|_| anyhow::anyhow!("Grammar failed to build"))
 }
 
 #[derive(Derivative)]

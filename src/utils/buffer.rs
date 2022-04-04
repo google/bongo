@@ -60,7 +60,7 @@ impl BufferRange {
             line_start = None;
           }
           _ => {
-            if let None = line_start {
+            if line_start.is_none() {
               line_start = Some(offset);
             }
           }
@@ -197,7 +197,7 @@ impl cmp::Eq for BufferRangeKey {}
 
 impl Buffer {
   fn ref_eq(&self, other: &Buffer) -> bool {
-    &*self.0 as *const BufferInner == &*other.0 as *const BufferInner
+    std::ptr::eq(&*self.0, &*other.0)
   }
 
   fn get_line_str_from_byte_offset(
@@ -248,7 +248,7 @@ impl Buffer {
     TextPos {
       line: line_number,
       column: col_index,
-      byte_offset: byte_offset,
+      byte_offset,
     }
   }
 }

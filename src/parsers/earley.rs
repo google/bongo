@@ -48,7 +48,7 @@ pub fn close_state<'a, E, T>(
       .flat_map(|state| {
         std::iter::empty()
           .chain(state.predict(grammar, prev_states).into_iter())
-          .chain(state.complete(tree_handle, prev_states, &new_state))
+          .chain(state.complete(tree_handle, prev_states, new_state))
       })
       .collect::<Vec<_>>();
 

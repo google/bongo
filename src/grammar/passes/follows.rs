@@ -24,8 +24,8 @@ where
   type Value = BTreeMap<E::NonTerm, BTreeSet<E::Term>>;
   type Error = FollowsError;
 
-  fn run_pass<'a>(
-    pass_map: &super::PassMap<'a, E>,
+  fn run_pass(
+    pass_map: &super::PassMap<E>,
   ) -> Result<Self::Value, FollowsError> {
     let gram = pass_map.grammar();
 

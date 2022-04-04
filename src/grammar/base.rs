@@ -375,7 +375,7 @@ impl<E: ElemTypes> Grammar<E> {
   }
 
   /// Returns an iterator over all of the rules for this grammar.
-  pub fn rules<'a>(&'a self) -> impl Iterator<Item = Rule<'a, E>> {
+  pub fn rules(&self) -> impl Iterator<Item = Rule<E>> {
     self.rule_set.iter().map(move |(_, rule)| Rule {
       grammar: ParentRef::new(self),
       rule: RefCompare::new(rule),
@@ -383,7 +383,7 @@ impl<E: ElemTypes> Grammar<E> {
   }
 
   /// Returns a map over rules of the grammar, keyed by the rule's head nonterminal.
-  pub fn rule_set<'a>(&'a self) -> BTreeMap<&'a E::NonTerm, Rule<'a, E>> {
+  pub fn rule_set(&self) -> BTreeMap<&E::NonTerm, Rule<E>> {
     self
       .rule_set
       .iter()
@@ -404,7 +404,7 @@ impl<E: ElemTypes> Grammar<E> {
   }
 
   /// Gets an iterator over all productions in the grammar.
-  pub fn prods<'a>(&'a self) -> impl Iterator<Item = Prod<'a, E>> {
+  pub fn prods(&self) -> impl Iterator<Item = Prod<E>> {
     self.rules().flat_map(move |rule| rule.prods())
   }
 
@@ -436,7 +436,7 @@ impl<E: ElemTypes> Grammar<E> {
       .collect()
   }
 
-  fn rules_without_prods<'a>(&'a self) -> BTreeSet<&'a E::NonTerm> {
+  fn rules_without_prods(&self) -> BTreeSet<&E::NonTerm> {
     let rules = self.rules();
     let prodless_rules = rules
       .into_iter()
@@ -580,7 +580,7 @@ impl<'a, E: ElemTypes> Rule<'a, E> {
   /// Returns an iterator over the productions of this rule.
   pub fn prods(&self) -> impl Iterator<Item = Prod<'a, E>> {
     let prods = &self.rule.prods;
-    prods.into_iter().map({
+    prods.iter().map({
       let grammar = *self.grammar;
       let head = &self.rule.head;
       move |prod| {
@@ -700,10 +700,10 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
 impl<'a, E: ElemTypes> Clone for Prod<'a, E> {
   fn clone(&self) -> Self {
     Prod {
-      grammar: self.grammar.clone(),
+      grammar: self.grammar,
       head: self.head,
-      prod: self.prod.clone(),
-      action_value: self.action_value.clone(),
+      prod: self.prod,
+      action_value: self.action_value,
     }
   }
 }

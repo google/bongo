@@ -55,7 +55,7 @@ impl ToDoc for () {
     &self,
     da: &'a DA,
   ) -> pretty::DocBuilder<'a, DA> {
-    da.text("()").into()
+    da.text("()")
   }
 }
 
@@ -92,7 +92,7 @@ impl Name {
 
 impl AsRef<str> for Name {
   fn as_ref(&self) -> &str {
-    return self.str();
+    self.str()
   }
 }
 
@@ -133,7 +133,7 @@ impl<L: Ord, V> TreeNode<L, V> {
   pub fn new(action: L, params: BTreeMap<Name, TreeValue<L, V>>) -> Self {
     TreeNode {
       action_name: action,
-      params: params,
+      params,
     }
   }
   pub fn from_action(action: L) -> Self {
@@ -251,6 +251,16 @@ where
 }
 
 pub struct CollectMap<K, V>(BTreeMap<K, BTreeSet<V>>);
+
+impl<K, V> Default for CollectMap<K, V>
+where
+  K: Ord,
+  V: Ord,
+{
+  fn default() -> Self {
+    CollectMap(BTreeMap::new())
+  }
+}
 
 impl<K, V> CollectMap<K, V>
 where

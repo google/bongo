@@ -1,7 +1,7 @@
 use std::{cmp, ops};
 
 fn ref_eq<T>(a: &T, b: &T) -> bool {
-  (a as *const T) == (b as *const T)
+  std::ptr::eq(a, b)
 }
 
 fn ref_cmp<T>(a: &T, b: &T) -> cmp::Ordering {
