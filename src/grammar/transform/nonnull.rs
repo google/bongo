@@ -158,8 +158,8 @@ fn build_nonnull_prods<E: ElemTypes>(
   for prod_elem in prod.prod_elements() {
     match &prod_elem.elem() {
       Elem::NonTerm(nt) => {
-        match nullable_info.get_nullable_info(nt) {
-          Some(info) => {
+        match nullable_info.get_nullable_action(nt) {
+          Some(action) => {
             // We have to clone all of the current build states.
             let mut new_build_states = Vec::new();
             for curr_build_state in &mut curr_build_states {
@@ -172,7 +172,7 @@ fn build_nonnull_prods<E: ElemTypes>(
               if let Some(id) = prod_elem.id() {
                 new_build_state
                   .action_args
-                  .insert(id.clone(), info.nullable_action().clone());
+                  .insert(id.clone(), action.clone());
               }
 
               new_build_state.nt_nullable_states.push(true);

@@ -80,7 +80,7 @@ pub struct GrammarNullableInfo<E: ElemTypes> {
 }
 
 impl<E: ElemTypes> GrammarNullableInfo<E> {
-  pub fn nonterm_info(&self) -> &BTreeMap<E::NonTerm, NonTermNullableInfo<E>> {
+  fn nonterm_info(&self) -> &BTreeMap<E::NonTerm, NonTermNullableInfo<E>> {
     &self.nonterm_info
   }
 
@@ -92,11 +92,14 @@ impl<E: ElemTypes> GrammarNullableInfo<E> {
     is_prod_nullable(&self.nonterm_info, prod)
   }
 
-  pub fn get_nullable_info(
+  pub fn get_nullable_action(
     &self,
     nt: &E::NonTerm,
-  ) -> Option<&NonTermNullableInfo<E>> {
-    self.nonterm_info.get(nt)
+  ) -> Option<&TreeNode<ProdKey<E>, Void>> {
+    self
+      .nonterm_info
+      .get(nt)
+      .and_then(|info| Some(&info.nullable_action))
   }
 
   pub fn get_nullable_set(&self) -> BTreeSet<E::NonTerm> {
@@ -106,7 +109,7 @@ impl<E: ElemTypes> GrammarNullableInfo<E> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub struct NonTermNullableInfo<E: ElemTypes> {
+struct NonTermNullableInfo<E: ElemTypes> {
   nullable_action: TreeNode<ProdKey<E>, Void>,
 }
 
@@ -249,13 +252,13 @@ mod test {
     let g = examples::make_paren();
     let nullables = calculate_nullables(&g).unwrap();
     assert!(nullables
-      .get_nullable_info(&NonTerminal::new("expr_list"))
+      .get_nullable_action(&NonTerminal::new("expr_list"))
       .is_some());
     assert!(nullables
-      .get_nullable_info(&NonTerminal::new("expr"))
+      .get_nullable_action(&NonTerminal::new("expr"))
       .is_none());
     assert!(nullables
-      .get_nullable_info(&NonTerminal::new("start"))
+      .get_nullable_action(&NonTerminal::new("start"))
       .is_none());
   }
 
