@@ -102,9 +102,14 @@ where
   }
 }
 
+pub type NonNullGrammar<T, NT, AK, AV> =
+  Grammar<T, NT, ActionKey<AK>, ActionValue<NT, AK, AV>>;
+pub type NonNullRuleBuilder<T, NT, AK, AV> =
+  RuleBuilder<T, NT, ActionKey<AK>, ActionValue<NT, AK, AV>>;
+
 pub fn transform_to_nonnull<T, NT, AK, AV>(
   g: &Grammar<T, NT, AK, AV>,
-) -> anyhow::Result<Grammar<T, NT, ActionKey<AK>, ActionValue<NT, AK, AV>>>
+) -> anyhow::Result<NonNullGrammar<T, NT, AK, AV>>
 where
   T: Ord + Clone,
   NT: Ord + Clone + 'static,
@@ -140,7 +145,7 @@ struct ProdBuildState<T, NT, AK> {
 fn build_nonnull_prods<T, NT, AK, AV>(
   nullable_info: &GrammarNullableInfo<NT, AK>,
   prod: &Prod<T, NT, AK, AV>,
-  r_builder: &mut RuleBuilder<T, NT, ActionKey<AK>, ActionValue<NT, AK, AV>>,
+  r_builder: &mut NonNullRuleBuilder<T, NT, AK, AV>,
 ) where
   T: Clone,
   NT: Ord + Clone,
@@ -154,7 +159,7 @@ fn build_nonnull_prods<T, NT, AK, AV>(
   }];
 
   for prod_elem in prod.prod_elements() {
-    match &prod_elem.elem() {
+    match prod_elem.elem() {
       Elem::NonTerm(nt) => {
         match nullable_info.get_nullable_action(nt) {
           Some(action) => {

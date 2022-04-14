@@ -50,6 +50,13 @@ impl<T, NT> Elem<T, NT> {
       Elem::Term(_) => None,
     }
   }
+
+  pub fn as_ref(&self) -> Elem<&T, &NT> {
+    match self {
+      Elem::Term(t) => Elem::Term(t),
+      Elem::NonTerm(nt) => Elem::NonTerm(nt),
+    }
+  }
 }
 
 impl<T, NT> ToDoc for Elem<T, NT>

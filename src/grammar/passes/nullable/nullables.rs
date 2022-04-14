@@ -124,10 +124,7 @@ where
     &self,
     nt: &NT,
   ) -> Option<&TreeNode<ProdKey<NT, AK>, Void>> {
-    self
-      .nonterm_info
-      .get(nt)
-      .and_then(|info| Some(&info.nullable_action))
+    self.nonterm_info.get(nt).map(|info| &info.nullable_action)
   }
 
   pub fn get_nullable_set(&self) -> BTreeSet<NT> {
