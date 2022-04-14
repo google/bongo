@@ -2,14 +2,18 @@
 //!
 //! Earley states consist of a set of production states.
 
+use crate::start_grammar::{
+  StartActionKey, StartActionValue, StartNonTerminal,
+};
+
 use {
   crate::{
-    grammar::{ElemTypes, Prod},
+    grammar::Prod,
     parsers::{
       tree::{Node, TreeHandle},
       Token,
     },
-    start_grammar::{StartElementTypes, StartGrammar, StreamTerminal},
+    start_grammar::{StartGrammar, StreamTerminal},
     state::ProdState,
     utils::{change_iter, WasChanged},
   },
@@ -20,18 +24,27 @@ use {
 #[derive(Derivative)]
 #[derivative(
   Clone(bound = ""),
-  Eq(bound = ""),
-  PartialEq(bound = ""),
-  Ord(bound = ""),
-  PartialOrd(bound = ""),
-  Debug(bound = "")
+  Eq(bound = "NT: Ord"),
+  PartialEq(bound = "NT: Ord"),
+  Ord(bound = "NT: Ord"),
+  PartialOrd(bound = "NT: Ord"),
+  Debug(bound = "T: std::fmt::Debug, NT: std::fmt::Debug")
 )]
-struct EarleyStateKey<'a, E: ElemTypes> {
-  prod_state: ProdState<'a, StartElementTypes<E>>,
+struct EarleyStateKey<'a, T, NT, AK, AV> {
+  prod_state: ProdState<
+    'a,
+    StreamTerminal<T>,
+    StartNonTerminal<NT>,
+    StartActionKey<AK>,
+    StartActionValue<AV>,
+  >,
   origin_index: usize,
 }
 
-impl<'a, E: ElemTypes> EarleyStateKey<'a, E> {
+impl<'a, T, NT, AK, AV> EarleyStateKey<'a, T, NT, AK, AV>
+where
+  T: Eq,
+{
   pub fn is_final_key(&self) -> bool {
     self
       .prod_state
@@ -44,27 +57,25 @@ impl<'a, E: ElemTypes> EarleyStateKey<'a, E> {
 #[derive(Derivative)]
 #[derivative(
   Clone(bound = ""),
-  Eq(bound = ""),
-  PartialEq(bound = ""),
-  Ord(bound = ""),
-  PartialOrd(bound = "")
+  Eq(bound = "NT: Ord"),
+  PartialEq(bound = "NT: Ord"),
+  Ord(bound = "NT: Ord"),
+  PartialOrd(bound = "NT: Ord")
 )]
-pub struct EarleyState<'a, E, T>
-where
-  E: ElemTypes,
-{
-  key: EarleyStateKey<'a, E>,
+pub struct EarleyState<'a, T, NT, AK, AV, V> {
+  key: EarleyStateKey<'a, T, NT, AK, AV>,
   #[derivative(Debug = "ignore")]
-  value: Vector<Node<'a, E, T>>,
+  value: Vector<Node<'a, T, AK, V>>,
 }
-
-impl<'a, E, T> EarleyState<'a, E, T>
-where
-  E: ElemTypes,
-  T: Ord + Clone,
-{
+impl<'a, T, NT, AK, AV, V> EarleyState<'a, T, NT, AK, AV, V> {
   pub fn from_prod_start(
-    prod: Prod<'a, StartElementTypes<E>>,
+    prod: Prod<
+      'a,
+      StreamTerminal<T>,
+      StartNonTerminal<NT>,
+      StartActionKey<AK>,
+      StartActionValue<AV>,
+    >,
     index: usize,
   ) -> Self {
     EarleyState {
@@ -76,24 +87,70 @@ where
     }
   }
 
-  pub fn prod_state(&self) -> &ProdState<'a, StartElementTypes<E>> {
+  pub fn prod_state(
+    &self,
+  ) -> &ProdState<
+    'a,
+    StreamTerminal<T>,
+    StartNonTerminal<NT>,
+    StartActionKey<AK>,
+    StartActionValue<AV>,
+  > {
     &self.key.prod_state
   }
 
   pub fn create_next_value(
     &self,
-    node: Node<'a, E, T>,
-  ) -> Vector<Node<'a, E, T>> {
+    node: Node<'a, T, AK, V>,
+  ) -> Vector<Node<'a, T, AK, V>> {
     let mut value = self.value.clone();
     value.push_back(node);
     value
   }
+}
 
+impl<'a, T, NT, AK, AV, V> EarleyState<'a, T, NT, AK, AV, V>
+where
+  T: Ord + Clone,
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+  V: Ord + Clone,
+{
+  pub fn scan(
+    &self,
+    tree_handle: &TreeHandle<'a, T, AK, V>,
+    next_token: &Token<T, V>,
+  ) -> Option<EarleyState<'a, T, NT, AK, AV, V>> {
+    self
+      .prod_state()
+      .next_elem_state()
+      .and_then(|(e, ps)| e.elem().as_term().map(move |t| (t, ps)))
+      .filter(|(t, _)| t.has_kind(&next_token.kind))
+      .map(|(_, ps)| EarleyState {
+        key: EarleyStateKey {
+          prod_state: ps,
+          origin_index: self.key.origin_index,
+        },
+        value: self.create_next_value(
+          tree_handle
+            .make_leaf_node(next_token.kind.clone(), next_token.value.clone()),
+        ),
+      })
+  }
+}
+
+impl<'a, T, NT, AK, AV, V> EarleyState<'a, T, NT, AK, AV, V>
+where
+  T: Ord + Clone + std::fmt::Debug,
+  NT: Ord + Clone + std::fmt::Debug,
+  AK: Ord + Clone,
+  V: Ord + Clone,
+{
   pub fn predict(
     &self,
-    grammar: &'a StartGrammar<E>,
-    prev_states: &[EarleyStateSet<'a, E, T>],
-  ) -> Vec<EarleyState<'a, E, T>> {
+    grammar: &'a StartGrammar<T, NT, AK, AV>,
+    prev_states: &[EarleyStateSet<'a, T, NT, AK, AV, V>],
+  ) -> Vec<EarleyState<'a, T, NT, AK, AV, V>> {
     self
       .prod_state()
       .next_elem()
@@ -111,34 +168,12 @@ where
       .collect()
   }
 
-  pub fn scan(
-    &self,
-    tree_handle: &TreeHandle<'a, E, T>,
-    next_token: &Token<E::Term, T>,
-  ) -> Option<EarleyState<'a, E, T>> {
-    self
-      .prod_state()
-      .next_elem_state()
-      .and_then(|(e, ps)| e.elem().as_term().map(move |t| (t, ps)))
-      .filter(|(t, _)| t.has_kind(&next_token.kind))
-      .map(|(_, ps)| EarleyState {
-        key: EarleyStateKey {
-          prod_state: ps,
-          origin_index: self.key.origin_index,
-        },
-        value: self.create_next_value(
-          tree_handle
-            .make_leaf_node(next_token.kind.clone(), next_token.value.clone()),
-        ),
-      })
-  }
-
   pub fn complete(
     &self,
-    tree_handle: &TreeHandle<'a, E, T>,
-    prev_states: &[EarleyStateSet<'a, E, T>],
-    curr_state: &EarleyStateSet<'a, E, T>,
-  ) -> Vec<EarleyState<'a, E, T>> {
+    tree_handle: &TreeHandle<'a, T, AK, V>,
+    prev_states: &[EarleyStateSet<'a, T, NT, AK, AV, V>],
+    curr_state: &EarleyStateSet<'a, T, NT, AK, AV, V>,
+  ) -> Vec<EarleyState<'a, T, NT, AK, AV, V>> {
     if self.prod_state().is_complete() {
       log::trace!("Completing prod state {:?}.", self.prod_state());
       let origin_state = if self.key.origin_index == prev_states.len() {
@@ -175,9 +210,10 @@ where
   }
 }
 
-impl<'a, E, T> std::fmt::Debug for EarleyState<'a, E, T>
+impl<'a, T, NT, AK, AV, V> std::fmt::Debug for EarleyState<'a, T, NT, AK, AV, V>
 where
-  E: ElemTypes,
+  T: std::fmt::Debug,
+  NT: std::fmt::Debug,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut st = f.debug_struct("EarleyState");
@@ -188,33 +224,47 @@ where
   }
 }
 
-pub struct EarleyStateSet<'a, E, T>
-where
-  E: ElemTypes,
-{
-  states: BTreeMap<EarleyStateKey<'a, E>, Vector<Node<'a, E, T>>>,
+pub struct EarleyStateSet<'a, T, NT, AK, AV, V> {
+  states:
+    BTreeMap<EarleyStateKey<'a, T, NT, AK, AV>, Vector<Node<'a, T, AK, V>>>,
 }
 
-impl<E: ElemTypes, T> Default for EarleyStateSet<'_, E, T> {
+impl<T, NT, AK, AV, V> Default for EarleyStateSet<'_, T, NT, AK, AV, V> {
   fn default() -> Self {
     EarleyStateSet {
       states: BTreeMap::new(),
     }
   }
 }
-
-impl<'a, E, T> EarleyStateSet<'a, E, T>
-where
-  E: ElemTypes,
-  T: Ord + Clone,
-{
+impl<'a, T, NT, AK, AV, V> EarleyStateSet<'a, T, NT, AK, AV, V> {
   pub fn new() -> Self {
     EarleyStateSet {
       states: BTreeMap::new(),
     }
   }
 
-  pub fn new_start(grammar: &'a StartGrammar<E>) -> Self {
+  pub fn is_empty(&self) -> bool {
+    self.states.is_empty()
+  }
+
+  pub fn states<'b>(
+    &'b self,
+  ) -> impl Iterator<Item = EarleyState<'a, T, NT, AK, AV, V>> + 'b {
+    self.states.iter().map(|(key, value)| EarleyState {
+      key: key.clone(),
+      value: value.clone(),
+    })
+  }
+}
+
+impl<'a, T, NT, AK, AV, V> EarleyStateSet<'a, T, NT, AK, AV, V>
+where
+  T: Ord + Clone,
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+  V: Ord + Clone,
+{
+  pub fn new_start(grammar: &'a StartGrammar<T, NT, AK, AV>) -> Self {
     let start_nt = grammar.start_nt();
     let start_rule = grammar.get_rule(start_nt);
     EarleyStateSet::from_states(
@@ -225,7 +275,7 @@ where
   }
 
   pub fn from_states(
-    iter: impl Iterator<Item = EarleyState<'a, E, T>>,
+    iter: impl Iterator<Item = EarleyState<'a, T, NT, AK, AV, V>>,
   ) -> Self {
     let mut state_set = EarleyStateSet::new();
     for state in iter {
@@ -235,16 +285,10 @@ where
     state_set
   }
 
-  pub fn states<'b>(
-    &'b self,
-  ) -> impl Iterator<Item = EarleyState<'a, E, T>> + 'b {
-    self.states.iter().map(|(key, value)| EarleyState {
-      key: key.clone(),
-      value: value.clone(),
-    })
-  }
-
-  pub fn insert(&mut self, state: &EarleyState<'a, E, T>) -> WasChanged {
+  pub fn insert(
+    &mut self,
+    state: &EarleyState<'a, T, NT, AK, AV, V>,
+  ) -> WasChanged {
     match self.states.entry(state.key.clone()) {
       btree_map::Entry::Vacant(vac) => {
         vac.insert(state.value.clone());
@@ -264,8 +308,8 @@ where
 
   pub fn shift(
     &self,
-    tree_handle: &TreeHandle<'a, E, T>,
-    token: &Token<E::Term, T>,
+    tree_handle: &TreeHandle<'a, T, AK, V>,
+    token: &Token<T, V>,
   ) -> Self {
     EarleyStateSet::from_states(
       self
@@ -275,11 +319,7 @@ where
     )
   }
 
-  pub fn is_empty(&self) -> bool {
-    self.states.is_empty()
-  }
-
-  pub fn get_final(&self) -> Option<&Node<'a, E, T>> {
+  pub fn get_final(&self) -> Option<&Node<'a, T, AK, V>> {
     for (k, v) in &self.states {
       if k.is_final_key() {
         assert_eq!(v.len(), 1);
@@ -291,10 +331,11 @@ where
   }
 }
 
-impl<'a, E, T> std::fmt::Debug for EarleyStateSet<'a, E, T>
+impl<'a, T, NT, AK, AV, V> std::fmt::Debug
+  for EarleyStateSet<'a, T, NT, AK, AV, V>
 where
-  E: ElemTypes,
-  T: Ord + Clone,
+  T: std::fmt::Debug,
+  NT: std::fmt::Debug,
 {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     f.debug_set().entries(self.states()).finish()

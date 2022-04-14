@@ -1,10 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::utils::{change_iter, change_loop, WasChanged};
-use crate::{
-  grammar::{Elem, ElemTypes},
-  utils::CollectMap,
-};
+use crate::{grammar::Elem, utils::CollectMap};
 
 use super::firsts::{Firsts, FirstsError};
 use super::Pass;
@@ -15,18 +12,22 @@ pub enum FollowsError {
   First(#[from] FirstsError),
 }
 
-pub struct Follows<E: ElemTypes>(BTreeMap<E::NonTerm, BTreeSet<E::Term>>);
+pub struct Follows<T, NT>(BTreeMap<NT, BTreeSet<T>>);
 
-impl<E> Pass<E> for Follows<E>
+impl<T, NT, AK, AV> Pass<T, NT, AK, AV> for Follows<T, NT>
 where
-  E: ElemTypes,
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  AK: Ord + Clone + 'static,
 {
   type Error = FollowsError;
 
-  fn run_pass(pass_map: &super::PassContext<E>) -> Result<Self, FollowsError> {
+  fn run_pass(
+    pass_map: &super::PassContext<T, NT, AK, AV>,
+  ) -> Result<Self, FollowsError> {
     let gram = pass_map.grammar();
 
-    let firsts = pass_map.get_pass::<Firsts<E>>()?;
+    let firsts = pass_map.get_pass::<Firsts<T, NT>>()?;
 
     let mut follows = CollectMap::new();
 

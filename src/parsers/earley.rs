@@ -21,7 +21,6 @@ mod state;
 
 use {
   crate::{
-    grammar::ElemTypes,
     parsers::{
       tree::{Node, TreeHandle},
       Token,
@@ -32,14 +31,16 @@ use {
   state::EarleyStateSet,
 };
 
-pub fn close_state<'a, E, T>(
-  grammar: &'a StartGrammar<E>,
-  tree_handle: &TreeHandle<'a, E, T>,
-  prev_states: &[EarleyStateSet<'a, E, T>],
-  new_state: &mut EarleyStateSet<'a, E, T>,
+pub fn close_state<'a, T, NT, AK, AV, V>(
+  grammar: &'a StartGrammar<T, NT, AK, AV>,
+  tree_handle: &TreeHandle<'a, T, AK, V>,
+  prev_states: &[EarleyStateSet<'a, T, NT, AK, AV, V>],
+  new_state: &mut EarleyStateSet<'a, T, NT, AK, AV, V>,
 ) where
-  E: ElemTypes,
-  T: Ord + Clone,
+  T: Ord + Clone + std::fmt::Debug,
+  NT: Ord + Clone + std::fmt::Debug,
+  AK: Ord + Clone,
+  V: Ord + Clone,
 {
   assert!(!new_state.is_empty());
   change_loop(|| {
@@ -56,18 +57,20 @@ pub fn close_state<'a, E, T>(
   });
 }
 
-pub fn parse<'a, E, T>(
-  grammar: &'a StartGrammar<E>,
-  tree_handle: &TreeHandle<'a, E, T>,
-  tokens: Vec<Token<E::Term, T>>,
-) -> Option<Node<'a, E, T>>
+pub fn parse<'a, T, NT, AK, AV, V>(
+  grammar: &'a StartGrammar<T, NT, AK, AV>,
+  tree_handle: &TreeHandle<'a, T, AK, V>,
+  tokens: Vec<Token<T, V>>,
+) -> Option<Node<'a, T, AK, V>>
 where
-  E: ElemTypes,
-  T: Ord + Clone,
+  T: Ord + Clone + std::fmt::Debug,
+  NT: Ord + Clone + std::fmt::Debug,
+  AK: Ord + Clone,
+  V: Ord + Clone,
 {
   let mut states = vec![];
 
-  let mut init_state: EarleyStateSet<'a, E, T> =
+  let mut init_state: EarleyStateSet<'a, T, NT, AK, AV, V> =
     EarleyStateSet::new_start(grammar);
   close_state(grammar, tree_handle, &states, &mut init_state);
   states.push(init_state);

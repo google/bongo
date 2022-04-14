@@ -30,11 +30,11 @@ mod tests {
   use crate::grammar::build;
   use crate::grammar::{
     passes::{nullable::Nullable, PassContext},
-    BaseElementTypes, Grammar, NonTerminal, Terminal,
+    Grammar, NonTerminal, Terminal,
   };
   use crate::utils::Name;
 
-  fn base_grammar() -> Grammar<BaseElementTypes> {
+  fn base_grammar() -> Grammar<Terminal, NonTerminal, Name, ()> {
     let t_a = Terminal::new("A");
     let nt_x = NonTerminal::new("x");
 
@@ -49,7 +49,7 @@ mod tests {
     .unwrap()
   }
 
-  fn create_arithmetic_grammar() -> Grammar<BaseElementTypes> {
+  fn create_arithmetic_grammar() -> Grammar<Terminal, NonTerminal, Name, ()> {
     let t_add = Terminal::new("+");
     let t_sub = Terminal::new("-");
     let t_mul = Terminal::new("*");
@@ -90,7 +90,7 @@ mod tests {
   fn test_arithemtic_grammar() {
     let grammar = create_arithmetic_grammar();
     let pass_map = PassContext::new(&grammar);
-    let nullable = pass_map.get_pass::<Nullable<_>>().unwrap();
+    let nullable = pass_map.get_pass::<Nullable<_, _>>().unwrap();
     assert!(!nullable.is_nullable(grammar.start_nt()));
   }
 
@@ -99,7 +99,7 @@ mod tests {
     let g = base_grammar();
 
     let pass_map = PassContext::new(&g);
-    let nullable = pass_map.get_pass::<Nullable<_>>().unwrap();
+    let nullable = pass_map.get_pass::<Nullable<_, _>>().unwrap();
 
     assert!(nullable.is_nullable(&NonTerminal::new("x")));
   }

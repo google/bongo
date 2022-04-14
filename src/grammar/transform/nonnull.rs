@@ -53,30 +53,23 @@ use {
         nullable::{GrammarNullableInfo, Nullable},
         PassContext,
       },
-      Elem, ElemTypes, Grammar, Prod, ProdElement, ProdKey, RuleBuilder,
+      Elem, Grammar, Prod, ProdElement, ProdKey, RuleBuilder,
     },
     utils::{Name, ToDoc, TreeNode, Void},
   },
-  std::{collections::BTreeMap, marker::PhantomData},
+  std::collections::BTreeMap,
 };
 
-pub struct NonNullElemTypes<E: ElemTypes>(PhantomData<E>);
-
-#[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
-)]
-pub struct ActionKey<E: ElemTypes> {
-  action: E::ActionKey,
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct ActionKey<AK> {
+  action: AK,
   nt_nullable_states: Vec<bool>,
 }
 
-impl<E: ElemTypes> ToDoc for ActionKey<E> {
+impl<AK> ToDoc for ActionKey<AK>
+where
+  AK: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -88,14 +81,16 @@ impl<E: ElemTypes> ToDoc for ActionKey<E> {
   }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub struct ActionValue<E: ElemTypes> {
-  parent_value: E::ActionValue,
-  nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
+#[derive(Clone, Debug)]
+pub struct ActionValue<NT, AK, AV> {
+  parent_value: AV,
+  nullable_arguments: BTreeMap<Name, TreeNode<ProdKey<NT, AK>, Void>>,
 }
 
-impl<E: ElemTypes> ToDoc for ActionValue<E> {
+impl<NT, AK, AV> ToDoc for ActionValue<NT, AK, AV>
+where
+  AV: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -107,18 +102,17 @@ impl<E: ElemTypes> ToDoc for ActionValue<E> {
   }
 }
 
-impl<E: ElemTypes> ElemTypes for NonNullElemTypes<E> {
-  type Term = E::Term;
-  type NonTerm = E::NonTerm;
-  type ActionKey = ActionKey<E>;
-  type ActionValue = ActionValue<E>;
-}
-
-pub fn transform_to_nonnull<E: ElemTypes>(
-  g: &Grammar<E>,
-) -> anyhow::Result<Grammar<NonNullElemTypes<E>>> {
+pub fn transform_to_nonnull<T, NT, AK, AV>(
+  g: &Grammar<T, NT, AK, AV>,
+) -> anyhow::Result<Grammar<T, NT, ActionKey<AK>, ActionValue<NT, AK, AV>>>
+where
+  T: Ord + Clone,
+  NT: Ord + Clone + 'static,
+  AK: Ord + Clone + 'static,
+  AV: Clone,
+{
   let pass_map = PassContext::new(g);
-  let nullable = pass_map.get_pass::<Nullable<E>>()?;
+  let nullable = pass_map.get_pass::<Nullable<NT, AK>>()?;
 
   build(g.start_nt().clone(), |g_builder| {
     for (nt, rule) in g.rule_set() {
@@ -136,19 +130,23 @@ pub fn transform_to_nonnull<E: ElemTypes>(
   .map_err(|_| anyhow::anyhow!("Grammar failed to build"))
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-struct ProdBuildState<E: ElemTypes> {
-  elems: Vec<ProdElement<NonNullElemTypes<E>>>,
+#[derive(Clone, Debug)]
+struct ProdBuildState<T, NT, AK> {
+  elems: Vec<ProdElement<T, NT>>,
   nt_nullable_states: Vec<bool>,
-  action_args: BTreeMap<Name, TreeNode<ProdKey<E>, Void>>,
+  action_args: BTreeMap<Name, TreeNode<ProdKey<NT, AK>, Void>>,
 }
 
-fn build_nonnull_prods<E: ElemTypes>(
-  nullable_info: &GrammarNullableInfo<E>,
-  prod: &Prod<E>,
-  r_builder: &mut RuleBuilder<NonNullElemTypes<E>>,
-) {
+fn build_nonnull_prods<T, NT, AK, AV>(
+  nullable_info: &GrammarNullableInfo<NT, AK>,
+  prod: &Prod<T, NT, AK, AV>,
+  r_builder: &mut RuleBuilder<T, NT, ActionKey<AK>, ActionValue<NT, AK, AV>>,
+) where
+  T: Clone,
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+  AV: Clone,
+{
   let mut curr_build_states = vec![ProdBuildState {
     elems: Vec::new(),
     nt_nullable_states: Vec::new(),
@@ -165,7 +163,7 @@ fn build_nonnull_prods<E: ElemTypes>(
             for curr_build_state in &mut curr_build_states {
               let mut new_build_state = curr_build_state.clone();
               // Write non-null version into existing state
-              curr_build_state.elems.push(prod_elem.clone_as_other());
+              curr_build_state.elems.push(prod_elem.clone());
               curr_build_state.nt_nullable_states.push(false);
 
               // Write null version into cloned state
@@ -184,7 +182,7 @@ fn build_nonnull_prods<E: ElemTypes>(
           None => {
             for curr_build_state in &mut curr_build_states {
               // Write non-null version into existing state
-              curr_build_state.elems.push(prod_elem.clone_as_other());
+              curr_build_state.elems.push(prod_elem.clone());
               curr_build_state.nt_nullable_states.push(false);
             }
           }
@@ -192,7 +190,7 @@ fn build_nonnull_prods<E: ElemTypes>(
       }
       Elem::Term(_) => {
         for prod_build_state in &mut curr_build_states {
-          prod_build_state.elems.push(prod_elem.clone_as_other())
+          prod_build_state.elems.push(prod_elem.clone())
         }
       }
     }

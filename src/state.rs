@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::{Elem, ElemTypes, Prod, ProdElement};
+use crate::grammar::{Elem, Prod, ProdElement};
 use std::{
   collections::{BTreeMap, BTreeSet},
   iter::FromIterator,
@@ -33,47 +33,72 @@ use std::{
 #[derive(Derivative)]
 #[derivative(
   Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
+  Debug(bound = "T: std::fmt::Debug, NT: std::fmt::Debug")
 )]
 
-pub struct ProdState<'a, E: ElemTypes> {
+pub struct ProdState<'a, T, NT, AK, AV> {
   /// The production this state is part of.
-  prod: Prod<'a, E>,
+  prod: Prod<'a, T, NT, AK, AV>,
 
   /// The index of this production state. Must be in the range [0,
   /// self.prod.prod_elements().len()].
   index: usize,
 }
 
-impl<'a, E: ElemTypes> ProdState<'a, E> {
+impl<'a, T, NT, AK, AV> Ord for ProdState<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self.prod.cmp(&other.prod)
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialOrd for ProdState<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialEq for ProdState<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.prod == other.prod
+  }
+}
+
+impl<'a, T, NT, AK, AV> Eq for ProdState<'a, T, NT, AK, AV> where NT: Ord {}
+
+impl<'a, T, NT, AK, AV> ProdState<'a, T, NT, AK, AV> {
   /// Create a ProdState from a given NonTerminal and Prod.
   ///
   /// This state's index will be at the start of the production.
-  pub fn from_start(prod: Prod<'a, E>) -> Self {
+  pub fn from_start(prod: Prod<'a, T, NT, AK, AV>) -> Self {
     ProdState { prod, index: 0 }
   }
 
-  pub fn prod(&self) -> Prod<'a, E> {
+  pub fn prod(&self) -> Prod<'a, T, NT, AK, AV> {
     self.prod
   }
 
-  pub fn offset_prod_elem(&self, i: usize) -> Option<&'a ProdElement<E>> {
+  pub fn offset_prod_elem(&self, i: usize) -> Option<&'a ProdElement<T, NT>> {
     self.prod.prod_elements().get(self.index + i)
   }
 
-  pub fn offset_elem(&self, i: usize) -> Option<&'a Elem<E>> {
+  pub fn offset_elem(&self, i: usize) -> Option<&'a Elem<T, NT>> {
     self.offset_prod_elem(i).map(ProdElement::elem)
   }
 
-  pub fn next_prod_elem(&self) -> Option<&'a ProdElement<E>> {
+  pub fn next_prod_elem(&self) -> Option<&'a ProdElement<T, NT>> {
     self.offset_prod_elem(0)
   }
 
-  pub fn next_elem(&self) -> Option<&'a Elem<E>> {
+  pub fn next_elem(&self) -> Option<&'a Elem<T, NT>> {
     self.offset_elem(0)
   }
 
@@ -81,7 +106,7 @@ impl<'a, E: ElemTypes> ProdState<'a, E> {
   /// end, then it reuturns `None`.
   pub fn next_elem_state(
     &self,
-  ) -> Option<(&'a ProdElement<E>, ProdState<'a, E>)> {
+  ) -> Option<(&'a ProdElement<T, NT>, ProdState<'a, T, NT, AK, AV>)> {
     self.next_prod_elem().map(|prod_elem| {
       (
         prod_elem,
@@ -93,54 +118,108 @@ impl<'a, E: ElemTypes> ProdState<'a, E> {
     })
   }
 
+  pub fn is_complete(&self) -> bool {
+    self.prod.num_elements() == self.index
+  }
+
+  pub fn action_key(&self) -> &'a AK {
+    self.prod.action_key()
+  }
+}
+
+impl<'a, T, NT, AK, AV> ProdState<'a, T, NT, AK, AV>
+where
+  T: Eq,
+  NT: Eq,
+{
   /// Return Some(state) which is this state advanced if
   /// the next element type is elem.
-  pub fn advance_if(&self, elem: &Elem<E>) -> Option<ProdState<'a, E>> {
+  pub fn advance_if(
+    &self,
+    elem: &Elem<T, NT>,
+  ) -> Option<ProdState<'a, T, NT, AK, AV>> {
     self
       .next_elem_state()
       .filter(|(e, _)| e.elem() == elem)
       .map(|(_, next)| next)
   }
-
-  pub fn is_complete(&self) -> bool {
-    self.prod.num_elements() == self.index
-  }
-
-  pub fn action_key(&self) -> &'a E::ActionKey {
-    self.prod.action_key()
-  }
 }
 
 /// A set of production states.
 #[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
-)]
-pub struct ProdStateSet<'a, E: ElemTypes> {
-  states: BTreeSet<ProdState<'a, E>>,
+#[derivative(Clone(bound = ""))]
+pub struct ProdStateSet<'a, T, NT, AK, AV> {
+  states: BTreeSet<ProdState<'a, T, NT, AK, AV>>,
 }
 
-impl<'a, E: ElemTypes> FromIterator<ProdState<'a, E>> for ProdStateSet<'a, E> {
-  fn from_iter<T: IntoIterator<Item = ProdState<'a, E>>>(iter: T) -> Self {
+impl<'a, T, NT, AK, AV> Ord for ProdStateSet<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self.states.cmp(&other.states)
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialOrd for ProdStateSet<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    self.states.partial_cmp(&other.states)
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialEq for ProdStateSet<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.states.eq(&other.states)
+  }
+}
+
+impl<'a, T, NT, AK, AV> Eq for ProdStateSet<'a, T, NT, AK, AV> where NT: Ord {}
+
+impl<'a, T, NT, AK, AV> FromIterator<ProdState<'a, T, NT, AK, AV>>
+  for ProdStateSet<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn from_iter<I: IntoIterator<Item = ProdState<'a, T, NT, AK, AV>>>(
+    iter: I,
+  ) -> Self {
     ProdStateSet {
       states: iter.into_iter().collect(),
     }
   }
 }
 
-impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
+impl<'a, T, NT, AK, AV> ProdStateSet<'a, T, NT, AK, AV> {
   pub fn new_empty() -> Self {
     ProdStateSet {
       states: BTreeSet::new(),
     }
   }
 
-  pub fn add(&mut self, state: ProdState<'a, E>) {
+  /// Returns an iterator over those states that are complete.
+  pub fn complete(&self) -> impl Iterator<Item = ProdState<'a, T, NT, AK, AV>> {
+    self
+      .states
+      .iter()
+      .filter(|st| st.is_complete())
+      .cloned()
+      .collect::<Vec<_>>()
+      .into_iter()
+  }
+}
+
+impl<'a, T, NT, AK, AV> ProdStateSet<'a, T, NT, AK, AV>
+where
+  T: Ord,
+  NT: Ord,
+{
+  pub fn add(&mut self, state: ProdState<'a, T, NT, AK, AV>) {
     self.states.insert(state);
   }
 
@@ -148,7 +227,8 @@ impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
   /// that.
   pub fn nexts(
     &self,
-  ) -> impl Iterator<Item = (&'a ProdElement<E>, ProdStateSet<'a, E>)> {
+  ) -> impl Iterator<Item = (&'a ProdElement<T, NT>, ProdStateSet<'a, T, NT, AK, AV>)>
+  {
     let mut result = BTreeMap::new();
 
     for (k, v) in self.states.iter().filter_map(ProdState::next_elem_state) {
@@ -164,8 +244,8 @@ impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
   /// Given a function that takes the closure of a given prod state, take the closure of all states in this set.
   pub fn take_closure<F, I>(&mut self, mut close_func: F)
   where
-    F: FnMut(&ProdState<'a, E>) -> I,
-    I: Iterator<Item = ProdState<'a, E>>,
+    F: FnMut(&ProdState<'a, T, NT, AK, AV>) -> I,
+    I: Iterator<Item = ProdState<'a, T, NT, AK, AV>>,
   {
     let mut seen_states = self.states.clone();
     let mut curr_states = self.states.clone();
@@ -187,16 +267,5 @@ impl<'a, E: ElemTypes> ProdStateSet<'a, E> {
       curr_states = next_states;
       next_states = BTreeSet::new();
     }
-  }
-
-  /// Returns an iterator over those states that are complete.
-  pub fn complete(&self) -> impl Iterator<Item = ProdState<'a, E>> {
-    self
-      .states
-      .iter()
-      .filter(|st| st.is_complete())
-      .cloned()
-      .collect::<Vec<_>>()
-      .into_iter()
   }
 }

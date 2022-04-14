@@ -8,12 +8,10 @@
 //! wrapper type that introduces the special `Start` non-terminal, and the `EndOfStream` terminal.
 //! Passes may then take these into account when generation their representations.
 
-use crate::grammar::ElemTypes;
 use crate::grammar::{
   build, Elem, Grammar, GrammarErrors, Prod, ProdElement, Rule,
 };
 use crate::utils::{take_only, ToDoc};
-use std::marker::PhantomData;
 
 /// A terminal wrapper type that adds the special `EndOfStream` terminal.
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Debug)]
@@ -137,43 +135,59 @@ where
   }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub struct StartElementTypes<E>(PhantomData<E>);
+pub type StartGrammar<T, NT, AK, AV> = Grammar<
+  StreamTerminal<T>,
+  StartNonTerminal<NT>,
+  StartActionKey<AK>,
+  StartActionValue<AV>,
+>;
 
-impl<E: ElemTypes> ElemTypes for StartElementTypes<E> {
-  type Term = StreamTerminal<E::Term>;
-  type NonTerm = StartNonTerminal<E::NonTerm>;
-
-  type ActionKey = StartActionKey<E::ActionKey>;
-  type ActionValue = StartActionValue<E::ActionValue>;
-}
-
-pub type StartGrammar<E> = Grammar<StartElementTypes<E>>;
-
-impl<E: ElemTypes> StartGrammar<E> {
-  pub fn start_rule(&self) -> Rule<StartElementTypes<E>> {
+impl<T, NT, AK, AV> StartGrammar<T, NT, AK, AV>
+where
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+{
+  pub fn start_rule(
+    &self,
+  ) -> Rule<
+    StreamTerminal<T>,
+    StartNonTerminal<NT>,
+    StartActionKey<AK>,
+    StartActionValue<AV>,
+  > {
     self.get_rule(&StartNonTerminal::Start)
   }
 
-  pub fn start_prod(&self) -> Prod<StartElementTypes<E>> {
+  pub fn start_prod(
+    &self,
+  ) -> Prod<
+    StreamTerminal<T>,
+    StartNonTerminal<NT>,
+    StartActionKey<AK>,
+    StartActionValue<AV>,
+  > {
     take_only(self.start_rule().prods())
       .expect("The start rule should only have a single production.")
   }
 }
 
-fn base_elem_to_start_elem<E: ElemTypes>(
-  elem: Elem<E>,
-) -> Elem<StartElementTypes<E>> {
+fn base_elem_to_start_elem<T, NT>(
+  elem: Elem<T, NT>,
+) -> Elem<StreamTerminal<T>, StartNonTerminal<NT>> {
   match elem {
     Elem::Term(t) => Elem::Term(StreamTerminal::Term(t)),
     Elem::NonTerm(nt) => Elem::NonTerm(StartNonTerminal::NTerm(nt)),
   }
 }
 
-pub fn wrap_grammar_with_start<E: ElemTypes>(
-  g: Grammar<E>,
-) -> Result<Grammar<StartElementTypes<E>>, GrammarErrors<StartElementTypes<E>>>
+pub fn wrap_grammar_with_start<T, NT, AK, AV>(
+  g: Grammar<T, NT, AK, AV>,
+) -> Result<StartGrammar<T, NT, AK, AV>, GrammarErrors<StartNonTerminal<NT>>>
+where
+  T: Clone,
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+  AV: Clone,
 {
   build(StartNonTerminal::Start, |gb| {
     gb.add_rule(StartNonTerminal::Start, |rb| {

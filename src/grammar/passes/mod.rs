@@ -13,7 +13,7 @@ use std::{
   rc::Rc,
 };
 
-use super::{ElemTypes, Grammar};
+use super::Grammar;
 
 pub trait BasePassError {
   fn as_any(&self) -> &(dyn std::any::Any + 'static);
@@ -35,10 +35,9 @@ where
 
 struct BoxPassError(Box<dyn BasePassError>);
 
-enum PassError<E, P>
+enum PassError<T, NT, AK, AV, P>
 where
-  P: Pass<E>,
-  E: ElemTypes,
+  P: Pass<T, NT, AK, AV>,
 {
   ThisPass(P::Error),
   PrevPass(Box<dyn BasePassError>),
@@ -51,30 +50,23 @@ where
 struct NoCurrentValue;
 
 /// A
-pub trait Pass<E>: Any + Sized + 'static
-where
-  E: ElemTypes,
-{
+pub trait Pass<T, NT, AK, AV>: Any + Sized + 'static {
   type Error: std::error::Error + 'static;
 
-  fn run_pass(pass_map: &PassContext<E>) -> Result<Self, Self::Error>;
+  fn run_pass(
+    pass_map: &PassContext<T, NT, AK, AV>,
+  ) -> Result<Self, Self::Error>;
 }
 
 /// A map from passes to their associated results.
-pub struct PassContext<'a, E>
-where
-  E: ElemTypes,
-{
-  grammar: &'a Grammar<E>,
+pub struct PassContext<'a, T, NT, AK, AV> {
+  grammar: &'a Grammar<T, NT, AK, AV>,
   passes: RefCell<BTreeMap<TypeId, Rc<dyn Any + 'static>>>,
 }
 
-impl<'a, E> PassContext<'a, E>
-where
-  E: ElemTypes,
-{
+impl<'a, T, NT, AK, AV> PassContext<'a, T, NT, AK, AV> {
   // Create a new pass map, where passes derive from the given grammar and other passes.
-  pub fn new(grammar: &'a Grammar<E>) -> Self {
+  pub fn new(grammar: &'a Grammar<T, NT, AK, AV>) -> Self {
     PassContext {
       grammar,
       passes: RefCell::new(BTreeMap::new()),
@@ -82,7 +74,7 @@ where
   }
 
   /// Returns the underlying grammar.
-  pub fn grammar(&self) -> &'a Grammar<E> {
+  pub fn grammar(&self) -> &'a Grammar<T, NT, AK, AV> {
     self.grammar
   }
 
@@ -90,7 +82,7 @@ where
   /// depend on other passes.
   pub fn get_pass<P>(&self) -> Result<Rc<P>, P::Error>
   where
-    P: Pass<E> + 'static,
+    P: Pass<T, NT, AK, AV> + 'static,
   {
     let pass_type = TypeId::of::<P>();
 

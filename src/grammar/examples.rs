@@ -12,9 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::grammar::{build, BaseElementTypes, Grammar, NonTerminal, Terminal};
+use crate::{
+  grammar::{build, Grammar, NonTerminal, Terminal},
+  utils::Name,
+};
 
-pub fn make_simple() -> Grammar<BaseElementTypes> {
+pub fn make_simple() -> Grammar<Terminal, NonTerminal, Name, ()> {
   let start = NonTerminal::new("start");
   let a_nt = NonTerminal::new("a");
   let b_nt = NonTerminal::new("b");
@@ -45,7 +48,7 @@ pub fn make_simple() -> Grammar<BaseElementTypes> {
   .unwrap()
 }
 
-pub fn make_simple_nullable() -> Grammar<BaseElementTypes> {
+pub fn make_simple_nullable() -> Grammar<Terminal, NonTerminal, Name, ()> {
   let start = NonTerminal::new("start");
   let a_nt = NonTerminal::new("a");
   let b_nt = NonTerminal::new("b");
@@ -77,7 +80,7 @@ pub fn make_simple_nullable() -> Grammar<BaseElementTypes> {
   .unwrap()
 }
 
-pub fn make_paren() -> Grammar<BaseElementTypes> {
+pub fn make_paren() -> Grammar<Terminal, NonTerminal, Name, ()> {
   let start = NonTerminal::new("start");
   let expr = NonTerminal::new("expr");
   let expr_list = NonTerminal::new("expr_list");
@@ -111,7 +114,7 @@ pub fn make_paren() -> Grammar<BaseElementTypes> {
   .unwrap()
 }
 
-pub fn make_ambiguous_nullable() -> Grammar<BaseElementTypes> {
+pub fn make_ambiguous_nullable() -> Grammar<Terminal, NonTerminal, Name, ()> {
   let start = NonTerminal::new("start");
   let a_nt = NonTerminal::new("a");
   let b_nt = NonTerminal::new("b");

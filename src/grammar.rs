@@ -21,6 +21,6 @@ pub mod transform;
 
 pub use base::{
   builder::{build, GrammarBuilder, ProductionBuilder, RuleBuilder},
-  BaseElementTypes, Elem, ElemTypes, Grammar, GrammarErrors, NonTerminal, Prod,
-  ProdElement, ProdKey, Rule, Terminal,
+  Elem, Grammar, GrammarErrors, NonTerminal, Prod, ProdElement, ProdKey, Rule,
+  Terminal,
 };

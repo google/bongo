@@ -13,27 +13,49 @@
 // limitations under the License.
 use {
   crate::{
-    grammar::{Elem, ElemTypes, Grammar, Prod, ProdKey},
+    grammar::{Elem, Grammar, Prod, ProdKey},
     utils::{TreeNode, TreeValue, Void},
   },
   std::collections::{BTreeMap, BTreeSet},
 };
-
-#[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
-)]
-struct InternalNullableInfo<'a, E: ElemTypes> {
+struct InternalNullableInfo<'a, T, NT, AK, AV> {
   /// The set of productions that are nullable
-  nullable_actions: BTreeSet<Prod<'a, E>>,
+  nullable_actions: BTreeSet<Prod<'a, T, NT, AK, AV>>,
 }
 
-impl<E: ElemTypes> InternalNullableInfo<'_, E> {
+impl<'a, T, NT, AK, AV> Ord for InternalNullableInfo<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self.nullable_actions.cmp(&other.nullable_actions)
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialOrd for InternalNullableInfo<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialEq for InternalNullableInfo<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.nullable_actions == other.nullable_actions
+  }
+}
+
+impl<'a, T, NT, AK, AV> Eq for InternalNullableInfo<'a, T, NT, AK, AV> where
+  NT: Ord
+{
+}
+
+impl<T, NT, AK, AV> InternalNullableInfo<'_, T, NT, AK, AV> {
   pub fn new() -> Self {
     InternalNullableInfo {
       nullable_actions: BTreeSet::new(),
@@ -45,12 +67,16 @@ impl<E: ElemTypes> InternalNullableInfo<'_, E> {
 ///
 /// The nullable set of a grammar is the set of non-terminals in that grammar
 /// that can parse the empty terminal sequence.
-fn inner_calculate_nullables<E: ElemTypes>(
-  g: &Grammar<E>,
-) -> BTreeMap<E::NonTerm, InternalNullableInfo<E>> {
+fn inner_calculate_nullables<T, NT, AK, AV>(
+  g: &Grammar<T, NT, AK, AV>,
+) -> BTreeMap<NT, InternalNullableInfo<T, NT, AK, AV>>
+where
+  T: Ord,
+  NT: Ord + Clone,
+{
   let prods = g.prods().collect::<Vec<_>>();
 
-  let mut nullable_nts: BTreeMap<E::NonTerm, InternalNullableInfo<E>> =
+  let mut nullable_nts: BTreeMap<NT, InternalNullableInfo<T, NT, AK, AV>> =
     BTreeMap::new();
 
   loop {
@@ -73,48 +99,49 @@ fn inner_calculate_nullables<E: ElemTypes>(
   }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub struct GrammarNullableInfo<E: ElemTypes> {
-  nonterm_info: BTreeMap<E::NonTerm, NonTermNullableInfo<E>>,
+#[derive(Clone, Debug)]
+pub struct GrammarNullableInfo<NT, AK> {
+  nonterm_info: BTreeMap<NT, NonTermNullableInfo<NT, AK>>,
 }
 
-impl<E: ElemTypes> GrammarNullableInfo<E> {
-  fn nonterm_info(&self) -> &BTreeMap<E::NonTerm, NonTermNullableInfo<E>> {
+impl<NT, AK> GrammarNullableInfo<NT, AK>
+where
+  NT: Ord + Clone,
+{
+  fn nonterm_info(&self) -> &BTreeMap<NT, NonTermNullableInfo<NT, AK>> {
     &self.nonterm_info
   }
 
-  pub fn is_nullable(&self, nt: &E::NonTerm) -> bool {
+  pub fn is_nullable(&self, nt: &NT) -> bool {
     self.nonterm_info.contains_key(nt)
   }
 
-  pub fn is_prod_nullable(&self, prod: &Prod<E>) -> bool {
+  pub fn is_prod_nullable<T, AV>(&self, prod: &Prod<T, NT, AK, AV>) -> bool {
     is_prod_nullable(&self.nonterm_info, prod)
   }
 
   pub fn get_nullable_action(
     &self,
-    nt: &E::NonTerm,
-  ) -> Option<&TreeNode<ProdKey<E>, Void>> {
+    nt: &NT,
+  ) -> Option<&TreeNode<ProdKey<NT, AK>, Void>> {
     self
       .nonterm_info
       .get(nt)
       .and_then(|info| Some(&info.nullable_action))
   }
 
-  pub fn get_nullable_set(&self) -> BTreeSet<E::NonTerm> {
+  pub fn get_nullable_set(&self) -> BTreeSet<NT> {
     self.nonterm_info().keys().cloned().collect()
   }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-struct NonTermNullableInfo<E: ElemTypes> {
-  nullable_action: TreeNode<ProdKey<E>, Void>,
+#[derive(Clone, Debug)]
+struct NonTermNullableInfo<NT, AK> {
+  nullable_action: TreeNode<ProdKey<NT, AK>, Void>,
 }
 
-impl<E: ElemTypes> NonTermNullableInfo<E> {
-  pub fn nullable_action(&self) -> &TreeNode<ProdKey<E>, Void> {
+impl<NT, AK> NonTermNullableInfo<NT, AK> {
+  pub fn nullable_action(&self) -> &TreeNode<ProdKey<NT, AK>, Void> {
     &self.nullable_action
   }
 }
@@ -125,9 +152,14 @@ pub enum NullableError {
   Ambiguity,
 }
 
-pub fn calculate_nullables<E: ElemTypes>(
-  g: &Grammar<E>,
-) -> Result<GrammarNullableInfo<E>, NullableError> {
+pub fn calculate_nullables<T, NT, AK, AV>(
+  g: &Grammar<T, NT, AK, AV>,
+) -> Result<GrammarNullableInfo<NT, AK>, NullableError>
+where
+  T: Ord,
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+{
   let inner_info = inner_calculate_nullables(g);
 
   // Sanity check outputs.
@@ -149,7 +181,7 @@ pub fn calculate_nullables<E: ElemTypes>(
 
   let mut remaining_nullables =
     inner_info.keys().cloned().collect::<BTreeSet<_>>();
-  let mut nullable_infos: BTreeMap<E::NonTerm, NonTermNullableInfo<E>> =
+  let mut nullable_infos: BTreeMap<NT, NonTermNullableInfo<NT, AK>> =
     BTreeMap::new();
   loop {
     'outer: for null_nt in &remaining_nullables {
@@ -193,10 +225,13 @@ pub fn calculate_nullables<E: ElemTypes>(
   })
 }
 
-fn is_prod_nullable<E: ElemTypes, V>(
-  nullables: &BTreeMap<E::NonTerm, V>,
-  prod: &Prod<E>,
-) -> bool {
+fn is_prod_nullable<T, NT, AK, AV, V>(
+  nullables: &BTreeMap<NT, V>,
+  prod: &Prod<T, NT, AK, AV>,
+) -> bool
+where
+  NT: Ord,
+{
   for elem in prod.elements() {
     match elem {
       Elem::Term(_) => return false,

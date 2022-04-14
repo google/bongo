@@ -14,10 +14,7 @@
 
 use std::sync::{Arc, RwLock};
 
-use crate::{
-  grammar::ElemTypes,
-  utils::{change_iter, WasChanged},
-};
+use crate::utils::{change_iter, WasChanged};
 use im::Vector;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -29,53 +26,33 @@ fn cmp_raw_refs<T>(a: &T, b: &T) -> std::cmp::Ordering {
   a_raw.cmp(&b_raw)
 }
 
-#[derive(Derivative)]
-#[derivative(
-  PartialEq(bound = "T: PartialEq"),
-  Eq(bound = "T: Eq"),
-  PartialOrd(bound = "T: PartialOrd"),
-  Ord(bound = "T: Ord")
-)]
-struct LeafData<E: ElemTypes, T> {
-  kind: E::Term,
-  value: Arc<T>,
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct LeafData<T, V> {
+  kind: T,
+  value: Arc<V>,
 }
 
-#[derive(Derivative)]
-#[derivative(
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = "")
-)]
-struct BranchData<E: ElemTypes> {
-  action: E::ActionKey,
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+struct BranchData<AK> {
+  action: AK,
   nodes: Vector<usize>,
 }
 
-#[derive(Derivative)]
-#[derivative(
-  PartialEq(bound = "T: PartialEq"),
-  Eq(bound = "T: Eq"),
-  PartialOrd(bound = "T: PartialOrd"),
-  Ord(bound = "T: Ord"),
-  PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum"
-)]
-enum NodeContentInner<E: ElemTypes, T> {
-  Leaf(LeafData<E, T>),
-  Branch(BranchData<E>),
+#[derive(PartialEq, Eq, PartialOrd, Ord)]
+enum NodeContentInner<T, AK, V> {
+  Leaf(LeafData<T, V>),
+  Branch(BranchData<AK>),
 }
 
-impl<E: ElemTypes, T> NodeContentInner<E, T> {
-  pub fn as_leaf(&self) -> Option<&LeafData<E, T>> {
+impl<T, AK, V> NodeContentInner<T, AK, V> {
+  pub fn as_leaf(&self) -> Option<&LeafData<T, V>> {
     match self {
       NodeContentInner::Leaf(leaf) => Some(leaf),
       NodeContentInner::Branch(_) => None,
     }
   }
 
-  pub fn as_branch(&self) -> Option<&BranchData<E>> {
+  pub fn as_branch(&self) -> Option<&BranchData<AK>> {
     match self {
       NodeContentInner::Leaf(_) => None,
       NodeContentInner::Branch(branch) => Some(branch),
@@ -83,19 +60,12 @@ impl<E: ElemTypes, T> NodeContentInner<E, T> {
   }
 }
 
-struct AltSet<E, T>
-where
-  E: ElemTypes,
-{
-  value_to_id: BTreeMap<Arc<NodeContentInner<E, T>>, usize>,
-  id_to_value: Vec<Arc<NodeContentInner<E, T>>>,
+struct AltSet<T, AK, V> {
+  value_to_id: BTreeMap<Arc<NodeContentInner<T, AK, V>>, usize>,
+  id_to_value: Vec<Arc<NodeContentInner<T, AK, V>>>,
 }
 
-impl<E, T> AltSet<E, T>
-where
-  E: ElemTypes,
-  T: Ord,
-{
+impl<T, AK, V> AltSet<T, AK, V> {
   pub fn new() -> Self {
     AltSet {
       value_to_id: BTreeMap::new(),
@@ -103,7 +73,24 @@ where
     }
   }
 
-  pub fn add(&mut self, content: NodeContentInner<E, T>) -> usize {
+  pub fn get(&self, index: usize) -> &NodeContentInner<T, AK, V> {
+    self.id_to_value.get(index).unwrap_or_else(|| {
+      panic!(
+        "Invalid index: {} where alts list size is {}",
+        index,
+        self.id_to_value.len()
+      )
+    })
+  }
+}
+
+impl<T, AK, V> AltSet<T, AK, V>
+where
+  T: Ord,
+  AK: Ord,
+  V: Ord,
+{
+  pub fn add(&mut self, content: NodeContentInner<T, AK, V>) -> usize {
     match self.value_to_id.get(&content) {
       Some(index) => *index,
       None => {
@@ -114,16 +101,6 @@ where
         index
       }
     }
-  }
-
-  pub fn get(&self, index: usize) -> &NodeContentInner<E, T> {
-    self.id_to_value.get(index).unwrap_or_else(|| {
-      panic!(
-        "Invalid index: {} where alts list size is {}",
-        index,
-        self.id_to_value.len()
-      )
-    })
   }
 }
 
@@ -136,46 +113,17 @@ struct ListData {
   nodes: Vector<usize>,
 }
 
-struct Inner<E: ElemTypes, T> {
+struct Inner<T, AK, V> {
   nodes: Vec<NodeData>,
-  alternatives: AltSet<E, T>,
+  alternatives: AltSet<T, AK, V>,
 }
 
-impl<E, T> Inner<E, T>
-where
-  E: ElemTypes,
-  T: Ord,
-{
+impl<T, AK, V> Inner<T, AK, V> {
   pub fn new() -> Self {
     Inner {
       nodes: Vec::new(),
       alternatives: AltSet::new(),
     }
-  }
-
-  pub fn make_node(&mut self) -> usize {
-    let index = self.nodes.len();
-    self.nodes.push(NodeData {
-      alternatives: BTreeSet::new(),
-    });
-    index
-  }
-
-  pub fn make_alt(&mut self, content: NodeContentInner<E, T>) -> usize {
-    self.alternatives.add(content)
-  }
-
-  pub fn add_node_alt(
-    &mut self,
-    node_index: usize,
-    alt_index: usize,
-  ) -> WasChanged {
-    let node_data = self.get_node_mut(node_index);
-    WasChanged::from_changed(node_data.alternatives.insert(alt_index))
-  }
-
-  pub fn is_same(&self, other: &Self) -> bool {
-    std::ptr::eq(self, other)
   }
 
   pub fn get_node(&self, index: usize) -> &NodeData {
@@ -198,8 +146,40 @@ where
     })
   }
 
-  pub fn get_alt(&self, index: usize) -> &NodeContentInner<E, T> {
+  pub fn get_alt(&self, index: usize) -> &NodeContentInner<T, AK, V> {
     self.alternatives.get(index)
+  }
+}
+
+impl<T, AK, V> Inner<T, AK, V>
+where
+  T: Ord,
+  AK: Ord,
+  V: Ord,
+{
+  pub fn make_node(&mut self) -> usize {
+    let index = self.nodes.len();
+    self.nodes.push(NodeData {
+      alternatives: BTreeSet::new(),
+    });
+    index
+  }
+
+  pub fn make_alt(&mut self, content: NodeContentInner<T, AK, V>) -> usize {
+    self.alternatives.add(content)
+  }
+
+  pub fn add_node_alt(
+    &mut self,
+    node_index: usize,
+    alt_index: usize,
+  ) -> WasChanged {
+    let node_data = self.get_node_mut(node_index);
+    WasChanged::from_changed(node_data.alternatives.insert(alt_index))
+  }
+
+  pub fn is_same(&self, other: &Self) -> bool {
+    std::ptr::eq(self, other)
   }
 }
 
@@ -207,13 +187,15 @@ where
 ///
 /// All elements of this tree are created under the lifetime of this tree
 /// owner.
-pub struct TreeOwner<E: ElemTypes, T> {
-  inner: RwLock<Inner<E, T>>,
+pub struct TreeOwner<T, AK, V> {
+  inner: RwLock<Inner<T, AK, V>>,
 }
 
-impl<E: ElemTypes, T> Default for TreeOwner<E, T>
+impl<T, AK, V> Default for TreeOwner<T, AK, V>
 where
   T: Ord,
+  AK: Ord,
+  V: Ord,
 {
   fn default() -> Self {
     TreeOwner {
@@ -222,9 +204,11 @@ where
   }
 }
 
-impl<E: ElemTypes, T> TreeOwner<E, T>
+impl<T, AK, V> TreeOwner<T, AK, V>
 where
   T: Ord,
+  AK: Ord,
+  V: Ord,
 {
   /// Creates a new, empty tree with no nodes.
   pub fn new() -> Self {
@@ -236,40 +220,60 @@ where
   /// Returns a TreeHandle for this owner.
   ///
   /// This can be used to create new nodes and alternatives.
-  pub fn handle(&self) -> TreeHandle<E, T> {
+  pub fn handle(&self) -> TreeHandle<T, AK, V> {
     TreeHandle(&self.inner)
   }
 }
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct TreeHandle<'a, E: ElemTypes, T>(&'a RwLock<Inner<E, T>>);
+pub struct TreeHandle<'a, T, AK, V>(&'a RwLock<Inner<T, AK, V>>);
 
-impl<E: ElemTypes, T> std::cmp::Ord for TreeHandle<'_, E, T> {
+impl<T, AK, V> std::cmp::Ord for TreeHandle<'_, T, AK, V> {
   fn cmp(&self, other: &Self) -> std::cmp::Ordering {
     cmp_raw_refs(self.0, other.0)
   }
 }
 
-impl<E: ElemTypes, T> std::cmp::PartialOrd for TreeHandle<'_, E, T> {
+impl<T, AK, V> std::cmp::PartialOrd for TreeHandle<'_, T, AK, V> {
   fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
     Some(self.cmp(other))
   }
 }
 
-impl<E: ElemTypes, T> std::cmp::PartialEq for TreeHandle<'_, E, T> {
+impl<T, AK, V> std::cmp::PartialEq for TreeHandle<'_, T, AK, V> {
   fn eq(&self, other: &Self) -> bool {
     matches!(self.cmp(other), std::cmp::Ordering::Equal)
   }
 }
 
-impl<E: ElemTypes, T> std::cmp::Eq for TreeHandle<'_, E, T> {}
+impl<T, AK, V> std::cmp::Eq for TreeHandle<'_, T, AK, V> {}
 
-impl<'a, E: ElemTypes, T> TreeHandle<'a, E, T>
+impl<'a, T, AK, V> TreeHandle<'a, T, AK, V> {
+  fn with<R, F>(&self, func: F) -> R
+  where
+    F: FnOnce(&Inner<T, AK, V>) -> R,
+  {
+    let guard = self.0.read().unwrap();
+    func(&guard)
+  }
+
+  fn with_mut<R, F>(&self, func: F) -> R
+  where
+    F: FnOnce(&mut Inner<T, AK, V>) -> R,
+  {
+    let mut guard = self.0.write().unwrap();
+    func(&mut guard)
+  }
+}
+
+impl<'a, T, AK, V> TreeHandle<'a, T, AK, V>
 where
   T: Ord,
+  AK: Ord,
+  V: Ord,
 {
-  pub fn make_node(&self) -> Node<'a, E, T> {
+  pub fn make_node(&self) -> Node<'a, T, AK, V> {
     self.with_mut(|inner| {
       let index = inner.make_node();
       Node {
@@ -279,7 +283,7 @@ where
     })
   }
 
-  pub fn make_leaf_node(&self, kind: E::Term, value: T) -> Node<'a, E, T> {
+  pub fn make_leaf_node(&self, kind: T, value: V) -> Node<'a, T, AK, V> {
     let node = self.make_node();
     let leaf_alt = self.make_leaf_alt(kind, value);
     node.add_alt(&leaf_alt);
@@ -288,16 +292,19 @@ where
 
   pub fn make_branch_node(
     &self,
-    action: E::ActionKey,
-    nodes: impl IntoIterator<Item = Node<'a, E, T>>,
-  ) -> Node<'a, E, T> {
+    action: AK,
+    nodes: impl IntoIterator<Item = Node<'a, T, AK, V>>,
+  ) -> Node<'a, T, AK, V> {
     let node = self.make_node();
     let branch_alt = self.make_branch_alt(action, nodes);
     node.add_alt(&branch_alt);
     node
   }
 
-  fn make_alt(&self, content: NodeContentInner<E, T>) -> Alternative<'a, E, T> {
+  fn make_alt(
+    &self,
+    content: NodeContentInner<T, AK, V>,
+  ) -> Alternative<'a, T, AK, V> {
     self.with_mut(|inner| {
       let index = inner.make_alt(content);
 
@@ -308,11 +315,7 @@ where
     })
   }
 
-  pub fn make_leaf_alt(
-    &self,
-    kind: E::Term,
-    value: T,
-  ) -> Alternative<'a, E, T> {
+  pub fn make_leaf_alt(&self, kind: T, value: V) -> Alternative<'a, T, AK, V> {
     self.make_alt(NodeContentInner::Leaf(LeafData {
       kind,
       value: Arc::new(value),
@@ -321,9 +324,9 @@ where
 
   pub fn make_branch_alt(
     &self,
-    action: E::ActionKey,
-    nodes: impl IntoIterator<Item = Node<'a, E, T>>,
-  ) -> Alternative<E, T> {
+    action: AK,
+    nodes: impl IntoIterator<Item = Node<'a, T, AK, V>>,
+  ) -> Alternative<T, AK, V> {
     let node_indexes = self.with(|inner| {
       nodes
         .into_iter()
@@ -346,22 +349,6 @@ where
       other.with(|other_inner| self_inner.is_same(other_inner))
     })
   }
-
-  fn with<R, F>(&self, func: F) -> R
-  where
-    F: FnOnce(&Inner<E, T>) -> R,
-  {
-    let guard = self.0.read().unwrap();
-    func(&guard)
-  }
-
-  fn with_mut<R, F>(&self, func: F) -> R
-  where
-    F: FnOnce(&mut Inner<E, T>) -> R,
-  {
-    let mut guard = self.0.write().unwrap();
-    func(&mut guard)
-  }
 }
 
 #[derive(Derivative)]
@@ -372,20 +359,24 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Node<'a, E: ElemTypes, T> {
+pub struct Node<'a, T, AK, V> {
   index: usize,
-  inner: TreeHandle<'a, E, T>,
+  inner: TreeHandle<'a, T, AK, V>,
 }
 
-impl<'a, E: ElemTypes, T> Node<'a, E, T>
-where
-  T: Ord,
-{
-  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+impl<'a, T, AK, V> Node<'a, T, AK, V> {
+  pub fn handle(&self) -> TreeHandle<'a, T, AK, V> {
     self.inner.clone()
   }
+}
 
-  pub fn add_alt(&self, alt: &Alternative<'a, E, T>) -> WasChanged {
+impl<'a, T, AK, V> Node<'a, T, AK, V>
+where
+  T: Ord,
+  AK: Ord,
+  V: Ord,
+{
+  pub fn add_alt(&self, alt: &Alternative<'a, T, AK, V>) -> WasChanged {
     assert!(self.inner.is_same(&alt.inner));
 
     self
@@ -393,7 +384,7 @@ where
       .with_mut(|inner| inner.add_node_alt(self.index, alt.index))
   }
 
-  pub fn alts(&self) -> impl Iterator<Item = Alternative<'a, E, T>> {
+  pub fn alts(&self) -> impl Iterator<Item = Alternative<'a, T, AK, V>> {
     let alt_indexes = self
       .inner
       .with(|inner| inner.get_node(self.index).alternatives.clone());
@@ -408,7 +399,7 @@ where
   }
 
   /// Adds all alternatives from node other into this node. Does not modify the other node.
-  pub fn add_all(&self, other: &Node<'a, E, T>) -> WasChanged {
+  pub fn add_all(&self, other: &Node<'a, T, AK, V>) -> WasChanged {
     assert!(self.inner.is_same(&other.inner));
 
     self.inner.with_mut(|inner| {
@@ -420,9 +411,11 @@ where
   }
 }
 
-impl<'a, E: ElemTypes, T> Node<'a, E, T>
+impl<'a, T, AK, V> Node<'a, T, AK, V>
 where
   T: Ord + std::fmt::Debug,
+  AK: Ord + std::fmt::Debug,
+  V: Ord + std::fmt::Debug,
 {
   pub fn to_dot(&self) -> String {
     let mut vec_cursor = std::io::Cursor::new(Vec::new());
@@ -439,20 +432,22 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Alternative<'a, E: ElemTypes, T> {
+pub struct Alternative<'a, T, AK, V> {
   index: usize,
-  inner: TreeHandle<'a, E, T>,
+  inner: TreeHandle<'a, T, AK, V>,
 }
 
-impl<'a, E: ElemTypes, T> Alternative<'a, E, T>
+impl<'a, T, AK, V> Alternative<'a, T, AK, V>
 where
   T: Ord,
+  AK: Ord,
+  V: Ord,
 {
-  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+  pub fn handle(&self) -> TreeHandle<'a, T, AK, V> {
     self.inner.clone()
   }
 
-  pub fn content(&self) -> NodeContent<'a, E, T> {
+  pub fn content(&self) -> NodeContent<'a, T, AK, V> {
     self.inner.with(|inner| match inner.get_alt(self.index) {
       NodeContentInner::Leaf(_) => NodeContent::Leaf(Leaf {
         index: self.index,
@@ -474,22 +469,24 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Leaf<'a, E: ElemTypes, T> {
+pub struct Leaf<'a, T, AK, V> {
   index: usize,
-  inner: TreeHandle<'a, E, T>,
+  inner: TreeHandle<'a, T, AK, V>,
 }
 
-impl<'a, E: ElemTypes, T> Leaf<'a, E, T>
+impl<'a, T, AK, V> Leaf<'a, T, AK, V>
 where
-  T: Ord,
+  T: Ord + Clone,
+  AK: Ord,
+  V: Ord,
 {
-  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+  pub fn handle(&self) -> TreeHandle<'a, T, AK, V> {
     self.inner.clone()
   }
 
   fn with_leaf<F, R>(&self, func: F) -> R
   where
-    F: FnOnce(&LeafData<E, T>) -> R,
+    F: FnOnce(&LeafData<T, V>) -> R,
   {
     self.inner.with(|inner| {
       func(
@@ -501,11 +498,11 @@ where
     })
   }
 
-  pub fn kind(&self) -> E::Term {
+  pub fn kind(&self) -> T {
     self.with_leaf(|leaf| leaf.kind.clone())
   }
 
-  pub fn value(&self) -> Arc<T> {
+  pub fn value(&self) -> Arc<V> {
     self.with_leaf(|leaf| leaf.value.clone())
   }
 }
@@ -518,22 +515,24 @@ where
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Branch<'a, E: ElemTypes, T> {
+pub struct Branch<'a, T, AK, V> {
   index: usize,
-  inner: TreeHandle<'a, E, T>,
+  inner: TreeHandle<'a, T, AK, V>,
 }
 
-impl<'a, E: ElemTypes, T> Branch<'a, E, T>
+impl<'a, T, AK, V> Branch<'a, T, AK, V>
 where
   T: Ord,
+  AK: Ord + Clone,
+  V: Ord,
 {
-  pub fn handle(&self) -> TreeHandle<'a, E, T> {
+  pub fn handle(&self) -> TreeHandle<'a, T, AK, V> {
     self.inner.clone()
   }
 
   fn with_branch<F, R>(&self, func: F) -> R
   where
-    F: FnOnce(&BranchData<E>) -> R,
+    F: FnOnce(&BranchData<AK>) -> R,
   {
     self.inner.with(|inner| {
       func(
@@ -545,11 +544,11 @@ where
     })
   }
 
-  pub fn action(&self) -> E::ActionKey {
+  pub fn action(&self) -> AK {
     self.with_branch(|branch| branch.action.clone())
   }
 
-  pub fn nodes(&self) -> impl Iterator<Item = Node<'a, E, T>> {
+  pub fn nodes(&self) -> impl Iterator<Item = Node<'a, T, AK, V>> {
     let node_indexes = self.with_branch(|branch| branch.nodes.clone());
 
     node_indexes.into_iter().map({
@@ -572,9 +571,9 @@ where
   PartialOrd = "feature_allow_slow_enum",
   Ord = "feature_allow_slow_enum"
 )]
-pub enum NodeContent<'a, E: ElemTypes, T> {
-  Leaf(Leaf<'a, E, T>),
-  Branch(Branch<'a, E, T>),
+pub enum NodeContent<'a, T, AK, V> {
+  Leaf(Leaf<'a, T, AK, V>),
+  Branch(Branch<'a, T, AK, V>),
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
@@ -583,9 +582,13 @@ enum DotNode {
   Alt(usize),
 }
 
-fn collect_nodes_and_alts<E: ElemTypes, T: Ord>(
-  node: &Node<E, T>,
-) -> (Vec<usize>, Vec<usize>) {
+fn collect_nodes_and_alts<T, AK, V: Ord>(
+  node: &Node<T, AK, V>,
+) -> (Vec<usize>, Vec<usize>)
+where
+  T: Ord,
+  AK: Ord,
+{
   let handle = node.handle();
 
   let mut seen = BTreeSet::new();
@@ -634,21 +637,20 @@ fn collect_nodes_and_alts<E: ElemTypes, T: Ord>(
   (nodes, alts)
 }
 
-struct DotPrinter<'a, E, T>
-where
-  E: ElemTypes,
-{
-  handle: TreeHandle<'a, E, T>,
+struct DotPrinter<'a, T, AK, V> {
+  handle: TreeHandle<'a, T, AK, V>,
   nodes: Vec<usize>,
   alts: Vec<usize>,
   root_node: usize,
 }
 
-impl<'a, E: ElemTypes, T> DotPrinter<'a, E, T>
+impl<'a, T, AK, V> DotPrinter<'a, T, AK, V>
 where
   T: Ord,
+  AK: Ord,
+  V: Ord,
 {
-  pub fn new(node: &Node<'a, E, T>) -> Self {
+  pub fn new(node: &Node<'a, T, AK, V>) -> Self {
     let handle = node.handle().clone();
     let (nodes, alts) = collect_nodes_and_alts(node);
     DotPrinter {
@@ -662,11 +664,12 @@ where
 
 type DotEdge = (DotNode, DotNode);
 
-impl<'a, 'b: 'a, E, T> dot::GraphWalk<'a, DotNode, DotEdge>
-  for DotPrinter<'b, E, T>
+impl<'a, 'b: 'a, T, AK, V> dot::GraphWalk<'a, DotNode, DotEdge>
+  for DotPrinter<'b, T, AK, V>
 where
-  E: ElemTypes,
   T: Ord,
+  AK: Ord,
+  V: Ord,
 {
   fn nodes(&'a self) -> dot::Nodes<'a, DotNode> {
     self
@@ -717,11 +720,12 @@ where
   }
 }
 
-impl<'a, 'b: 'a, E, T> dot::Labeller<'a, DotNode, DotEdge>
-  for DotPrinter<'b, E, T>
+impl<'a, 'b: 'a, T, AK, V> dot::Labeller<'a, DotNode, DotEdge>
+  for DotPrinter<'b, T, AK, V>
 where
-  E: ElemTypes,
-  T: Ord + std::fmt::Debug,
+  T: std::fmt::Debug,
+  AK: std::fmt::Debug,
+  V: std::fmt::Debug,
 {
   fn graph_id(&'a self) -> dot::Id<'a> {
     dot::Id::new("G").unwrap()

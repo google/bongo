@@ -3,7 +3,7 @@ use std::collections::{btree_map, BTreeMap, BTreeSet};
 use crate::{
   grammar::{
     passes::{firsts::Firsts, PassContext},
-    Elem, ElemTypes,
+    Elem,
   },
   state::ProdState,
   utils::{change_iter, change_loop, CollectMap},
@@ -31,23 +31,59 @@ where
   result.into_iter()
 }
 
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
-struct ParseState<'a, E>
-where
-  E: ElemTypes,
-{
-  prods: BTreeMap<ProdState<'a, E>, BTreeSet<E::Term>>,
+#[derive(Clone)]
+struct ParseState<'a, T, NT, AK, AV> {
+  prods: BTreeMap<ProdState<'a, T, NT, AK, AV>, BTreeSet<T>>,
 }
 
-impl<'a, E> ParseState<'a, E>
+impl<'a, T, NT, AK, AV> Ord for ParseState<'a, T, NT, AK, AV>
 where
-  E: ElemTypes,
+  T: Ord,
+  NT: Ord,
+{
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self.prods.cmp(&other.prods)
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialEq for ParseState<'a, T, NT, AK, AV>
+where
+  T: Ord,
+  NT: Ord,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.prods == other.prods
+  }
+}
+
+impl<'a, T, NT, AK, AV> Eq for ParseState<'a, T, NT, AK, AV>
+where
+  T: Ord,
+  NT: Ord,
+{
+}
+
+impl<'a, T, NT, AK, AV> PartialOrd for ParseState<'a, T, NT, AK, AV>
+where
+  T: Ord,
+  NT: Ord,
+{
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<'a, T, NT, AK, AV> ParseState<'a, T, NT, AK, AV>
+where
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  AK: Ord + Clone + 'static,
 {
   pub fn from_prod_lookahead(
-    passes: &PassContext<'a, E>,
-    items: impl IntoIterator<Item = (ProdState<'a, E>, BTreeSet<E::Term>)>,
+    passes: &PassContext<'a, T, NT, AK, AV>,
+    items: impl IntoIterator<Item = (ProdState<'a, T, NT, AK, AV>, BTreeSet<T>)>,
   ) -> anyhow::Result<Self> {
-    let firsts = passes.get_pass::<Firsts<E>>()?;
+    let firsts = passes.get_pass::<Firsts<T, NT>>()?;
     let mut prods = CollectMap::from_seed(items.into_iter().collect());
 
     change_loop(|| {
@@ -83,8 +119,8 @@ where
 
   pub fn shift_actions(
     &self,
-    passes: &PassContext<'a, E>,
-  ) -> anyhow::Result<BTreeMap<E::Term, ParseState<'a, E>>> {
+    passes: &PassContext<'a, T, NT, AK, AV>,
+  ) -> anyhow::Result<BTreeMap<T, ParseState<'a, T, NT, AK, AV>>> {
     let iter = self
       .prods
       .iter()
@@ -100,7 +136,7 @@ where
       .collect::<Result<_, _>>()
   }
 
-  pub fn reducable_actions(&self) -> impl Iterator<Item = &E::ActionKey> {
+  pub fn reducable_actions(&self) -> impl Iterator<Item = &AK> {
     self.prods.keys().filter_map(|prod| {
       if prod.is_complete() {
         Some(prod.action_key())

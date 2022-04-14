@@ -14,8 +14,6 @@
 
 use std::sync::Arc;
 
-use crate::grammar::ElemTypes;
-
 pub mod earley;
 pub mod lalr;
 pub mod tree;
@@ -75,9 +73,9 @@ where
   }
 }
 
-pub trait Parser<E: ElemTypes, T> {
-  fn parse<S: TokenStream<E::Term, T>>(
+pub trait Parser<T, AK, V> {
+  fn parse<S: TokenStream<T, V>>(
     &self,
     stream: S,
-  ) -> anyhow::Result<tree::Node<E, T>>;
+  ) -> anyhow::Result<tree::Node<T, AK, V>>;
 }

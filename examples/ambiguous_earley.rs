@@ -1,5 +1,5 @@
 use bongo::grammar::{
-  build, BaseElementTypes, Elem, Grammar, NonTerminal, ProdElement,
+  build, Elem, Grammar, NonTerminal, ProdElement, Terminal,
 };
 use bongo::parsers::earley::parse;
 use bongo::parsers::tree::TreeOwner;
@@ -8,7 +8,7 @@ use bongo::utils::Name;
 
 fn main() {
   let a_nt = NonTerminal::new("A");
-  let g: Grammar<BaseElementTypes> = build(&a_nt, |b| {
+  let g: Grammar<Terminal, NonTerminal, Name, ()> = build(&a_nt, |b| {
     b.add_rule(&a_nt, |br| {
       br.add_prod_with_elems(&Name::new("a_empty"), (), vec![])
         .add_prod_with_elems(
@@ -27,7 +27,7 @@ fn main() {
 
   eprintln!("Grammar: {}", g.to_pretty());
 
-  let tree: TreeOwner<_, ()> = TreeOwner::new();
+  let tree: TreeOwner<_, _, ()> = TreeOwner::new();
 
   let node = parse(&g, &tree.handle(), vec![]).unwrap();
 

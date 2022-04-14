@@ -1,10 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::utils::{change_iter, change_loop, WasChanged};
-use crate::{
-  grammar::{Elem, ElemTypes},
-  utils::CollectMap,
-};
+use crate::{grammar::Elem, utils::CollectMap};
 
 use super::nullable::{self, Nullable};
 use super::Pass;
@@ -15,29 +12,31 @@ pub enum FirstsError {
   NullableError(#[from] nullable::NullableError),
 }
 
-pub struct Firsts<E: ElemTypes>(BTreeMap<E::NonTerm, BTreeSet<E::Term>>);
+pub struct Firsts<T, NT>(BTreeMap<NT, BTreeSet<T>>);
 
-impl<E> Firsts<E>
+impl<T, NT> Firsts<T, NT>
 where
-  E: ElemTypes,
+  NT: Ord,
 {
-  pub fn get(&self, nt: &E::NonTerm) -> Option<&BTreeSet<E::Term>> {
+  pub fn get(&self, nt: &NT) -> Option<&BTreeSet<T>> {
     self.0.get(nt)
   }
 }
 
-impl<E> Pass<E> for Firsts<E>
+impl<T, NT, AK, AV> Pass<T, NT, AK, AV> for Firsts<T, NT>
 where
-  E: ElemTypes,
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  AK: Ord + Clone + 'static,
 {
   type Error = FirstsError;
 
   fn run_pass(
-    pass_context: &super::PassContext<E>,
+    pass_context: &super::PassContext<T, NT, AK, AV>,
   ) -> Result<Self, FirstsError> {
     let gram = pass_context.grammar();
 
-    let nullables = pass_context.get_pass::<Nullable<E>>()?;
+    let nullables = pass_context.get_pass::<Nullable<NT, AK>>()?;
 
     let mut firsts = CollectMap::new();
 

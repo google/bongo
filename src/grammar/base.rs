@@ -21,29 +21,22 @@ use {
   std::collections::{BTreeMap, BTreeSet},
 };
 
+use std::fmt::Debug;
+
 pub use cmp_wrappers::{NoCompare, ParentRef, RefCompare};
-pub use element_types::{BaseElementTypes, ElemTypes, NonTerminal, Terminal};
+pub use element_types::{NonTerminal, Terminal};
 
 /// A single element (terminal or non-terminal).
-#[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  PartialOrd = "feature_allow_slow_enum",
-  Ord = "feature_allow_slow_enum"
-)]
-pub enum Elem<E: ElemTypes> {
-  Term(E::Term),
-  NonTerm(E::NonTerm),
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub enum Elem<T, NT> {
+  Term(T),
+  NonTerm(NT),
 }
 
-impl<E: ElemTypes> Elem<E> {
+impl<T, NT> Elem<T, NT> {
   /// If this element is a terminal, returns a `Some` value containing a
   /// terminal datum. Returns `None` otherwise.
-  pub fn as_term(&self) -> Option<&E::Term> {
+  pub fn as_term(&self) -> Option<&T> {
     match self {
       Elem::NonTerm(_) => None,
       Elem::Term(t) => Some(t),
@@ -51,26 +44,19 @@ impl<E: ElemTypes> Elem<E> {
   }
 
   /// Gets an element as a nonterm. Returns a `None` value otherwise.
-  pub fn as_nonterm(&self) -> Option<&E::NonTerm> {
+  pub fn as_nonterm(&self) -> Option<&NT> {
     match self {
       Elem::NonTerm(nt) => Some(nt),
       Elem::Term(_) => None,
     }
   }
+}
 
-  /// Clone this element into an element of another ElementTypes instance.
-  /// The `E::Term` and `E::NonTerm` datum types must be the same as those in
-  /// `E2`.
-  pub fn clone_as_other<E2>(&self) -> Elem<E2>
-  where
-    E2: ElemTypes<Term = E::Term, NonTerm = E::NonTerm>,
-  {
-    match self {
-      Elem::Term(t) => Elem::Term(t.clone()),
-      Elem::NonTerm(nt) => Elem::NonTerm(nt.clone()),
-    }
-  }
-
+impl<T, NT> ToDoc for Elem<T, NT>
+where
+  T: ToDoc,
+  NT: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -87,7 +73,11 @@ impl<E: ElemTypes> Elem<E> {
   }
 }
 
-impl<E: ElemTypes> std::fmt::Debug for Elem<E> {
+impl<T, NT> std::fmt::Debug for Elem<T, NT>
+where
+  T: Debug,
+  NT: Debug,
+{
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
     match self {
       Elem::Term(term) => fmt.write_str(&format!("{:?}", term)),
@@ -97,22 +87,15 @@ impl<E: ElemTypes> std::fmt::Debug for Elem<E> {
 }
 
 /// An element within a production. Includes an optional identifier.
-#[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = "")
-)]
-pub struct ProdElement<E: ElemTypes> {
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct ProdElement<T, NT> {
   identifier: Option<Name>,
-  element: Elem<E>,
+  element: Elem<T, NT>,
 }
 
-impl<E: ElemTypes> ProdElement<E> {
+impl<T, NT> ProdElement<T, NT> {
   /// Returns a ProductionElement that is annotated with "name".
-  pub fn new_with_name(name: Name, e: Elem<E>) -> Self {
+  pub fn new_with_name(name: Name, e: Elem<T, NT>) -> Self {
     ProdElement {
       identifier: Some(name),
       element: e,
@@ -120,7 +103,7 @@ impl<E: ElemTypes> ProdElement<E> {
   }
 
   /// Returns a ProductionElement that takes an optional identifier.
-  pub fn new(name: Option<Name>, e: Elem<E>) -> Self {
+  pub fn new(name: Option<Name>, e: Elem<T, NT>) -> Self {
     ProdElement {
       identifier: name,
       element: e,
@@ -128,7 +111,7 @@ impl<E: ElemTypes> ProdElement<E> {
   }
 
   /// Returns an unannotated ProductionElement
-  pub fn new_empty(e: Elem<E>) -> Self {
+  pub fn new_empty(e: Elem<T, NT>) -> Self {
     ProdElement {
       identifier: None,
       element: e,
@@ -141,23 +124,16 @@ impl<E: ElemTypes> ProdElement<E> {
   }
 
   // Returns the element.
-  pub fn elem(&self) -> &Elem<E> {
+  pub fn elem(&self) -> &Elem<T, NT> {
     &self.element
   }
+}
 
-  /// Clone this element into an element of another ElementTypes instance.
-  /// The `E::Term` and `E::NonTerm` datum types must be the same as those in
-  /// `E2`.
-  pub fn clone_as_other<E2>(&self) -> ProdElement<E2>
-  where
-    E2: ElemTypes<Term = E::Term, NonTerm = E::NonTerm>,
-  {
-    ProdElement {
-      identifier: self.identifier.clone(),
-      element: self.element.clone_as_other(),
-    }
-  }
-
+impl<T, NT> ToDoc for ProdElement<T, NT>
+where
+  T: ToDoc,
+  NT: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -175,7 +151,11 @@ impl<E: ElemTypes> ProdElement<E> {
   }
 }
 
-impl<E: ElemTypes> std::fmt::Debug for ProdElement<E> {
+impl<T, NT> std::fmt::Debug for ProdElement<T, NT>
+where
+  T: Debug,
+  NT: Debug,
+{
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
     if let Some(name) = &self.identifier {
       fmt.write_str(&format!("{}:", name))?;
@@ -184,8 +164,8 @@ impl<E: ElemTypes> std::fmt::Debug for ProdElement<E> {
   }
 }
 
-impl<E: ElemTypes> From<Elem<E>> for ProdElement<E> {
-  fn from(e: Elem<E>) -> ProdElement<E> {
+impl<T, NT> From<Elem<T, NT>> for ProdElement<T, NT> {
+  fn from(e: Elem<T, NT>) -> ProdElement<T, NT> {
     ProdElement {
       identifier: None,
       element: e,
@@ -193,44 +173,47 @@ impl<E: ElemTypes> From<Elem<E>> for ProdElement<E> {
   }
 }
 
-#[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
-)]
-struct ProdInner<E: ElemTypes> {
-  action_key: E::ActionKey,
-  elements: Vec<ProdElement<E>>,
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+struct ProdInner<T, NT, AK, AV> {
+  action_key: AK,
+  action_value: AV,
+  elements: Vec<ProdElement<T, NT>>,
 }
 
-impl<E: ElemTypes> ProdInner<E> {
-  fn new(action_key: E::ActionKey, elements: Vec<ProdElement<E>>) -> Self {
+impl<T, NT, AK, AV> ProdInner<T, NT, AK, AV> {
+  fn new(
+    action_key: AK,
+    action_value: AV,
+    elements: Vec<ProdElement<T, NT>>,
+  ) -> Self {
     ProdInner {
       action_key,
+      action_value,
       elements,
     }
   }
 
-  pub fn prod_elements(&self) -> &Vec<ProdElement<E>> {
+  pub fn prod_elements(&self) -> &Vec<ProdElement<T, NT>> {
     &self.elements
   }
 
-  pub fn elements_iter(&self) -> impl Iterator<Item = &Elem<E>> + Clone {
+  pub fn elements_iter(&self) -> impl Iterator<Item = &Elem<T, NT>> + Clone {
     self.elements.iter().map(|prod_elem| &prod_elem.element)
   }
 
-  pub fn element_at(&self, index: usize) -> Option<&Elem<E>> {
+  pub fn element_at(&self, index: usize) -> Option<&Elem<T, NT>> {
     self.elements.get(index).map(|prod_elem| &prod_elem.element)
   }
 
-  pub fn action_key(&self) -> &E::ActionKey {
+  pub fn action_key(&self) -> &AK {
     &self.action_key
   }
-
+}
+impl<T, NT, AK, AV> ToDoc for ProdInner<T, NT, AK, AV>
+where
+  T: ToDoc,
+  NT: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -252,53 +235,50 @@ impl<E: ElemTypes> ProdInner<E> {
 /// lifetime key value that allows us to track which production is used. It's
 /// possible we may be able to transform that later, but for now this is simple
 /// enough.
-#[derive(Derivative)]
-#[derivative(
-  Clone(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = ""),
-  Debug(bound = "")
-)]
-pub struct ProdKey<E: ElemTypes> {
-  head: E::NonTerm,
-  action_key: E::ActionKey,
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct ProdKey<NT, AK> {
+  head: NT,
+  action_key: AK,
 }
 
-impl<E: ElemTypes> ProdKey<E> {
+impl<NT, AK> ProdKey<NT, AK> {
   /// Gets the head of this prod key.
-  pub fn head(&self) -> &E::NonTerm {
+  pub fn head(&self) -> &NT {
     &self.head
   }
 
   /// Gets the action_key of this prod key.
-  pub fn action_key(&self) -> &E::ActionKey {
+  pub fn action_key(&self) -> &AK {
     &self.action_key
   }
 }
 
 /// A concrete raw rule value as stored inside a Grammar struct.
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-struct RuleInner<E: ElemTypes> {
-  head: E::NonTerm,
-  prods: Vec<ProdInner<E>>,
+#[derive(Clone, Debug)]
+struct RuleInner<T, NT, AK, AV> {
+  head: NT,
+  prods: Vec<ProdInner<T, NT, AK, AV>>,
 }
 
-impl<E: ElemTypes> RuleInner<E> {
-  pub fn new(head: E::NonTerm, prods: Vec<ProdInner<E>>) -> Self {
+impl<T, NT, AK, AV> RuleInner<T, NT, AK, AV> {
+  pub fn new(head: NT, prods: Vec<ProdInner<T, NT, AK, AV>>) -> Self {
     RuleInner { head, prods }
   }
 
-  pub fn head(&self) -> &E::NonTerm {
+  pub fn head(&self) -> &NT {
     &self.head
   }
 
-  pub fn prods(&self) -> &Vec<ProdInner<E>> {
+  pub fn prods(&self) -> &Vec<ProdInner<T, NT, AK, AV>> {
     &self.prods
   }
+}
 
+impl<T, NT, AK, AV> ToDoc for RuleInner<T, NT, AK, AV>
+where
+  T: ToDoc,
+  NT: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -333,57 +313,85 @@ impl<E: ElemTypes> RuleInner<E> {
 ///
 /// Grammars are read-only, and the accessors use the lifetime of the
 /// grammar object.
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct Grammar<E: ElemTypes> {
-  start_symbol: E::NonTerm,
-  rule_set: BTreeMap<E::NonTerm, RuleInner<E>>,
-  action_map: BTreeMap<E::ActionKey, E::ActionValue>,
+#[derive(Clone)]
+pub struct Grammar<T, NT, AK, AV> {
+  start_symbol: NT,
+  rule_set: BTreeMap<NT, RuleInner<T, NT, AK, AV>>,
 }
 
-impl<E: ElemTypes> std::fmt::Debug for Grammar<E> {
+impl<T, NT, AK, AV> std::fmt::Debug for Grammar<T, NT, AK, AV>
+where
+  T: Debug,
+  NT: Debug,
+{
   fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut dbg_struct = f.debug_struct("Grammar");
     dbg_struct.field("Terms", &self.get_terminals().collect::<Vec<_>>());
     dbg_struct.field("NonTerms", &self.get_nonterminals().collect::<Vec<_>>());
-    dbg_struct.field("Rules", &self.rules().collect::<Vec<_>>());
+    dbg_struct
+      .field("Rules", &self.rules().collect::<Vec<Rule<T, NT, AK, AV>>>());
     dbg_struct.finish()
   }
 }
 
-impl<E: ElemTypes> Grammar<E> {
-  fn new(
-    start: E::NonTerm,
-    rule_set: impl IntoIterator<Item = RuleInner<E>>,
-    action_map: BTreeMap<E::ActionKey, E::ActionValue>,
-  ) -> Result<Self, GrammarErrors<E>> {
-    let g = Grammar {
-      start_symbol: start,
-      rule_set: rule_set
-        .into_iter()
-        .map(|r| (r.head().clone(), r))
-        .collect(),
-      action_map,
-    };
-
-    g.check_grammar().map(|_| g)
-  }
-
+impl<T, NT, AK, AV> Grammar<T, NT, AK, AV> {
   /// Returns the start nonterminal for this grammar.
-  pub fn start_nt(&self) -> &E::NonTerm {
+  pub fn start_nt(&self) -> &NT {
     &self.start_symbol
   }
 
+  fn get_elements(&self) -> impl Iterator<Item = &Elem<T, NT>> {
+    self
+      .rule_set
+      .values()
+      .flat_map(|r| &r.prods)
+      .flat_map(|p| p.elements_iter())
+  }
+
+  fn get_terminals(&self) -> impl Iterator<Item = &T> {
+    self.get_elements().filter_map(|e| e.as_term())
+  }
+
+  fn get_nonterminals(&self) -> impl Iterator<Item = &NT> {
+    self.get_elements().filter_map(|e| e.as_nonterm())
+  }
+
   /// Returns an iterator over all of the rules for this grammar.
-  pub fn rules(&self) -> impl Iterator<Item = Rule<E>> {
+  pub fn rules(&self) -> impl Iterator<Item = Rule<T, NT, AK, AV>> {
     self.rule_set.iter().map(move |(_, rule)| Rule {
       grammar: ParentRef::new(self),
       rule: RefCompare::new(rule),
     })
   }
 
+  /// Gets an iterator over all productions in the grammar.
+  pub fn prods(&self) -> impl Iterator<Item = Prod<T, NT, AK, AV>> {
+    self.rules().flat_map(move |rule| rule.prods())
+  }
+}
+
+impl<T, NT, AK, AV> Grammar<T, NT, AK, AV>
+where
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+{
+  fn new(
+    start: NT,
+    rule_set: impl IntoIterator<Item = RuleInner<T, NT, AK, AV>>,
+  ) -> Result<Self, GrammarErrors<NT>> {
+    let g = Grammar {
+      start_symbol: start,
+      rule_set: rule_set
+        .into_iter()
+        .map(|r| (r.head().clone(), r))
+        .collect(),
+    };
+
+    g.check_grammar().map(|_| g)
+  }
+
   /// Returns a map over rules of the grammar, keyed by the rule's head nonterminal.
-  pub fn rule_set(&self) -> BTreeMap<&E::NonTerm, Rule<E>> {
+  pub fn rule_set(&self) -> BTreeMap<&NT, Rule<T, NT, AK, AV>> {
     self
       .rule_set
       .iter()
@@ -392,51 +400,28 @@ impl<E: ElemTypes> Grammar<E> {
   }
 
   /// Gets the rule that has the given nonterminal as a head.
-  pub fn try_get_rule<'a>(&'a self, nt: &E::NonTerm) -> Option<Rule<'a, E>> {
+  pub fn try_get_rule<'a>(
+    &'a self,
+    nt: &NT,
+  ) -> Option<Rule<'a, T, NT, AK, AV>> {
     self.rule_set.get(nt).map(|rule| Rule::new(self, rule))
   }
 
   /// Gets the rule that has the given nonterminal as a head.
-  pub fn get_rule<'a>(&'a self, nt: &E::NonTerm) -> Rule<'a, E> {
+  pub fn get_rule<'a>(&'a self, nt: &NT) -> Rule<'a, T, NT, AK, AV> {
     self
       .try_get_rule(nt)
       .expect("An NT rule exists in the grammar.")
   }
 
-  /// Gets an iterator over all productions in the grammar.
-  pub fn prods(&self) -> impl Iterator<Item = Prod<E>> {
-    self.rules().flat_map(move |rule| rule.prods())
-  }
-
-  pub fn to_pretty(&self) -> String {
-    let arena = pretty::Arena::new();
-    format!("{}", self.to_doc(&arena).into_doc().pretty(80))
-  }
-
-  fn get_elements(&self) -> impl Iterator<Item = &Elem<E>> {
-    self
-      .rule_set
-      .values()
-      .flat_map(|r| &r.prods)
-      .flat_map(|p| p.elements_iter())
-  }
-
-  fn get_terminals(&self) -> impl Iterator<Item = &E::Term> {
-    self.get_elements().filter_map(|e| e.as_term())
-  }
-
-  fn get_nonterminals(&self) -> impl Iterator<Item = &E::NonTerm> {
-    self.get_elements().filter_map(|e| e.as_nonterm())
-  }
-
-  fn nonterminals_without_rules(&self) -> BTreeSet<&E::NonTerm> {
+  fn nonterminals_without_rules(&self) -> BTreeSet<&NT> {
     self
       .get_nonterminals()
       .filter(move |nt| !self.rule_set.contains_key(nt))
       .collect()
   }
 
-  fn rules_without_prods(&self) -> BTreeSet<&E::NonTerm> {
+  fn rules_without_prods(&self) -> BTreeSet<&NT> {
     let rules = self.rules();
     let prodless_rules = rules
       .into_iter()
@@ -445,7 +430,7 @@ impl<E: ElemTypes> Grammar<E> {
     head_iter.collect()
   }
 
-  fn reachable_nonterms(&self) -> BTreeSet<&E::NonTerm> {
+  fn reachable_nonterms(&self) -> BTreeSet<&NT> {
     breadth_first_search(std::iter::once(&self.start_symbol), |nt| {
       self
         .get_rule(nt)
@@ -456,7 +441,7 @@ impl<E: ElemTypes> Grammar<E> {
     })
   }
 
-  fn unreachable_nonterms(&self) -> BTreeSet<&E::NonTerm> {
+  fn unreachable_nonterms(&self) -> BTreeSet<&NT> {
     let reachable_nonterms = self.reachable_nonterms();
     self
       .get_nonterminals()
@@ -465,15 +450,25 @@ impl<E: ElemTypes> Grammar<E> {
   }
 }
 
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Debug(bound = ""))]
-pub struct GrammarErrors<E: ElemTypes> {
-  unreachable_nonterms: BTreeSet<E::NonTerm>,
-  nonterms_without_rules: BTreeSet<E::NonTerm>,
-  rules_without_prods: BTreeSet<E::NonTerm>,
+impl<T, NT, AK, AV> Grammar<T, NT, AK, AV>
+where
+  T: ToDoc,
+  NT: ToDoc,
+{
+  pub fn to_pretty(&self) -> String {
+    let arena = pretty::Arena::new();
+    format!("{}", self.to_doc(&arena).into_doc().pretty(80))
+  }
 }
 
-impl<E: ElemTypes> GrammarErrors<E> {
+#[derive(Clone, Debug)]
+pub struct GrammarErrors<NT> {
+  unreachable_nonterms: BTreeSet<NT>,
+  nonterms_without_rules: BTreeSet<NT>,
+  rules_without_prods: BTreeSet<NT>,
+}
+
+impl<NT> GrammarErrors<NT> {
   fn into_result(self) -> Result<(), Self> {
     if self.unreachable_nonterms.is_empty()
       && self.nonterms_without_rules.is_empty()
@@ -486,8 +481,12 @@ impl<E: ElemTypes> GrammarErrors<E> {
   }
 }
 
-impl<E: ElemTypes> Grammar<E> {
-  fn check_grammar(&self) -> Result<(), GrammarErrors<E>> {
+impl<T, NT, AK, AV> Grammar<T, NT, AK, AV>
+where
+  NT: Ord + Clone,
+  AK: Ord + Clone,
+{
+  fn check_grammar(&self) -> Result<(), GrammarErrors<NT>> {
     GrammarErrors {
       unreachable_nonterms: self
         .unreachable_nonterms()
@@ -509,7 +508,11 @@ impl<E: ElemTypes> Grammar<E> {
   }
 }
 
-impl<E: ElemTypes> ToDoc for Grammar<E> {
+impl<T, NT, AK, AV> ToDoc for Grammar<T, NT, AK, AV>
+where
+  T: ToDoc,
+  NT: ToDoc,
+{
   fn to_doc<'a, DA: pretty::DocAllocator<'a>>(
     &self,
     da: &'a DA,
@@ -560,42 +563,49 @@ impl<E: ElemTypes> ToDoc for Grammar<E> {
   PartialOrd(bound = ""),
   Ord(bound = "")
 )]
-pub struct Rule<'a, E: ElemTypes> {
-  grammar: ParentRef<'a, Grammar<E>>,
-  rule: RefCompare<'a, RuleInner<E>>,
+pub struct Rule<'a, T, NT, AK, AV> {
+  grammar: ParentRef<'a, Grammar<T, NT, AK, AV>>,
+  rule: RefCompare<'a, RuleInner<T, NT, AK, AV>>,
 }
 
-impl<'a, E: ElemTypes> Rule<'a, E> {
-  fn new(grammar: &'a Grammar<E>, rule: &'a RuleInner<E>) -> Self {
+impl<'a, T, NT, AK, AV> Rule<'a, T, NT, AK, AV> {
+  /// Returns the head nonterminal.
+  pub fn head(&self) -> &'a NT {
+    &self.rule.head
+  }
+
+  /// Returns an iterator over the productions of this rule.
+  pub fn prods(&self) -> impl Iterator<Item = Prod<'a, T, NT, AK, AV>> {
+    let prods = &self.rule.prods;
+    prods.iter().map({
+      let grammar = *self.grammar;
+      let head = &self.rule.head;
+      move |prod| Prod::new(grammar, head, prod)
+    })
+  }
+}
+
+impl<'a, T, NT, AK, AV> Rule<'a, T, NT, AK, AV>
+where
+  NT: Clone,
+  AK: Ord + Clone,
+{
+  fn new(
+    grammar: &'a Grammar<T, NT, AK, AV>,
+    rule: &'a RuleInner<T, NT, AK, AV>,
+  ) -> Self {
     Rule {
       grammar: ParentRef::new(grammar),
       rule: RefCompare::new(rule),
     }
   }
-  /// Returns the head nonterminal.
-  pub fn head(&self) -> &'a E::NonTerm {
-    &self.rule.head
-  }
-
-  /// Returns an iterator over the productions of this rule.
-  pub fn prods(&self) -> impl Iterator<Item = Prod<'a, E>> {
-    let prods = &self.rule.prods;
-    prods.iter().map({
-      let grammar = *self.grammar;
-      let head = &self.rule.head;
-      move |prod| {
-        Prod::new(
-          grammar,
-          head,
-          prod,
-          grammar.action_map.get(&prod.action_key).unwrap(),
-        )
-      }
-    })
-  }
 }
 
-impl<'a, E: ElemTypes> std::fmt::Debug for Rule<'a, E> {
+impl<'a, T, NT, AK, AV> std::fmt::Debug for Rule<'a, T, NT, AK, AV>
+where
+  T: Debug,
+  NT: Debug,
+{
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut dbg_struct = fmt.debug_struct("Rule");
     dbg_struct.field("head", self.head());
@@ -612,78 +622,106 @@ impl<'a, E: ElemTypes> std::fmt::Debug for Rule<'a, E> {
 /// A sequence of ProductionElements, indicating the body of the production,
 /// and an action key which gives this production (along with the head) a unique
 /// value.
-#[derive(Derivative)]
-#[derivative(
-  Copy(bound = ""),
-  PartialEq(bound = ""),
-  Eq(bound = ""),
-  PartialOrd(bound = ""),
-  Ord(bound = "")
-)]
-pub struct Prod<'a, E: ElemTypes> {
-  grammar: ParentRef<'a, Grammar<E>>,
-  head: &'a E::NonTerm,
-  prod: RefCompare<'a, ProdInner<E>>,
-  action_value: NoCompare<&'a E::ActionValue>,
+pub struct Prod<'a, T, NT, AK, AV> {
+  grammar: ParentRef<'a, Grammar<T, NT, AK, AV>>,
+  head: &'a NT,
+  prod: RefCompare<'a, ProdInner<T, NT, AK, AV>>,
 }
 
-impl<'a, E: ElemTypes> Prod<'a, E> {
+impl<'a, T, NT, AK, AV> Ord for Prod<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    self.prod.cmp(&other.prod)
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialOrd for Prod<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+    Some(self.cmp(other))
+  }
+}
+
+impl<'a, T, NT, AK, AV> PartialEq for Prod<'a, T, NT, AK, AV>
+where
+  NT: Ord,
+{
+  fn eq(&self, other: &Self) -> bool {
+    self.prod == other.prod
+  }
+}
+
+impl<'a, T, NT, AK, AV> Eq for Prod<'a, T, NT, AK, AV> where NT: Ord {}
+
+impl<'a, T, NT, AK, AV> Copy for Prod<'a, T, NT, AK, AV> {}
+
+impl<'a, T, NT, AK, AV> Prod<'a, T, NT, AK, AV> {
   fn new(
-    grammar: &'a Grammar<E>,
-    head: &'a E::NonTerm,
-    prod: &'a ProdInner<E>,
-    action_value: &'a E::ActionValue,
+    grammar: &'a Grammar<T, NT, AK, AV>,
+    head: &'a NT,
+    prod: &'a ProdInner<T, NT, AK, AV>,
   ) -> Self {
     Prod {
       grammar: ParentRef::new(grammar),
       head,
       prod: RefCompare::new(prod),
-      action_value: NoCompare::new(action_value),
     }
   }
 
   /// Returns the head of this production.
-  pub fn head(&self) -> &'a E::NonTerm {
+  pub fn head(&self) -> &'a NT {
     self.head
   }
 
   /// Returns the elements of this production, including any identifiers of the production.
-  pub fn prod_elements(&self) -> &'a Vec<ProdElement<E>> {
+  pub fn prod_elements(&self) -> &'a Vec<ProdElement<T, NT>> {
     &self.prod.elements
   }
 
-  /// Returns the number of elements in this production.
-  pub fn num_elements(&self) -> usize {
-    self.prod_elements().len()
-  }
-
   /// Returns an iterator over the elements of this production, without any identifiers.
-  pub fn elements(&self) -> impl Iterator<Item = &'a Elem<E>> + Clone {
+  pub fn elements(&self) -> impl Iterator<Item = &'a Elem<T, NT>> + Clone {
     self.prod.elements_iter()
   }
+  /// Returns the number of elements in this production.
+  pub fn num_elements(&self) -> usize {
+    self.prod.elements.len()
+  }
 
+  /// Returns the action key of this production.
+  pub fn action_key(&self) -> &'a AK {
+    self.prod.action_key()
+  }
+}
+
+impl<'a, T, NT, AK, AV> Prod<'a, T, NT, AK, AV>
+where
+  NT: Clone,
+  AK: Clone,
+{
   /// Returns the prod element at a given index. Panics on out-of-bounds access.
-  pub fn prod_element_at(&self, index: usize) -> Option<&'a ProdElement<E>> {
+  pub fn prod_element_at(
+    &self,
+    index: usize,
+  ) -> Option<&'a ProdElement<T, NT>> {
     self.prod.elements.get(index)
   }
 
   /// Returns the element at a given index. Panics on out-of-bounds access.
-  pub fn element_at(&self, index: usize) -> Option<&'a Elem<E>> {
+  pub fn element_at(&self, index: usize) -> Option<&'a Elem<T, NT>> {
     self.prod.element_at(index)
   }
 
-  /// Returns the action key of this production.
-  pub fn action_key(&self) -> &'a E::ActionKey {
-    self.prod.action_key()
-  }
-
   /// Returns the action value of this production.
-  pub fn action_value(&self) -> &'a E::ActionValue {
-    *self.action_value
+  pub fn action_value(&self) -> &'a AV {
+    &self.prod.action_value
   }
 
   /// Returns the `ProdKey` of this production.
-  pub fn prod_key(&self) -> ProdKey<E> {
+  pub fn prod_key(&self) -> ProdKey<NT, AK> {
     ProdKey {
       head: self.head().clone(),
       action_key: self.action_key().clone(),
@@ -692,23 +730,26 @@ impl<'a, E: ElemTypes> Prod<'a, E> {
 
   /// Returns a `Some` containing the first element of this production, or None if
   /// the production is empty.
-  pub fn first_elem(&self) -> Option<&'a Elem<E>> {
+  pub fn first_elem(&self) -> Option<&'a Elem<T, NT>> {
     self.prod.elements.first().map(|pe| pe.elem())
   }
 }
 
-impl<'a, E: ElemTypes> Clone for Prod<'a, E> {
+impl<'a, T, NT, AK, AV> Clone for Prod<'a, T, NT, AK, AV> {
   fn clone(&self) -> Self {
     Prod {
       grammar: self.grammar,
       head: self.head,
       prod: self.prod,
-      action_value: self.action_value,
     }
   }
 }
 
-impl<'a, E: ElemTypes> std::fmt::Debug for Prod<'a, E> {
+impl<'a, T, NT, AK, AV> std::fmt::Debug for Prod<'a, T, NT, AK, AV>
+where
+  T: Debug,
+  NT: Debug,
+{
   fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
     let mut dbg_struct = fmt.debug_struct("Prod");
     dbg_struct.field("head", self.head());

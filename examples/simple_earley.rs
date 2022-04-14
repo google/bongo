@@ -1,5 +1,5 @@
 use bongo::grammar::{
-  build, BaseElementTypes, Elem, Grammar, NonTerminal, ProdElement, Terminal,
+  build, Elem, Grammar, NonTerminal, ProdElement, Terminal,
 };
 use bongo::parsers::earley::parse;
 use bongo::parsers::{tree::TreeOwner, Token};
@@ -11,7 +11,7 @@ fn main() {
   let lp_t = Terminal::new("LPAREN");
   let rp_t = Terminal::new("RPAREN");
   let v_t = Terminal::new("VALUE");
-  let g: Grammar<BaseElementTypes> = build(&a_nt, |b| {
+  let g: Grammar<Terminal, NonTerminal, Name, ()> = build(&a_nt, |b| {
     b.add_rule(&a_nt, |br| {
       br.add_prod_with_elems(
         &Name::new("value"),
@@ -41,7 +41,7 @@ fn main() {
 
   eprintln!("Grammar: {}", g.to_pretty());
 
-  let tree: TreeOwner<_, &'static str> = TreeOwner::new();
+  let tree: TreeOwner<_, _, &'static str> = TreeOwner::new();
 
   let node = parse(
     &g,
