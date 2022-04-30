@@ -227,8 +227,6 @@ where
 
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
 
-  type ProdId = ProdID;
-
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
   fn start_non_term(&self) -> &Self::NonTerm {
@@ -244,14 +242,20 @@ where
   }
 
   fn prods(&self) -> Vec<&Self::Prod> {
-      self.0.prods.iter().collect()
+    self.0.prods.iter().collect()
   }
 
-  fn get_prod(&self, prod_id: &Self::ProdId) -> Option<&Self::Prod> {
+  fn get_prod(
+    &self,
+    prod_id: &<Self::Prod as Prod>::ProdId,
+  ) -> Option<&Self::Prod> {
     self.0.prods.get(prod_id)
   }
 
-  fn get_non_term(&self, key: &<Self::NonTerm as NonTerm>::Key) -> Option<&Self::NonTerm> {
+  fn get_non_term(
+    &self,
+    key: &<Self::NonTerm as NonTerm>::Key,
+  ) -> Option<&Self::NonTerm> {
     self.0.non_terminals.get(key)
   }
 }
@@ -310,7 +314,6 @@ where
   ProdID: Ord,
 {
   type Key = NT;
-  type Term = T;
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
   fn key(&self) -> &Self::Key {

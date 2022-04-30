@@ -30,7 +30,9 @@ where
     let start_nt = start_nt.into();
     GrammarBuilder {
       terminals: BTreeSet::new(),
-      non_terminals: [(start_nt.clone(), BTreeSet::new())].into_iter().collect(),
+      non_terminals: [(start_nt.clone(), BTreeSet::new())]
+        .into_iter()
+        .collect(),
       prods: BTreeMap::new(),
       start_nt,
     }
@@ -65,7 +67,10 @@ where
           self.terminals.insert(t.clone());
         }
         Elem::NonTerm(nt) => {
-          self.non_terminals.entry(nt.clone()).or_insert_with(|| BTreeSet::new());
+          self
+            .non_terminals
+            .entry(nt.clone())
+            .or_insert_with(|| BTreeSet::new());
         }
       }
     }

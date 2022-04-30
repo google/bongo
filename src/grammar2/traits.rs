@@ -9,9 +9,8 @@ pub trait NamedElem {
 }
 
 pub trait NonTerm {
-  type Term;
   type Key;
-  type Prod: Prod<Term = Self::Term, NonTerm = Self>;
+  type Prod: Prod<NonTerm = Self>;
 
   /// Gets the key of the non-terminal.
   fn key(&self) -> &Self::Key;
@@ -24,7 +23,7 @@ pub trait Prod {
   type Term;
   type ProdId;
   type ActionValue;
-  type NonTerm: NonTerm<Term = Self::Term, Prod = Self>;
+  type NonTerm: NonTerm<Prod = Self>;
   type NamedElem: NamedElem<Term = Self::Term, NonTerm = Self::NonTerm>;
 
   fn head(&self) -> Self::NonTerm;
@@ -39,17 +38,10 @@ pub trait Grammar {
   type Term;
 
   /// A handle to a non terminal.
-  type NonTerm: NonTerm<Term = Self::Term, Prod = Self::Prod>;
-
-  /// An identifier of a production.
-  type ProdId;
+  type NonTerm: NonTerm<Prod = Self::Prod>;
 
   /// A handle to a production.
-  type Prod: Prod<
-    Term = Self::Term,
-    NonTerm = Self::NonTerm,
-    ProdId = Self::ProdId,
-  >;
+  type Prod: Prod<Term = Self::Term, NonTerm = Self::NonTerm>;
 
   /// Returns the start non-terminal of the grammar.
   fn start_non_term(&self) -> &Self::NonTerm;
@@ -61,7 +53,13 @@ pub trait Grammar {
   fn prods(&self) -> Vec<&Self::Prod>;
 
   /// Returns the prod with the given id.
-  fn get_prod(&self, prod_id: &Self::ProdId) -> Option<&Self::Prod>;
+  fn get_prod(
+    &self,
+    prod_id: &<Self::Prod as Prod>::ProdId,
+  ) -> Option<&Self::Prod>;
   /// Returns the non-term with the given key.
-  fn get_non_term(&self, key: &<Self::NonTerm as NonTerm>::Key) -> Option<&Self::NonTerm>;
+  fn get_non_term(
+    &self,
+    key: &<Self::NonTerm as NonTerm>::Key,
+  ) -> Option<&Self::NonTerm>;
 }
