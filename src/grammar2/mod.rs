@@ -8,6 +8,7 @@ pub use impls::builder::{ElementBuilder, GrammarBuilder};
 pub use impls::{GrammarHandle, NonTermHandle, ProdHandle};
 pub use traits::{Grammar, NamedElem, NonTerm, Prod};
 
+/// An element of a production. It is either a terminal or non-terminal.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Elem<T, NT> {
   Term(T),
