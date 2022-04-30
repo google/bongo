@@ -25,9 +25,9 @@ impl<T> KeyExtractor<T> for ProdKeyExtractor
 where
   T: Prod,
 {
-  type Key = T::ProdId;
+  type Key = T::Key;
 
   fn extract_key<'a>(&self, rule: &'a T) -> &'a Self::Key {
-    rule.action_id()
+    rule.key()
   }
 }

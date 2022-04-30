@@ -56,7 +56,7 @@ struct GrammarImpl<T, NT, ProdID, AV> {
 struct ProdImpl<T, NT, ProdID, AV> {
   grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
   head: NT,
-  action_id: ProdID,
+  key: ProdID,
   action_value: AV,
   prod_elems: Vec<NamedElemImpl<T, NT>>,
 }
@@ -152,7 +152,7 @@ impl<T, NT, ProdID, AV> ProdHandle<T, NT, ProdID, AV> {
     ProdHandle(Rc::new(ProdImpl {
       grammar,
       head,
-      action_id,
+      key: action_id,
       action_value,
       prod_elems,
     }))
@@ -175,7 +175,7 @@ where
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     f.debug_struct("ProdHandle")
       .field("head", &self.0.head)
-      .field("action_id", &self.0.action_id)
+      .field("action_id", &self.0.key)
       .field("action_value", &self.0.action_value)
       .field("prod_elems", &self.0.prod_elems)
       .finish()
@@ -247,7 +247,7 @@ where
 
   fn get_prod(
     &self,
-    prod_id: &<Self::Prod as Prod>::ProdId,
+    prod_id: &<Self::Prod as Prod>::Key,
   ) -> Option<&Self::Prod> {
     self.0.prods.get(prod_id)
   }
@@ -270,7 +270,7 @@ where
 
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
 
-  type ProdId = ProdID;
+  type Key = ProdID;
 
   type ActionValue = AV;
 
@@ -285,8 +285,8 @@ where
       .clone()
   }
 
-  fn action_id(&self) -> &Self::ProdId {
-    &self.0.action_id
+  fn key(&self) -> &Self::Key {
+    &self.0.key
   }
 
   fn action_value(&self) -> &Self::ActionValue {

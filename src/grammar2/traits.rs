@@ -21,13 +21,13 @@ pub trait NonTerm {
 
 pub trait Prod {
   type Term;
-  type ProdId;
+  type Key;
   type ActionValue;
   type NonTerm: NonTerm<Prod = Self>;
   type NamedElem: NamedElem<Term = Self::Term, NonTerm = Self::NonTerm>;
 
   fn head(&self) -> Self::NonTerm;
-  fn action_id(&self) -> &Self::ProdId;
+  fn key(&self) -> &Self::Key;
   fn action_value(&self) -> &Self::ActionValue;
   fn prod_elements(&self) -> Vec<Self::NamedElem>;
 }
@@ -55,7 +55,7 @@ pub trait Grammar {
   /// Returns the prod with the given id.
   fn get_prod(
     &self,
-    prod_id: &<Self::Prod as Prod>::ProdId,
+    prod_id: &<Self::Prod as Prod>::Key,
   ) -> Option<&Self::Prod>;
   /// Returns the non-term with the given key.
   fn get_non_term(
