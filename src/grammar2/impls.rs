@@ -6,10 +6,8 @@ use std::rc::{Rc, Weak};
 
 use crate::utils::svec::{IdentityKeyExtractor, SVec};
 
-use super::key_extractors::{
-  NonTermKeyExtractor, ProdKeyExtractor, RuleKeyExtractor,
-};
-use super::traits::{Grammar, NamedElem, NonTerm, Prod, Rule};
+use super::key_extractors::{NonTermKeyExtractor, ProdKeyExtractor};
+use super::traits::{Grammar, NamedElem, NonTerm, Prod};
 use super::Elem;
 
 pub struct NamedElemRef<T, NT, ProdID, AV> {
@@ -52,14 +50,7 @@ struct GrammarImpl<T, NT, ProdID, AV> {
   start_nt: NT,
   terminals: SVec<T, IdentityKeyExtractor>,
   non_terminals: SVec<NonTermHandle<T, NT, ProdID, AV>, NonTermKeyExtractor>,
-  rules: SVec<RuleHandle<T, NT, ProdID, AV>, RuleKeyExtractor>,
   prods: SVec<ProdHandle<T, NT, ProdID, AV>, ProdKeyExtractor>,
-}
-
-struct RuleImpl<T, NT, ProdID, AV> {
-  grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
-  head: NT,
-  prods: SVec<ProdID, IdentityKeyExtractor>,
 }
 
 struct ProdImpl<T, NT, ProdID, AV> {
@@ -73,6 +64,7 @@ struct ProdImpl<T, NT, ProdID, AV> {
 struct NonTermImpl<T, NT, ProdID, AV> {
   grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
   key: NT,
+  prods: SVec<ProdID, IdentityKeyExtractor>,
 }
 
 pub struct NamedElemImpl<T, NT> {
@@ -146,32 +138,6 @@ where
   }
 }
 
-/// A handle for Rule objects.
-pub struct RuleHandle<T, NT, ProdID, AV>(Rc<RuleImpl<T, NT, ProdID, AV>>);
-
-impl<T, NT, ProdID, AV> RuleHandle<T, NT, ProdID, AV>
-where
-  ProdID: Ord,
-{
-  fn new(
-    grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
-    head: NT,
-    prods: Vec<ProdID>,
-  ) -> Self {
-    RuleHandle(Rc::new(RuleImpl {
-      head,
-      grammar,
-      prods: prods.into(),
-    }))
-  }
-}
-
-impl<T, NT, ProdID, AV> Clone for RuleHandle<T, NT, ProdID, AV> {
-  fn clone(&self) -> Self {
-    RuleHandle(Rc::clone(&self.0))
-  }
-}
-
 /// A handle for Prod objects.
 pub struct ProdHandle<T, NT, ProdID, AV>(Rc<ProdImpl<T, NT, ProdID, AV>>);
 
@@ -219,9 +185,20 @@ where
 /// A handle for NonTerm objects.
 pub struct NonTermHandle<T, NT, ProdID, AV>(Rc<NonTermImpl<T, NT, ProdID, AV>>);
 
-impl<T, NT, ProdID, AV> NonTermHandle<T, NT, ProdID, AV> {
-  fn new(grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>, key: NT) -> Self {
-    NonTermHandle(Rc::new(NonTermImpl { grammar, key }))
+impl<T, NT, ProdID, AV> NonTermHandle<T, NT, ProdID, AV>
+where
+  ProdID: Ord,
+{
+  fn new(
+    grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
+    key: NT,
+    prods: Vec<ProdID>,
+  ) -> Self {
+    NonTermHandle(Rc::new(NonTermImpl {
+      grammar,
+      key,
+      prods: prods.into(),
+    }))
   }
 }
 
@@ -254,8 +231,6 @@ where
 
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
-  type Rule = RuleHandle<T, NT, ProdID, AV>;
-
   fn start_non_term(&self) -> &Self::NonTerm {
     self.0.non_terminals.get(&self.0.start_nt).unwrap()
   }
@@ -268,56 +243,8 @@ where
     self.0.non_terminals.iter().collect()
   }
 
-  fn rules(&self) -> Vec<&Self::Rule> {
-    self.0.rules.iter().collect()
-  }
-
   fn get_prod(&self, prod_id: &Self::ProdId) -> Option<&Self::Prod> {
     self.0.prods.get(prod_id)
-  }
-}
-
-impl<T, NT, ProdID, AV> Rule for RuleHandle<T, NT, ProdID, AV>
-where
-  T: Clone,
-  NT: Ord + Clone,
-  ProdID: Ord,
-{
-  type Term = T;
-
-  type Key = NT;
-
-  type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
-
-  type Prod = ProdHandle<T, NT, ProdID, AV>;
-
-  fn key(&self) -> &Self::Key {
-    &self.0.head
-  }
-
-  fn head(&self) -> Self::NonTerm {
-    let grammar = self.0.grammar.upgrade().expect("grammar is alive");
-    grammar
-      .non_terminals
-      .get(&self.0.head)
-      .expect("non-term key exists in grammar")
-      .clone()
-  }
-
-  fn prods(&self) -> Vec<Self::Prod> {
-    let grammar = self.0.grammar.upgrade().expect("grammar is alive");
-    self
-      .0
-      .prods
-      .iter()
-      .map(|prod_id| {
-        grammar
-          .prods
-          .get(prod_id)
-          .expect("prod key exists in grammar")
-          .clone()
-      })
-      .collect()
   }
 }
 
@@ -330,8 +257,6 @@ where
   type Term = T;
 
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
-
-  type Rule = RuleHandle<T, NT, ProdID, AV>;
 
   type ProdId = ProdID;
 
@@ -377,18 +302,26 @@ where
   ProdID: Ord,
 {
   type Key = NT;
-  type Rule = RuleHandle<T, NT, ProdID, AV>;
+  type Term = T;
+  type Prod = ProdHandle<T, NT, ProdID, AV>;
 
   fn key(&self) -> &Self::Key {
     &self.0.key
   }
 
-  fn rule(&self) -> Self::Rule {
+  fn prods(&self) -> Vec<Self::Prod> {
     let grammar = self.0.grammar.upgrade().expect("grammar is alive");
-    grammar
-      .rules
-      .get(&self.0.key)
-      .expect("rule key exists in grammar")
-      .clone()
+    self
+      .0
+      .prods
+      .iter()
+      .map(|prod_id| {
+        grammar
+          .prods
+          .get(prod_id)
+          .expect("prod key exists in grammar")
+          .clone()
+      })
+      .collect()
   }
 }

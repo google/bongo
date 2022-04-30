@@ -15,10 +15,9 @@ pub struct ProdContents<T, NT, ProdID, AV> {
 
 pub struct GrammarBuilder<T, NT, ProdID, AV> {
   terminals: BTreeSet<T>,
-  non_terminals: BTreeSet<NT>,
+  non_terminals: BTreeMap<NT, BTreeSet<ProdID>>,
   start_nt: NT,
   prods: BTreeMap<ProdID, ProdContents<T, NT, ProdID, AV>>,
-  rules: BTreeMap<NT, BTreeSet<ProdID>>,
 }
 
 impl<T, NT, ProdID, AV> GrammarBuilder<T, NT, ProdID, AV>
@@ -31,10 +30,9 @@ where
     let start_nt = start_nt.into();
     GrammarBuilder {
       terminals: BTreeSet::new(),
-      non_terminals: [start_nt.clone()].into_iter().collect(),
+      non_terminals: [(start_nt.clone(), BTreeSet::new())].into_iter().collect(),
       prods: BTreeMap::new(),
       start_nt,
-      rules: BTreeMap::new(),
     }
   }
 
@@ -61,21 +59,19 @@ where
       Entry::Occupied(_) => panic!("duplicate production id: {:?}", id),
     };
 
-    self.non_terminals.insert(prod_contents.head.clone());
-
     for elem in &prod_contents.elements {
       match &elem.elem {
         Elem::Term(t) => {
           self.terminals.insert(t.clone());
         }
         Elem::NonTerm(nt) => {
-          self.non_terminals.insert(nt.clone());
+          self.non_terminals.entry(nt.clone()).or_insert_with(|| BTreeSet::new());
         }
       }
     }
 
     self
-      .rules
+      .non_terminals
       .entry(prod_contents.head.clone())
       .or_insert_with(|| BTreeSet::new())
       .insert(prod_contents.id.clone());
@@ -83,7 +79,6 @@ where
   }
 
   pub fn build(self) -> super::GrammarHandle<T, NT, ProdID, AV> {
-    assert!(self.non_terminals == self.rules.keys().cloned().collect());
     super::GrammarHandle::new(|grammar| {
       let terminals = self.terminals.into_iter().collect();
       let prods = self
@@ -107,11 +102,11 @@ where
         })
         .collect();
 
-      let rules = self
-        .rules
+      let non_terminals = self
+        .non_terminals
         .into_iter()
         .map(|(nt, rule_contents)| {
-          super::RuleHandle::new(
+          super::NonTermHandle::new(
             grammar.clone(),
             nt,
             rule_contents.into_iter().collect(),
@@ -119,17 +114,10 @@ where
         })
         .collect();
 
-      let non_terminals = self
-        .non_terminals
-        .into_iter()
-        .map(|nt| super::NonTermHandle::new(grammar.clone(), nt))
-        .collect();
-
       super::GrammarImpl {
         terminals,
         non_terminals,
         start_nt: self.start_nt,
-        rules,
         prods,
       }
     })

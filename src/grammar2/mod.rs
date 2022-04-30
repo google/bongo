@@ -5,8 +5,8 @@ mod traits;
 use std::fmt;
 
 pub use impls::builder::{ElementBuilder, GrammarBuilder};
-pub use impls::{GrammarHandle, NonTermHandle, ProdHandle, RuleHandle};
-pub use traits::{Grammar, NamedElem, NonTerm, Prod, Rule};
+pub use impls::{GrammarHandle, NonTermHandle, ProdHandle};
+pub use traits::{Grammar, NamedElem, NonTerm, Prod};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Elem<T, NT> {
@@ -56,7 +56,6 @@ mod test {
   use super::GrammarBuilder;
   use super::GrammarHandle;
   use super::NonTerm;
-  use super::Rule;
 
   #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
   enum Term {
@@ -121,7 +120,6 @@ mod test {
     let grammar = create_arithmetic_grammar();
     println!("{:#?}", grammar);
     assert_eq!(grammar.non_terminals().len(), 1);
-    assert_eq!(grammar.rules().len(), 1);
-    assert_eq!(grammar.start_non_term().rule().prods().len(), 6);
+    assert_eq!(grammar.start_non_term().prods().len(), 6);
   }
 }

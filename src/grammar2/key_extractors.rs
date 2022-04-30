@@ -1,6 +1,6 @@
 use crate::utils::svec::KeyExtractor;
 
-use super::traits::{NonTerm, Prod, Rule};
+use super::traits::{NonTerm, Prod};
 
 /// Key extractor for `Rule`, using the `NonTerm`'s `Key`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
@@ -29,20 +29,5 @@ where
 
   fn extract_key<'a>(&self, rule: &'a T) -> &'a Self::Key {
     rule.action_id()
-  }
-}
-
-/// Key extractor for `Rule`, using the `NonTerm`'s `Key`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
-pub struct RuleKeyExtractor;
-
-impl<T> KeyExtractor<T> for RuleKeyExtractor
-where
-  T: Rule,
-{
-  type Key = T::Key;
-
-  fn extract_key<'a>(&self, rule: &'a T) -> &'a Self::Key {
-    rule.key()
   }
 }
