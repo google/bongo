@@ -1,4 +1,4 @@
-use std::{ops::Deref, fmt::Debug};
+use std::{fmt::Debug, ops::Deref};
 
 pub trait KeyExtractor<V> {
   type Key;
@@ -122,12 +122,14 @@ where
   }
 }
 
-impl<V, F> Debug for SVec<V, F> where V: Debug {
+impl<V, F> Debug for SVec<V, F>
+where
+  V: Debug,
+{
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     f.debug_list().entries(self.iter()).finish()
   }
 }
-
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct IdentityKeyExtractor;
