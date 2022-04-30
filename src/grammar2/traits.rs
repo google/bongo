@@ -8,8 +8,8 @@ pub trait NamedElem {
   fn elem(&self) -> Elem<Self::Term, Self::NonTerm>;
 }
 
-pub trait NonTerm {
-  type Key;
+pub trait NonTerm: Clone {
+  type Key: Ord + Clone;
   type Prod: Prod<NonTerm = Self>;
 
   /// Gets the key of the non-terminal.
@@ -19,15 +19,15 @@ pub trait NonTerm {
   fn prods(&self) -> Vec<Self::Prod>;
 }
 
-pub trait Prod {
-  type Term;
-  type Key;
+pub trait Prod: Clone {
+  type Term: Ord + Clone;
+  type Key: Ord + Clone;
   type ActionValue;
   type NonTerm: NonTerm<Prod = Self>;
   type NamedElem: NamedElem<Term = Self::Term, NonTerm = Self::NonTerm>;
 
-  fn head(&self) -> Self::NonTerm;
   fn key(&self) -> &Self::Key;
+  fn head(&self) -> Self::NonTerm;
   fn action_value(&self) -> &Self::ActionValue;
   fn prod_elements(&self) -> Vec<Self::NamedElem>;
 }
@@ -35,7 +35,7 @@ pub trait Prod {
 /// A trait of a context-free grammar.
 pub trait Grammar {
   /// The type of terminal symbols.
-  type Term;
+  type Term: Ord + Clone;
 
   /// A handle to a non terminal.
   type NonTerm: NonTerm<Prod = Self::Prod>;
@@ -57,6 +57,7 @@ pub trait Grammar {
     &self,
     prod_id: &<Self::Prod as Prod>::Key,
   ) -> Option<&Self::Prod>;
+  
   /// Returns the non-term with the given key.
   fn get_non_term(
     &self,

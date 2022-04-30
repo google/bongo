@@ -18,9 +18,9 @@ pub struct NamedElemRef<T, NT, ProdID, AV> {
 
 impl<T, NT, ProdID, AV> NamedElem for NamedElemRef<T, NT, ProdID, AV>
 where
-  T: Clone,
+  T: Ord + Clone,
   NT: Ord + Clone,
-  ProdID: Ord,
+  ProdID: Ord + Clone,
 {
   type Term = T;
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
@@ -219,9 +219,9 @@ where
 
 impl<T, NT, ProdID, AV> Grammar for GrammarHandle<T, NT, ProdID, AV>
 where
-  T: Clone,
+  T: Ord + Clone,
   NT: Ord + Clone,
-  ProdID: Ord,
+  ProdID: Ord + Clone,
 {
   type Term = T;
 
@@ -262,9 +262,9 @@ where
 
 impl<T, NT, ProdID, AV> Prod for ProdHandle<T, NT, ProdID, AV>
 where
-  T: Clone,
+  T: Ord + Clone,
   NT: Ord + Clone,
-  ProdID: Ord,
+  ProdID: Ord + Clone,
 {
   type Term = T;
 
@@ -309,9 +309,9 @@ where
 
 impl<T, NT, ProdID, AV> NonTerm for NonTermHandle<T, NT, ProdID, AV>
 where
-  T: Clone,
+  T: Ord + Clone,
   NT: Ord + Clone,
-  ProdID: Ord,
+  ProdID: Ord + Clone,
 {
   type Key = NT;
   type Prod = ProdHandle<T, NT, ProdID, AV>;
