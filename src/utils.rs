@@ -18,6 +18,7 @@ pub mod buffer;
 pub mod fmt;
 pub mod graph_closure;
 pub mod mergeables;
+pub mod svec;
 pub mod type_map;
 
 pub fn fixed_point<T: Eq>(start: T, mut apply: impl FnMut(&T) -> T) -> T {
