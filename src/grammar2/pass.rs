@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::utils::type_map::{TypeMapKey, TypeMap};
+use crate::utils::type_map::{TypeMap, TypeMapKey};
 
 use super::{Grammar, NonTerm, Prod};
 

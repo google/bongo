@@ -1,7 +1,7 @@
 mod impls;
 mod key_extractors;
-mod traits;
 mod pass;
+mod traits;
 
 use std::fmt;
 

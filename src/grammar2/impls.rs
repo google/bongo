@@ -2,18 +2,26 @@ pub mod builder;
 
 use std::borrow::Cow;
 use std::fmt;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
-use crate::utils::svec::{IdentityKeyExtractor, SVec};
+use crate::utils::svec::{IdentityKeyExtractor, KeyExtractor, SVec};
 
-use super::key_extractors::{NonTermKeyExtractor, ProdKeyExtractor};
 use super::traits::{Grammar, NamedElem, NonTerm, Prod};
 use super::Elem;
 
+#[derive(Clone, Copy, Debug)]
+struct TermIndex(usize);
+
+#[derive(Clone, Copy, Debug)]
+struct NonTermIndex(usize);
+
+#[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Debug)]
+struct ProdIndex(usize);
+
 pub struct NamedElemRef<T, NT, ProdID, AV> {
-  grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
+  grammar: GrammarHandle<T, NT, ProdID, AV>,
   name: Option<Rc<String>>,
-  elem: Elem<T, NT>,
+  elem: Elem<TermIndex, NonTermIndex>,
 }
 
 impl<T, NT, ProdID, AV> NamedElem for NamedElemRef<T, NT, ProdID, AV>
@@ -30,41 +38,95 @@ where
   }
 
   fn elem(&self) -> Elem<Self::Term, Self::NonTerm> {
-    match &self.elem {
-      Elem::Term(t) => Elem::Term(t.clone()),
-      Elem::NonTerm(nt) => {
-        let grammar = self.grammar.upgrade().expect("grammar is still alive");
-        Elem::NonTerm(
-          grammar
-            .non_terminals
-            .get(nt)
-            .expect("non-terminal is still alive")
-            .clone(),
-        )
+    match self.elem {
+      Elem::Term(t_i) => {
+        Elem::Term(self.grammar.get_term_by_index(t_i).clone())
+      }
+      Elem::NonTerm(nt_i) => {
+        Elem::NonTerm(self.grammar.get_non_term_handle_by_index(nt_i))
       }
     }
   }
 }
 
 struct GrammarImpl<T, NT, ProdID, AV> {
-  start_nt: NT,
+  start_nt: NonTermIndex,
   terminals: SVec<T, IdentityKeyExtractor>,
-  non_terminals: SVec<NonTermHandle<T, NT, ProdID, AV>, NonTermKeyExtractor>,
-  prods: SVec<ProdHandle<T, NT, ProdID, AV>, ProdKeyExtractor>,
+  non_terminals: SVec<NonTermImpl<NT>, NonTermImplKeyExtractor>,
+  prods: SVec<ProdImpl<ProdID, AV>, ProdImplKeyExtractor>,
 }
 
-struct ProdImpl<T, NT, ProdID, AV> {
-  grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
-  head: NT,
+impl<T, NT, ProdID, AV> GrammarImpl<T, NT, ProdID, AV>
+where
+  T: Ord,
+  NT: Ord,
+  ProdID: Ord,
+{
+  fn new(
+    start_nt: NonTermIndex,
+    terminals: SVec<T, IdentityKeyExtractor>,
+    non_terminals: SVec<NonTermImpl<NT>, NonTermImplKeyExtractor>,
+    prods: SVec<ProdImpl<ProdID, AV>, ProdImplKeyExtractor>,
+  ) -> Self {
+    Self {
+      start_nt,
+      terminals,
+      non_terminals,
+      prods,
+    }
+  }
+}
+
+#[derive(Debug)]
+struct ProdImpl<ProdID, AV> {
+  head: NonTermIndex,
   key: ProdID,
   action_value: AV,
-  prod_elems: Vec<NamedElemImpl<T, NT>>,
+  prod_elems: Vec<NamedElemImpl<TermIndex, NonTermIndex>>,
 }
 
-struct NonTermImpl<T, NT, ProdID, AV> {
-  grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
+impl<ProdID, AV> ProdImpl<ProdID, AV> {
+  fn new(
+    head: NonTermIndex,
+    key: ProdID,
+    action_value: AV,
+    prod_elems: Vec<NamedElemImpl<TermIndex, NonTermIndex>>,
+  ) -> Self {
+    ProdImpl {
+      head,
+      key,
+      action_value,
+      prod_elems,
+    }
+  }
+}
+
+#[derive(Debug)]
+struct NonTermImpl<NT> {
   key: NT,
-  prods: SVec<ProdID, IdentityKeyExtractor>,
+  prods: SVec<ProdIndex, IdentityKeyExtractor>,
+}
+
+#[derive(Default)]
+struct ProdImplKeyExtractor;
+
+impl<ProdID, AV> KeyExtractor<ProdImpl<ProdID, AV>> for ProdImplKeyExtractor {
+  type Key = ProdID;
+
+  fn extract_key<'a>(&self, prod: &'a ProdImpl<ProdID, AV>) -> &'a ProdID {
+    &prod.key
+  }
+}
+
+#[derive(Default)]
+struct NonTermImplKeyExtractor;
+
+impl<NT> KeyExtractor<NonTermImpl<NT>> for NonTermImplKeyExtractor {
+  type Key = NT;
+
+  fn extract_key<'a>(&self, non_term: &'a NonTermImpl<NT>) -> &'a NT {
+    &non_term.key
+  }
 }
 
 pub struct NamedElemImpl<T, NT> {
@@ -104,14 +166,53 @@ where
 
 pub struct GrammarHandle<T, NT, ProdID, AV>(Rc<GrammarImpl<T, NT, ProdID, AV>>);
 
-impl<T, NT, ProdID, AV> GrammarHandle<T, NT, ProdID, AV> {
-  fn new<F>(inner: F) -> Self
-  where
-    F: FnOnce(
-      &Weak<GrammarImpl<T, NT, ProdID, AV>>,
-    ) -> GrammarImpl<T, NT, ProdID, AV>,
-  {
-    GrammarHandle(Rc::new_cyclic(inner))
+impl<T, NT, ProdID, AV> GrammarHandle<T, NT, ProdID, AV>
+where
+  T: Ord,
+  NT: Ord,
+  ProdID: Ord,
+{
+  fn new(grammar: GrammarImpl<T, NT, ProdID, AV>) -> Self {
+    GrammarHandle(Rc::new(grammar))
+  }
+
+  fn get_term_by_index(&self, index: TermIndex) -> &T {
+    self.0.terminals.get_by_index(index.0).expect("valid index")
+  }
+
+  fn get_non_term_impl_by_index(
+    &self,
+    index: NonTermIndex,
+  ) -> &NonTermImpl<NT> {
+    self
+      .0
+      .non_terminals
+      .get_by_index(index.0)
+      .expect("valid index")
+  }
+
+  fn get_prod_impl_by_index(&self, index: ProdIndex) -> &ProdImpl<ProdID, AV> {
+    self.0.prods.get_by_index(index.0).expect("valid index")
+  }
+
+  fn get_non_term_handle_by_index(
+    &self,
+    index: NonTermIndex,
+  ) -> NonTermHandle<T, NT, ProdID, AV> {
+    NonTermHandle {
+      grammar: self.clone(),
+      non_term_index: index,
+    }
+  }
+
+  fn get_prod_handle_by_index(
+    &self,
+    index: ProdIndex,
+  ) -> ProdHandle<T, NT, ProdID, AV> {
+    ProdHandle {
+      grammar: self.clone(),
+      prod_index: index,
+    }
   }
 }
 
@@ -139,81 +240,91 @@ where
 }
 
 /// A handle for Prod objects.
-pub struct ProdHandle<T, NT, ProdID, AV>(Rc<ProdImpl<T, NT, ProdID, AV>>);
+pub struct ProdHandle<T, NT, ProdID, AV> {
+  grammar: GrammarHandle<T, NT, ProdID, AV>,
+  prod_index: ProdIndex,
+}
 
 impl<T, NT, ProdID, AV> ProdHandle<T, NT, ProdID, AV> {
   fn new(
-    grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
-    head: NT,
-    action_id: ProdID,
-    action_value: AV,
-    prod_elems: Vec<NamedElemImpl<T, NT>>,
+    grammar: GrammarHandle<T, NT, ProdID, AV>,
+    prod_index: ProdIndex,
   ) -> Self {
-    ProdHandle(Rc::new(ProdImpl {
+    ProdHandle {
       grammar,
-      head,
-      key: action_id,
-      action_value,
-      prod_elems,
-    }))
+      prod_index,
+    }
   }
 }
 
 impl<T, NT, ProdID, AV> Clone for ProdHandle<T, NT, ProdID, AV> {
   fn clone(&self) -> Self {
-    ProdHandle(Rc::clone(&self.0))
+    ProdHandle {
+      grammar: self.grammar.clone(),
+      prod_index: self.prod_index,
+    }
   }
 }
 
 impl<T, NT, ProdID, AV> fmt::Debug for ProdHandle<T, NT, ProdID, AV>
 where
-  T: fmt::Debug,
-  NT: fmt::Debug,
-  ProdID: fmt::Debug,
+  T: fmt::Debug + Ord,
+  NT: fmt::Debug + Ord,
+  ProdID: fmt::Debug + Ord,
   AV: fmt::Debug,
 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    let prod_impl = self.grammar.get_prod_impl_by_index(self.prod_index);
     f.debug_struct("ProdHandle")
-      .field("head", &self.0.head)
-      .field("action_id", &self.0.key)
-      .field("action_value", &self.0.action_value)
-      .field("prod_elems", &self.0.prod_elems)
+      .field("head", &prod_impl.head)
+      .field("action_id", &prod_impl.key)
+      .field("action_value", &prod_impl.action_value)
+      .field("prod_elems", &prod_impl.prod_elems)
       .finish()
   }
 }
 
 /// A handle for NonTerm objects.
-pub struct NonTermHandle<T, NT, ProdID, AV>(Rc<NonTermImpl<T, NT, ProdID, AV>>);
+pub struct NonTermHandle<T, NT, ProdID, AV> {
+  grammar: GrammarHandle<T, NT, ProdID, AV>,
+  non_term_index: NonTermIndex,
+}
 
 impl<T, NT, ProdID, AV> NonTermHandle<T, NT, ProdID, AV>
 where
   ProdID: Ord,
 {
   fn new(
-    grammar: Weak<GrammarImpl<T, NT, ProdID, AV>>,
-    key: NT,
-    prods: Vec<ProdID>,
+    grammar: GrammarHandle<T, NT, ProdID, AV>,
+    non_term_index: NonTermIndex,
   ) -> Self {
-    NonTermHandle(Rc::new(NonTermImpl {
+    NonTermHandle {
       grammar,
-      key,
-      prods: prods.into(),
-    }))
+      non_term_index,
+    }
   }
 }
 
 impl<T, NT, ProdID, AV> Clone for NonTermHandle<T, NT, ProdID, AV> {
   fn clone(&self) -> Self {
-    NonTermHandle(Rc::clone(&self.0))
+    NonTermHandle {
+      grammar: self.grammar.clone(),
+      non_term_index: self.non_term_index,
+    }
   }
 }
 
 impl<T, NT, ProdID, AV> fmt::Debug for NonTermHandle<T, NT, ProdID, AV>
 where
-  NT: fmt::Debug,
+  T: Ord,
+  NT: fmt::Debug + Ord,
+  ProdID: fmt::Debug + Ord,
 {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-    fmt::Debug::fmt(&self.0.key, f)
+    self
+      .grammar
+      .get_non_term_impl_by_index(self.non_term_index)
+      .fmt(f)
   }
 }
 
@@ -229,34 +340,46 @@ where
 
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
-  fn start_non_term(&self) -> &Self::NonTerm {
-    self.0.non_terminals.get(&self.0.start_nt).unwrap()
+  fn start_non_term(&self) -> Self::NonTerm {
+    self.get_non_term_handle_by_index(self.0.start_nt)
   }
 
   fn terminals(&self) -> Vec<&Self::Term> {
     self.0.terminals.iter().collect()
   }
 
-  fn non_terminals(&self) -> Vec<&Self::NonTerm> {
-    self.0.non_terminals.iter().collect()
+  fn non_terminals(&self) -> Vec<Self::NonTerm> {
+    (0..self.0.non_terminals.len())
+      .map(|i| self.get_non_term_handle_by_index(NonTermIndex(i)))
+      .collect()
   }
 
-  fn prods(&self) -> Vec<&Self::Prod> {
-    self.0.prods.iter().collect()
+  fn prods(&self) -> Vec<Self::Prod> {
+    (0..self.0.prods.len())
+      .map(|i| self.get_prod_handle_by_index(ProdIndex(i)))
+      .collect()
   }
 
   fn get_prod(
     &self,
     prod_id: &<Self::Prod as Prod>::Key,
-  ) -> Option<&Self::Prod> {
-    self.0.prods.get(prod_id)
+  ) -> Option<Self::Prod> {
+    self
+      .0
+      .prods
+      .get_index_of(prod_id)
+      .map(|i| self.get_prod_handle_by_index(ProdIndex(i)))
   }
 
   fn get_non_term(
     &self,
     key: &<Self::NonTerm as NonTerm>::Key,
-  ) -> Option<&Self::NonTerm> {
-    self.0.non_terminals.get(key)
+  ) -> Option<Self::NonTerm> {
+    self
+      .0
+      .non_terminals
+      .get_index_of(key)
+      .map(|i| self.get_non_term_handle_by_index(NonTermIndex(i)))
   }
 }
 
@@ -277,29 +400,27 @@ where
   type NamedElem = NamedElemRef<T, NT, ProdID, AV>;
 
   fn head(&self) -> Self::NonTerm {
-    let grammar = self.0.grammar.upgrade().expect("grammar is alive");
-    grammar
-      .non_terminals
-      .get(&self.0.head)
-      .expect("non-term key exists in grammar")
-      .clone()
+    let prod_impl = self.grammar.get_prod_impl_by_index(self.prod_index);
+    self.grammar.get_non_term_handle_by_index(prod_impl.head)
   }
 
   fn key(&self) -> &Self::Key {
-    &self.0.key
+    let prod_impl = self.grammar.get_prod_impl_by_index(self.prod_index);
+    &prod_impl.key
   }
 
   fn action_value(&self) -> &Self::ActionValue {
-    &self.0.action_value
+    let prod_impl = self.grammar.get_prod_impl_by_index(self.prod_index);
+    &prod_impl.action_value
   }
 
   fn prod_elements(&self) -> Vec<Self::NamedElem> {
-    self
-      .0
+    let prod_impl = self.grammar.get_prod_impl_by_index(self.prod_index);
+    prod_impl
       .prod_elems
       .iter()
       .map(|elem| NamedElemRef {
-        grammar: self.0.grammar.clone(),
+        grammar: self.grammar.clone(),
         name: elem.name.clone(),
         elem: elem.elem.clone(),
       })
@@ -317,22 +438,18 @@ where
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
   fn key(&self) -> &Self::Key {
-    &self.0.key
+    let non_term_impl =
+      self.grammar.get_non_term_impl_by_index(self.non_term_index);
+    &non_term_impl.key
   }
 
   fn prods(&self) -> Vec<Self::Prod> {
-    let grammar = self.0.grammar.upgrade().expect("grammar is alive");
-    self
-      .0
+    let non_term_impl =
+      self.grammar.get_non_term_impl_by_index(self.non_term_index);
+    non_term_impl
       .prods
       .iter()
-      .map(|prod_id| {
-        grammar
-          .prods
-          .get(prod_id)
-          .expect("prod key exists in grammar")
-          .clone()
-      })
+      .map(|prod_index| self.grammar.get_prod_handle_by_index(*prod_index))
       .collect()
   }
 }

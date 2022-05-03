@@ -44,23 +44,21 @@ pub trait Grammar: Clone {
   type Prod: Prod<Term = Self::Term, NonTerm = Self::NonTerm>;
 
   /// Returns the start non-terminal of the grammar.
-  fn start_non_term(&self) -> &Self::NonTerm;
+  fn start_non_term(&self) -> Self::NonTerm;
   /// Returns a list of all terminals in the grammar.
   fn terminals(&self) -> Vec<&Self::Term>;
   /// Returns a list of all non-terminals in the grammar.
-  fn non_terminals(&self) -> Vec<&Self::NonTerm>;
+  fn non_terminals(&self) -> Vec<Self::NonTerm>;
   /// Returns a list of all productions in the grammar.
-  fn prods(&self) -> Vec<&Self::Prod>;
+  fn prods(&self) -> Vec<Self::Prod>;
 
   /// Returns the prod with the given id.
-  fn get_prod(
-    &self,
-    prod_id: &<Self::Prod as Prod>::Key,
-  ) -> Option<&Self::Prod>;
-  
+  fn get_prod(&self, prod_id: &<Self::Prod as Prod>::Key)
+    -> Option<Self::Prod>;
+
   /// Returns the non-term with the given key.
   fn get_non_term(
     &self,
     key: &<Self::NonTerm as NonTerm>::Key,
-  ) -> Option<&Self::NonTerm>;
+  ) -> Option<Self::NonTerm>;
 }

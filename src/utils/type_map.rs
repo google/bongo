@@ -117,7 +117,10 @@ impl TypeMap {
   }
 
   /// Returns a mutable reference to the value associated with the given key.
-  pub fn get_mut<T: TypeMapKey>(&mut self, key: &T) -> Option<&mut T::ValueType> {
+  pub fn get_mut<T: TypeMapKey>(
+    &mut self,
+    key: &T,
+  ) -> Option<&mut T::ValueType> {
     let object_ref: &dyn TypeKeyObjectTrait = key;
     self
       .0

@@ -63,6 +63,20 @@ where
       .ok()
       .map(|i| &self.vec[i])
   }
+
+  pub fn get_index_of(&self, key: &F::Key) -> Option<usize> {
+    self
+      .vec
+      .binary_search_by(|v| {
+        let v = self.extractor.extract_key(v);
+        v.cmp(key)
+      })
+      .ok()
+  }
+
+  pub fn get_by_index(&self, index: usize) -> Option<&V> {
+    self.vec.get(index)
+  }
 }
 
 impl<V, F> From<Vec<V>> for SVec<V, F>
