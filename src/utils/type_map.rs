@@ -4,7 +4,7 @@ use std::{any::Any, borrow::Borrow, collections::BTreeMap};
 /// orderable, as well as implementing `Any`.
 ///
 /// Each implementation has a type that it can return from a type map.
-pub trait TypeKey: Ord + Any + 'static {
+pub trait TypeMapKey: Ord + Any + 'static {
   /// The type that this key returns from a type map.
   type ValueType: Any + 'static;
 }
@@ -21,7 +21,7 @@ trait TypeKeyObjectTrait: Any + 'static {
 
 impl<T> TypeKeyObjectTrait for T
 where
-  T: TypeKey,
+  T: TypeMapKey,
 {
   fn as_any(&self) -> &(dyn Any + 'static) {
     self
@@ -103,12 +103,12 @@ impl TypeMap {
   }
 
   /// Inserts a new key-value pair into the map.
-  pub fn insert<T: TypeKey>(&mut self, key: T, value: T::ValueType) {
+  pub fn insert<T: TypeMapKey>(&mut self, key: T, value: T::ValueType) {
     self.0.insert(TypeKeyObject(Box::new(key)), Box::new(value));
   }
 
   /// Returns a reference to the value associated with the given key.
-  pub fn get<T: TypeKey>(&self, key: &T) -> Option<&T::ValueType> {
+  pub fn get<T: TypeMapKey>(&self, key: &T) -> Option<&T::ValueType> {
     let object_ref: &dyn TypeKeyObjectTrait = key;
     self
       .0
@@ -117,7 +117,7 @@ impl TypeMap {
   }
 
   /// Returns a mutable reference to the value associated with the given key.
-  pub fn get_mut<T: TypeKey>(&mut self, key: &T) -> Option<&mut T::ValueType> {
+  pub fn get_mut<T: TypeMapKey>(&mut self, key: &T) -> Option<&mut T::ValueType> {
     let object_ref: &dyn TypeKeyObjectTrait = key;
     self
       .0

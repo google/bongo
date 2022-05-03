@@ -32,10 +32,10 @@ impl<V, F> SVec<V, F> {
   }
 }
 
-impl<K, V, F> SVec<V, F>
+impl<V, F> SVec<V, F>
 where
-  F: KeyExtractor<V, Key = K>,
-  K: Ord,
+  F: KeyExtractor<V>,
+  F::Key: Ord,
 {
   pub fn new<I>(extractor: F, iter: I) -> Self
   where
@@ -53,7 +53,7 @@ where
     }
   }
 
-  pub fn get(&self, key: &K) -> Option<&V> {
+  pub fn get(&self, key: &F::Key) -> Option<&V> {
     self
       .vec
       .binary_search_by(|v| {
@@ -84,10 +84,10 @@ where
   }
 }
 
-impl<K, V, F> IntoIterator for SVec<V, F>
+impl<V, F> IntoIterator for SVec<V, F>
 where
-  F: KeyExtractor<V, Key = K>,
-  K: Ord,
+  F: KeyExtractor<V>,
+  F::Key: Ord,
 {
   type Item = V;
   type IntoIter = std::vec::IntoIter<V>;
@@ -97,10 +97,10 @@ where
   }
 }
 
-impl<K, V, F> FromIterator<V> for SVec<V, F>
+impl<V, F> FromIterator<V> for SVec<V, F>
 where
-  F: KeyExtractor<V, Key = K> + Default,
-  K: Ord,
+  F: KeyExtractor<V> + Default,
+  F::Key: Ord,
 {
   fn from_iter<I>(iter: I) -> Self
   where

@@ -33,7 +33,7 @@ pub trait Prod: Clone {
 }
 
 /// A trait of a context-free grammar.
-pub trait Grammar {
+pub trait Grammar: Clone {
   /// The type of terminal symbols.
   type Term: Ord + Clone;
 
