@@ -6,6 +6,15 @@ use std::{
 
 use super::Elem;
 
+fn create_index_map<T>(iter: impl IntoIterator<Item = T>) -> BTreeMap<T, usize>
+where
+  T: Ord,
+{
+  let mut items: Vec<_> = iter.into_iter().collect();
+  items.sort();
+  items.into_iter().enumerate().map(|(i, x)| (x, i)).collect()
+}
+
 pub struct ProdContents<T, NT, ProdID, AV> {
   id: ProdID,
   head: NT,
@@ -84,47 +93,64 @@ where
   }
 
   pub fn build(self) -> super::GrammarHandle<T, NT, ProdID, AV> {
-    super::GrammarHandle::new(|grammar| {
-      let terminals = self.terminals.into_iter().collect();
-      let prods = self
-        .prods
-        .into_iter()
-        .map(|(_, prod_contents)| {
-          let ProdContents {
-            id,
-            head,
-            action_value,
-            elements,
-          } = prod_contents;
+    // We need to create index maps for the terms, non-terms, and productions to allow
+    // us to use the indexes in the internal data structures for the grammar, instead of
+    // repeatedly cloning the keys for the various items.
+    let term_index_map = create_index_map(self.terminals.iter().cloned());
+    let non_term_index_map =
+      create_index_map(self.non_terminals.iter().map(|(nt, _)| nt).cloned());
+    let prod_index_map =
+      create_index_map(self.prods.iter().map(|(id, _)| id).cloned());
+      
+    let prods = self
+      .prods
+      .into_iter()
+      .map(|(_, prod_contents)| {
+        let ProdContents {
+          id,
+          head,
+          action_value,
+          elements,
+        } = prod_contents;
 
-          super::ProdHandle::new(
-            grammar.clone(),
-            head,
-            id,
-            action_value,
-            elements,
-          )
-        })
-        .collect();
+        super::ProdImpl::new(
+          super::NonTermIndex(non_term_index_map[&head]),
+          id,
+          action_value,
+          elements
+            .into_iter()
+            .map(|elem| super::NamedElemImpl {
+              name: elem.name,
+              elem: match elem.elem {
+                Elem::Term(t) => {
+                  Elem::Term(super::TermIndex(term_index_map[&t]))
+                }
+                Elem::NonTerm(nt) => {
+                  Elem::NonTerm(super::NonTermIndex(non_term_index_map[&nt]))
+                }
+              },
+            })
+            .collect(),
+        )
+      })
+      .collect();
 
-      let non_terminals = self
-        .non_terminals
-        .into_iter()
-        .map(|(nt, rule_contents)| {
-          super::NonTermHandle::new(
-            grammar.clone(),
-            nt,
-            rule_contents.into_iter().collect(),
-          )
-        })
-        .collect();
-
-      super::GrammarImpl {
-        terminals,
-        non_terminals,
-        start_nt: self.start_nt,
-        prods,
-      }
+    let non_terminals = self
+      .non_terminals
+      .into_iter()
+      .map(|(nt, rule_contents)| super::NonTermImpl {
+        key: nt,
+        prods: rule_contents
+          .into_iter()
+          .map(|prod_id| super::ProdIndex(prod_index_map[&prod_id]))
+          .collect(),
+      })
+      .collect();
+    super::GrammarHandle::new(super::GrammarImpl {
+      terminals: self.terminals.into_iter().collect(),
+      non_terminals,
+      start_nt: super::NonTermIndex(non_term_index_map[&self.start_nt]),
+      prods,
     })
   }
 }
