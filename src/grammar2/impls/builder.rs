@@ -101,7 +101,6 @@ where
       create_index_map(self.non_terminals.iter().map(|(nt, _)| nt).cloned());
     let prod_index_map =
       create_index_map(self.prods.iter().map(|(id, _)| id).cloned());
-
     let prods = self
       .prods
       .into_iter()
