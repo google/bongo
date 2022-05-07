@@ -1,3 +1,20 @@
+//! Defines the pass types over grammar.
+//!
+//! Traditionally, the information about a grammar is built up over several
+//! passes, each of which attach data to the entities in the grammar. The
+//! [PassSet] type encapsulates this information, taking a reference to a
+//! grammar, and having [Pass]es build themselves up within the set.
+//!
+//! The [Pass] trait is the base trait for all passes. It can then implement
+//! one or more of [TermPass], [NonTermPass], or [ProdPass] to give the type
+//! of data it stores for each of their respective entities. The [Pass] trait
+//! itself provides the [Pass::execute] method, which is used to generate the
+//! contents of the pass. Once a pass is executed, the data it contains is
+//! immutable.
+//!
+//! Passes can be dependent on each other. Dependency cycles are not allowed,
+//! and will cause a runtime panic.
+
 use std::{cell::RefCell, collections::BTreeMap, marker::PhantomData, rc::Rc};
 
 use crate::utils::type_map::{TypeMap, TypeMapKey};
@@ -22,8 +39,10 @@ pub trait ProdPass: Pass {
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct TermTypeKey<P, K>(PhantomData<(P, K)>);
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct NonTermTypeKey<P, K>(PhantomData<(P, K)>);
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct ProdTypeKey<P, K>(PhantomData<(P, K)>);
 
@@ -140,15 +159,58 @@ where
   }
 }
 
-pub struct PassContext<'a, P, G>
-where
-  P: Pass,
-  G: Grammar,
-{
+/// The context available during the [Pass::execute] method. It allows access
+/// to the grammar, 
+pub struct PassContext<'a, P, G> {
   grammar: &'a G,
   pass: &'a P,
   pass_set: &'a PassSet<'a, G>,
   storage: &'a mut SinglePassStorage<P, G>,
+}
+
+impl<'a, P, G> PassContext<'a, P, G>
+where
+  P: Pass,
+  G: Grammar,
+{
+  pub fn grammar(&self) -> &'a G {
+    self.grammar
+  }
+
+  pub fn pass(&self) -> &'a P {
+    self.pass
+  }
+
+  pub fn pass_set(&self) -> &'a PassSet<'a, G> {
+    self.pass_set
+  }
+
+  pub fn insert_term_value(&mut self, term: &G::Term, value: P::TermValue)
+  where
+    P: TermPass,
+  {
+    self.storage.insert_term_value(term, value);
+  }
+
+  pub fn insert_non_term_value(
+    &mut self,
+    term: &<G::NonTerm as NonTerm>::Key,
+    value: P::NonTermValue,
+  ) where
+    P: NonTermPass,
+  {
+    self.storage.insert_non_term_value(term, value);
+  }
+
+  pub fn insert_prod_value(
+    &mut self,
+    prod: &<G::Prod as Prod>::Key,
+    value: P::ProdValue,
+  ) where
+    P: ProdPass,
+  {
+    self.storage.insert_prod_value(prod, value);
+  }
 }
 
 #[derive(Clone)]
@@ -194,6 +256,7 @@ where
   type ValueType = Option<Rc<SinglePassStorage<P, G>>>;
 }
 
+/// Contains a set of passes over a grammar.
 pub struct PassSet<'a, G> {
   grammar: &'a G,
   pass_map: RefCell<TypeMap>,
