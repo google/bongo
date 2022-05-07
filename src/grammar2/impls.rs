@@ -330,9 +330,9 @@ where
 
 impl<T, NT, ProdID, AV> Grammar for GrammarHandle<T, NT, ProdID, AV>
 where
-  T: Ord + Clone,
-  NT: Ord + Clone,
-  ProdID: Ord + Clone,
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  ProdID: Ord + Clone + 'static,
 {
   type Term = T;
 
@@ -385,9 +385,9 @@ where
 
 impl<T, NT, ProdID, AV> Prod for ProdHandle<T, NT, ProdID, AV>
 where
-  T: Ord + Clone,
-  NT: Ord + Clone,
-  ProdID: Ord + Clone,
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  ProdID: Ord + Clone + 'static,
 {
   type Term = T;
 
@@ -430,9 +430,9 @@ where
 
 impl<T, NT, ProdID, AV> NonTerm for NonTermHandle<T, NT, ProdID, AV>
 where
-  T: Ord + Clone,
-  NT: Ord + Clone,
-  ProdID: Ord + Clone,
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  ProdID: Ord + Clone + 'static,
 {
   type Key = NT;
   type Prod = ProdHandle<T, NT, ProdID, AV>;

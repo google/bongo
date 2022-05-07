@@ -108,12 +108,26 @@ impl TypeMap {
   }
 
   /// Returns a reference to the value associated with the given key.
-  pub fn get<T: TypeMapKey>(&self, key: &T) -> Option<&T::ValueType> {
+  pub fn get<'s, T: TypeMapKey>(&'s self, key: &T) -> Option<&'s T::ValueType> {
     let object_ref: &dyn TypeKeyObjectTrait = key;
     self
       .0
       .get(object_ref)
       .map(|v| v.downcast_ref::<T::ValueType>().unwrap())
+  }
+
+  pub fn get_mut_or_else<'s, T: TypeMapKey, F: FnOnce() -> T::ValueType>(
+    &'s mut self,
+    key: T,
+    f: F,
+  ) -> &'s mut T::ValueType {
+    let object_ref = TypeKeyObject(Box::new(key));
+    self
+      .0
+      .entry(object_ref)
+      .or_insert_with(|| Box::new(f()))
+      .downcast_mut::<T::ValueType>()
+      .unwrap()
   }
 
   /// Returns a mutable reference to the value associated with the given key.

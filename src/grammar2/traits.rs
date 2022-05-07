@@ -9,7 +9,7 @@ pub trait NamedElem {
 }
 
 pub trait NonTerm: Clone {
-  type Key: Ord + Clone;
+  type Key: Ord + Clone + 'static;
   type Prod: Prod<NonTerm = Self>;
 
   /// Gets the key of the non-terminal.
@@ -20,8 +20,8 @@ pub trait NonTerm: Clone {
 }
 
 pub trait Prod: Clone {
-  type Term: Ord + Clone;
-  type Key: Ord + Clone;
+  type Term: Ord + Clone + 'static;
+  type Key: Ord + Clone + 'static;
   type ActionValue;
   type NonTerm: NonTerm<Prod = Self>;
   type NamedElem: NamedElem<Term = Self::Term, NonTerm = Self::NonTerm>;
@@ -35,7 +35,7 @@ pub trait Prod: Clone {
 /// A trait of a context-free grammar.
 pub trait Grammar: Clone {
   /// The type of terminal symbols.
-  type Term: Ord + Clone;
+  type Term: Ord + Clone + 'static;
 
   /// A handle to a non terminal.
   type NonTerm: NonTerm<Prod = Self::Prod>;
