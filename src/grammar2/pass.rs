@@ -19,56 +19,100 @@ use std::{cell::RefCell, collections::BTreeMap, marker::PhantomData, rc::Rc};
 
 use crate::utils::type_map::{TypeMap, TypeMapKey};
 
-use super::{Grammar, NonTerm, Prod};
+use super::{
+  traits::{NonTermKey, ProdKey, TermKey},
+  Grammar, NonTerm, Prod,
+};
 
-pub trait Pass: Sized + Ord + Clone + 'static {
-  fn execute<G: Grammar>(&self, pass_context: &mut PassContext<Self, G>);
+pub trait Pass<G>: Sized + Ord + Clone + 'static
+where
+  G: Grammar,
+{
+  fn execute(&self, pass_context: &mut PassContext<Self, G>);
 }
 
-pub trait TermPass: Pass {
+pub trait TermPass<G>: Pass<G>
+where
+  G: Grammar,
+{
   type TermValue;
 }
 
-pub trait NonTermPass: Pass {
+pub trait NonTermPass<G>: Pass<G>
+where
+  G: Grammar,
+{
   type NonTermValue;
 }
 
-pub trait ProdPass: Pass {
+pub trait ProdPass<G>: Pass<G>
+where
+  G: Grammar,
+{
   type ProdValue;
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct TermTypeKey<P, K>(PhantomData<(P, K)>);
+type PassTermValue<P, G> = <P as TermPass<G>>::TermValue;
+type PassNonTermValue<P, G> = <P as NonTermPass<G>>::NonTermValue;
+type PassProdValue<P, G> = <P as ProdPass<G>>::ProdValue;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct NonTermTypeKey<P, K>(PhantomData<(P, K)>);
+macro_rules! define_entity_key {
+  ($name:ident, $key_type:ident, $pass_subtype:ident, $pass_value_type:ident) => {
+    #[derive(Clone, Debug, Default)]
+    struct $name<P, G>(PhantomData<(P, G)>);
+    impl<P, G> PartialEq for $name<P, G>
+    where
+      G: Grammar,
+      P: Pass<G>,
+    {
+      fn eq(&self, _other: &$name<P, G>) -> bool {
+        true
+      }
+    }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
-struct ProdTypeKey<P, K>(PhantomData<(P, K)>);
+    impl<P, G> PartialOrd for $name<P, G>
+    where
+      G: Grammar,
+      P: Pass<G>,
+    {
+      fn partial_cmp(
+        &self,
+        _other: &$name<P, G>,
+      ) -> Option<std::cmp::Ordering> {
+        Some(std::cmp::Ordering::Equal)
+      }
+    }
 
-impl<P, K> TypeMapKey for TermTypeKey<P, K>
-where
-  P: TermPass,
-  K: Ord + Clone + 'static,
-{
-  type ValueType = BTreeMap<K, Rc<P::TermValue>>;
+    impl<P, G> Eq for $name<P, G>
+    where
+      G: Grammar,
+      P: Pass<G>,
+    {
+    }
+
+    impl<P, G> Ord for $name<P, G>
+    where
+      G: Grammar,
+      P: Pass<G>,
+    {
+      fn cmp(&self, _other: &$name<P, G>) -> std::cmp::Ordering {
+        std::cmp::Ordering::Equal
+      }
+    }
+
+    impl<P, G> TypeMapKey for $name<P, G>
+    where
+      P: $pass_subtype<G>,
+      G: Grammar + 'static,
+    {
+      type ValueType = BTreeMap<$key_type<G>, Rc<$pass_value_type<P, G>>>;
+    }
+  };
 }
 
-impl<P, K> TypeMapKey for NonTermTypeKey<P, K>
-where
-  P: NonTermPass,
-  K: Ord + Clone + 'static,
-{
-  type ValueType = BTreeMap<K, Rc<P::NonTermValue>>;
-}
-
-impl<P, K> TypeMapKey for ProdTypeKey<P, K>
-where
-  P: ProdPass,
-  K: Ord + Clone + 'static,
-{
-  type ValueType = BTreeMap<K, Rc<P::ProdValue>>;
-}
+define_entity_key!(TermTypeKey, TermKey, TermPass, PassTermValue);
+define_entity_key!(NonTermTypeKey, NonTermKey, NonTermPass, PassNonTermValue);
+define_entity_key!(ProdTypeKey, ProdKey, ProdPass, PassProdValue);
 
 struct SinglePassStorage<P, G> {
   entity_map: TypeMap,
@@ -77,8 +121,8 @@ struct SinglePassStorage<P, G> {
 
 impl<P, G> SinglePassStorage<P, G>
 where
-  P: Pass,
-  G: Grammar,
+  P: Pass<G>,
+  G: Grammar + 'static,
 {
   fn new() -> Self {
     SinglePassStorage {
@@ -89,9 +133,9 @@ where
 
   fn get_term_value(&self, term: &G::Term) -> Option<Rc<P::TermValue>>
   where
-    P: TermPass,
+    P: TermPass<G>,
   {
-    let key: TermTypeKey<P, G::Term> = TermTypeKey(PhantomData);
+    let key: TermTypeKey<P, G> = TermTypeKey(PhantomData);
     self.entity_map.get(&key).and_then(|m| m.get(term).cloned())
   }
 
@@ -100,10 +144,9 @@ where
     term: &<G::NonTerm as NonTerm>::Key,
   ) -> Option<Rc<P::NonTermValue>>
   where
-    P: NonTermPass,
+    P: NonTermPass<G>,
   {
-    let key: NonTermTypeKey<P, <G::NonTerm as NonTerm>::Key> =
-      NonTermTypeKey(PhantomData);
+    let key: NonTermTypeKey<P, G> = NonTermTypeKey(PhantomData);
     self.entity_map.get(&key).and_then(|m| m.get(term).cloned())
   }
 
@@ -112,17 +155,17 @@ where
     prod: &<G::Prod as Prod>::Key,
   ) -> Option<Rc<P::ProdValue>>
   where
-    P: ProdPass,
+    P: ProdPass<G>,
   {
-    let key: ProdTypeKey<P, <G::Prod as Prod>::Key> = ProdTypeKey(PhantomData);
+    let key: ProdTypeKey<P, G> = ProdTypeKey(PhantomData);
     self.entity_map.get(&key).and_then(|m| m.get(prod).cloned())
   }
 
   fn insert_term_value(&mut self, term: &G::Term, value: P::TermValue)
   where
-    P: TermPass,
+    P: TermPass<G>,
   {
-    let key: TermTypeKey<P, G::Term> = TermTypeKey(PhantomData);
+    let key: TermTypeKey<P, G> = TermTypeKey(PhantomData);
     self
       .entity_map
       .get_mut_or_else(key, || BTreeMap::new())
@@ -134,10 +177,9 @@ where
     term: &<G::NonTerm as NonTerm>::Key,
     value: P::NonTermValue,
   ) where
-    P: NonTermPass,
+    P: NonTermPass<G>,
   {
-    let key: NonTermTypeKey<P, <G::NonTerm as NonTerm>::Key> =
-      NonTermTypeKey(PhantomData);
+    let key: NonTermTypeKey<P, G> = NonTermTypeKey(PhantomData);
     self
       .entity_map
       .get_mut_or_else(key, || BTreeMap::new())
@@ -149,9 +191,9 @@ where
     prod: &<G::Prod as Prod>::Key,
     value: P::ProdValue,
   ) where
-    P: ProdPass,
+    P: ProdPass<G>,
   {
-    let key: ProdTypeKey<P, <G::Prod as Prod>::Key> = ProdTypeKey(PhantomData);
+    let key: ProdTypeKey<P, G> = ProdTypeKey(PhantomData);
     self
       .entity_map
       .get_mut_or_else(key, || BTreeMap::new())
@@ -160,34 +202,34 @@ where
 }
 
 /// The context available during the [Pass::execute] method. It allows access
-/// to the grammar, 
+/// to the grammar,
 pub struct PassContext<'a, P, G> {
-  grammar: &'a G,
   pass: &'a P,
-  pass_set: &'a PassSet<'a, G>,
+  pass_set: &'a PassSet<G>,
   storage: &'a mut SinglePassStorage<P, G>,
 }
 
 impl<'a, P, G> PassContext<'a, P, G>
 where
-  P: Pass,
-  G: Grammar,
+  P: Pass<G>,
+  G: Grammar + 'static,
 {
+  /// Returns the grammar used by the pass.
   pub fn grammar(&self) -> &'a G {
-    self.grammar
+    self.pass_set.grammar()
   }
 
   pub fn pass(&self) -> &'a P {
     self.pass
   }
 
-  pub fn pass_set(&self) -> &'a PassSet<'a, G> {
+  pub fn pass_set(&self) -> &'a PassSet<G> {
     self.pass_set
   }
 
-  pub fn insert_term_value(&mut self, term: &G::Term, value: P::TermValue)
+  pub fn insert_term_value(&mut self, term: &TermKey<G>, value: P::TermValue)
   where
-    P: TermPass,
+    P: TermPass<G>,
   {
     self.storage.insert_term_value(term, value);
   }
@@ -197,7 +239,7 @@ where
     term: &<G::NonTerm as NonTerm>::Key,
     value: P::NonTermValue,
   ) where
-    P: NonTermPass,
+    P: NonTermPass<G>,
   {
     self.storage.insert_non_term_value(term, value);
   }
@@ -207,7 +249,7 @@ where
     prod: &<G::Prod as Prod>::Key,
     value: P::ProdValue,
   ) where
-    P: ProdPass,
+    P: ProdPass<G>,
   {
     self.storage.insert_prod_value(prod, value);
   }
@@ -221,18 +263,18 @@ struct PassTypeKey<P, G> {
 
 impl<P, G> PartialEq for PassTypeKey<P, G>
 where
-  P: Pass,
+  P: Ord,
 {
   fn eq(&self, other: &Self) -> bool {
     self.pass == other.pass
   }
 }
 
-impl<P, G> Eq for PassTypeKey<P, G> where P: Pass {}
+impl<P, G> Eq for PassTypeKey<P, G> where P: Ord {}
 
 impl<P, G> PartialOrd for PassTypeKey<P, G>
 where
-  P: Pass,
+  P: Ord,
 {
   fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
     Some(self.cmp(other))
@@ -241,7 +283,7 @@ where
 
 impl<P, G> Ord for PassTypeKey<P, G>
 where
-  P: Pass,
+  P: Ord,
 {
   fn cmp(&self, other: &Self) -> std::cmp::Ordering {
     self.pass.cmp(&other.pass)
@@ -250,25 +292,25 @@ where
 
 impl<P, G> TypeMapKey for PassTypeKey<P, G>
 where
-  P: Pass,
+  P: Pass<G>,
   G: Grammar + 'static,
 {
   type ValueType = Option<Rc<SinglePassStorage<P, G>>>;
 }
 
 /// Contains a set of passes over a grammar.
-pub struct PassSet<'a, G> {
-  grammar: &'a G,
+pub struct PassSet<G> {
+  grammar: G,
   pass_map: RefCell<TypeMap>,
 }
 
-impl<'a, G> PassSet<'a, G>
+impl<G> PassSet<G>
 where
   G: Grammar + 'static,
 {
   fn get_single_pass_storage<P>(&self, pass: &P) -> Rc<SinglePassStorage<P, G>>
   where
-    P: Pass,
+    P: Pass<G>,
   {
     let pass_key: PassTypeKey<P, G> = PassTypeKey {
       pass: pass.clone(),
@@ -287,8 +329,7 @@ where
     let mut new_single_pass_storage: SinglePassStorage<P, G> =
       SinglePassStorage::new();
     let mut pass_context = PassContext {
-      grammar: self.grammar,
-      pass: pass,
+      pass,
       pass_set: self,
       storage: &mut new_single_pass_storage,
     };
@@ -300,24 +341,28 @@ where
       single_pass_rc
     }
   }
+  pub fn grammar(&self) -> &G {
+    &self.grammar
+  }
+
   pub fn get_term_value<P>(
     &self,
-    pass: &'a P,
-    term: &'a G::Term,
+    pass: &P,
+    term: &TermKey<G>,
   ) -> Option<Rc<P::TermValue>>
   where
-    P: TermPass + 'static,
+    P: TermPass<G> + 'static,
   {
     self.get_single_pass_storage(pass).get_term_value(term)
   }
 
   pub fn get_non_term_value<P>(
     &self,
-    pass: &'a P,
-    non_term: &'a <G::NonTerm as NonTerm>::Key,
+    pass: &P,
+    non_term: &NonTermKey<G>,
   ) -> Option<Rc<P::NonTermValue>>
   where
-    P: NonTermPass + 'static,
+    P: NonTermPass<G> + 'static,
   {
     self
       .get_single_pass_storage(pass)
@@ -326,11 +371,11 @@ where
 
   pub fn get_prod_value<P>(
     &self,
-    pass: &'a P,
-    prod: &'a <G::Prod as Prod>::Key,
+    pass: &P,
+    prod: &ProdKey<G>,
   ) -> Option<Rc<P::ProdValue>>
   where
-    P: ProdPass + 'static,
+    P: ProdPass<G> + 'static,
   {
     self.get_single_pass_storage(pass).get_prod_value(prod)
   }

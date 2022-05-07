@@ -94,6 +94,7 @@ impl Borrow<dyn TypeKeyObjectTrait> for TypeKeyObject {
 
 /// `TypeMap` is a map from keys of types that implement `TypeKey` to values. It is a heterogeneous
 /// map, meaning both the types and the keys can be of different concrete types. The `TypeKey` trait is used to provide a type-safe interface on the map.
+#[derive(Default)]
 pub struct TypeMap(BTreeMap<TypeKeyObject, Box<dyn Any + 'static>>);
 
 impl TypeMap {
@@ -116,11 +117,11 @@ impl TypeMap {
       .map(|v| v.downcast_ref::<T::ValueType>().unwrap())
   }
 
-  pub fn get_mut_or_else<'s, T: TypeMapKey, F: FnOnce() -> T::ValueType>(
-    &'s mut self,
+  pub fn get_mut_or_else<T: TypeMapKey, F: FnOnce() -> T::ValueType>(
+    &mut self,
     key: T,
     f: F,
-  ) -> &'s mut T::ValueType {
+  ) -> &mut T::ValueType {
     let object_ref = TypeKeyObject(Box::new(key));
     self
       .0

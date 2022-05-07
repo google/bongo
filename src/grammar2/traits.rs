@@ -53,8 +53,7 @@ pub trait Grammar: Clone {
   fn prods(&self) -> Vec<Self::Prod>;
 
   /// Returns the prod with the given id.
-  fn get_prod(&self, prod_id: &<Self::Prod as Prod>::Key)
-    -> Option<Self::Prod>;
+  fn get_prod(&self, prod_id: &ProdKey<Self>) -> Option<Self::Prod>;
 
   /// Returns the non-term with the given key.
   fn get_non_term(
@@ -62,3 +61,7 @@ pub trait Grammar: Clone {
     key: &<Self::NonTerm as NonTerm>::Key,
   ) -> Option<Self::NonTerm>;
 }
+
+pub type TermKey<G> = <G as Grammar>::Term;
+pub type NonTermKey<G> = <<G as Grammar>::NonTerm as NonTerm>::Key;
+pub type ProdKey<G> = <<G as Grammar>::Prod as Prod>::Key;
