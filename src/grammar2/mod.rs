@@ -8,6 +8,7 @@ use std::fmt;
 pub use impls::builder::{ElementBuilder, GrammarBuilder};
 pub use impls::{GrammarHandle, NonTermHandle, ProdHandle};
 pub use traits::{Grammar, NamedElem, NonTerm, Prod};
+pub use pass::{Pass, TermPass, NonTermPass, ProdPass, PassContext, PassSet};
 
 /// An element of a production. It is either a terminal or non-terminal.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]

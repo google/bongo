@@ -21,6 +21,7 @@ extern crate derivative;
 
 pub mod grammar;
 pub mod grammar2;
+pub mod passes;
 pub mod parsers;
 pub mod start_grammar;
 pub mod state;
