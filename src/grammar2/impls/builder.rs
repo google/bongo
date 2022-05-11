@@ -31,9 +31,9 @@ pub struct GrammarBuilder<T, NT, ProdID, AV> {
 
 impl<T, NT, ProdID, AV> GrammarBuilder<T, NT, ProdID, AV>
 where
-  T: Clone + Ord,
-  NT: Clone + Ord,
-  ProdID: Clone + Ord + Debug,
+  T: Clone + Ord + 'static,
+  NT: Clone + Ord + 'static,
+  ProdID: Clone + Ord + Debug + 'static,
 {
   pub fn new(start_nt: impl Into<NT>) -> Self {
     let start_nt = start_nt.into();
@@ -143,14 +143,21 @@ where
           .into_iter()
           .map(|prod_id| super::ProdIndex(prod_index_map[&prod_id]))
           .collect(),
+        nullable: false,
+        firsts: vec![].into_iter().collect(),
+        follows: vec![].into_iter().collect(),
       })
       .collect();
-    super::GrammarHandle::new(super::GrammarImpl {
+    let mut grammar_impl = super::GrammarImpl {
       terminals: self.terminals.into_iter().collect(),
       non_terminals,
       start_nt: super::NonTermIndex(non_term_index_map[&self.start_nt]),
       prods,
-    })
+    };
+    grammar_impl.calculate_nullables();
+    grammar_impl.calculate_firsts();
+    grammar_impl.calculate_follows();
+    super::GrammarHandle::new(grammar_impl)
   }
 }
 

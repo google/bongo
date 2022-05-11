@@ -1,6 +1,7 @@
 pub mod builder;
 
 use std::borrow::Cow;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::rc::Rc;
 
@@ -9,12 +10,15 @@ use crate::utils::svec::{IdentityKeyExtractor, KeyExtractor, SVec};
 use super::traits::{Grammar, NamedElem, NonTerm, Prod};
 use super::Elem;
 
-#[derive(Clone, Copy, Debug)]
+/// An index into the term list for a grammar.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct TermIndex(usize);
 
-#[derive(Clone, Copy, Debug)]
+/// An index into the non-terminal list for a grammar.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 struct NonTermIndex(usize);
 
+/// An index into the production list for a grammar.
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Debug)]
 struct ProdIndex(usize);
 
@@ -49,11 +53,12 @@ where
   }
 }
 
+/// The primary storage of grammar data.
 struct GrammarImpl<T, NT, ProdID, AV> {
-  start_nt: NonTermIndex,
   terminals: SVec<T, IdentityKeyExtractor>,
   non_terminals: SVec<NonTermImpl<NT>, NonTermImplKeyExtractor>,
   prods: SVec<ProdImpl<ProdID, AV>, ProdImplKeyExtractor>,
+  start_nt: NonTermIndex,
 }
 
 impl<T, NT, ProdID, AV> GrammarImpl<T, NT, ProdID, AV>
@@ -105,6 +110,9 @@ impl<ProdID, AV> ProdImpl<ProdID, AV> {
 struct NonTermImpl<NT> {
   key: NT,
   prods: SVec<ProdIndex, IdentityKeyExtractor>,
+  nullable: bool,
+  firsts: SVec<TermIndex, IdentityKeyExtractor>,
+  follows: SVec<TermIndex, IdentityKeyExtractor>,
 }
 
 #[derive(Default)]
@@ -451,5 +459,176 @@ where
       .iter()
       .map(|prod_index| self.grammar.get_prod_handle_by_index(*prod_index))
       .collect()
+  }
+}
+
+fn insert_with_change<K, V>(
+  map: &mut BTreeMap<K, BTreeSet<V>>,
+  key: K,
+  value: V,
+  changed: &mut bool,
+) where
+  K: Ord,
+  V: Ord,
+{
+  let set = map.entry(key).or_insert(BTreeSet::new());
+  if set.insert(value) {
+    *changed = true;
+  }
+}
+
+impl<T, NT, ProdID, AV> GrammarImpl<T, NT, ProdID, AV>
+where
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  ProdID: Ord + Clone + 'static,
+{
+  fn calculate_nullables(&mut self) {
+    let mut changed = true;
+    while changed {
+      changed = false;
+      for prod_impl in self.prods.iter() {
+        if self
+          .non_terminals
+          .get_by_index(prod_impl.head.0)
+          .unwrap()
+          .nullable
+        {
+          continue;
+        }
+
+        let is_head_nullable = prod_impl
+          .prod_elems
+          .iter()
+          .map(|e| &e.elem)
+          .all(|e| match e {
+            Elem::Term(_) => false,
+            Elem::NonTerm(nt_i) => {
+              self.non_terminals.get_by_index(nt_i.0).unwrap().nullable
+            }
+          });
+        if is_head_nullable {
+          self
+            .non_terminals
+            .get_mut_by_index(prod_impl.head.0)
+            .unwrap()
+            .nullable = true;
+          changed = true;
+        }
+      }
+    }
+  }
+
+  fn find_firsts(&self) -> BTreeMap<NonTermIndex, BTreeSet<TermIndex>> {
+    let mut firsts = (0..self.non_terminals.len())
+      .into_iter()
+      .map(|i| (NonTermIndex(i), BTreeSet::new()))
+      .collect();
+    let mut changed = true;
+    while changed {
+      changed = false;
+      for prod_impl in self.prods.iter() {
+        'inner: for elem in prod_impl.prod_elems.iter() {
+          match &elem.elem {
+            Elem::Term(t_i) => {
+              insert_with_change(
+                &mut firsts,
+                prod_impl.head,
+                *t_i,
+                &mut changed,
+              );
+              break 'inner;
+            }
+            Elem::NonTerm(nt_i) => {
+              let curr_firsts = firsts.get_mut(&nt_i).unwrap().clone();
+              for t_i in curr_firsts {
+                insert_with_change(
+                  &mut firsts,
+                  prod_impl.head,
+                  t_i,
+                  &mut changed,
+                );
+              }
+
+              if !self.non_terminals.get_by_index(nt_i.0).unwrap().nullable {
+                break 'inner;
+              }
+            }
+          }
+        }
+      }
+    }
+    firsts
+  }
+
+  fn calculate_firsts(&mut self) {
+    let firsts = self.find_firsts();
+    for (nt_i, firsts) in firsts {
+      self.non_terminals.get_mut_by_index(nt_i.0).unwrap().firsts =
+        firsts.into_iter().collect();
+    }
+  }
+
+  fn find_follows(&self) -> BTreeMap<NonTermIndex, BTreeSet<TermIndex>> {
+    let mut follows = (0..self.non_terminals.len())
+      .into_iter()
+      .map(|i| (NonTermIndex(i), BTreeSet::new()))
+      .collect();
+    let mut changed = true;
+    while changed {
+      changed = false;
+      for prod_impl in self.prods.iter() {
+        'outer: for (i, elem) in prod_impl.prod_elems.iter().enumerate() {
+          if let Elem::NonTerm(follow_i) = elem.elem {
+            for next_elem in prod_impl.prod_elems[i + 1..].iter() {
+              match next_elem.elem {
+                Elem::Term(t_i) => {
+                  insert_with_change(&mut follows, follow_i, t_i, &mut changed);
+                  continue 'outer;
+                }
+                Elem::NonTerm(nt_i) => {
+                  let firsts_of_nt = self
+                    .non_terminals
+                    .get_by_index(nt_i.0)
+                    .unwrap()
+                    .firsts
+                    .clone();
+                  for t_i in firsts_of_nt.iter() {
+                    insert_with_change(
+                      &mut follows,
+                      follow_i,
+                      *t_i,
+                      &mut changed,
+                    );
+                  }
+
+                  if !self.non_terminals.get_by_index(nt_i.0).unwrap().nullable
+                  {
+                    continue 'outer;
+                  }
+                }
+              }
+            }
+
+            // If we've got here, then we completed the 'inner loop. This means
+            // that all elements of the production were nullable after i. Add
+            // the follow set of the head to the follow set of elem.
+            let head_follows = follows.get(&prod_impl.head).unwrap().clone();
+            for t_i in head_follows.iter() {
+              insert_with_change(&mut follows, follow_i, *t_i, &mut changed);
+            }
+          }
+        }
+      }
+    }
+    follows
+  }
+
+  fn calculate_follows(&mut self) {
+    let follows = self.find_follows();
+    for (nt_i, follows) in follows {
+      self.non_terminals.get_mut_by_index(nt_i.0).unwrap().follows =
+        follows.into_iter().collect();
+    }
   }
 }

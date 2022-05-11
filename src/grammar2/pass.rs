@@ -58,7 +58,7 @@ type PassProdValue<P, G> = <P as ProdPass<G>>::ProdValue;
 
 macro_rules! define_entity_key {
   ($name:ident, $key_type:ident, $pass_subtype:ident, $pass_value_type:ident) => {
-    #[derive(Clone, Debug, Default)]
+    #[derive(Clone, Debug)]
     struct $name<P, G>(PhantomData<(P, G)>);
     impl<P, G> PartialEq for $name<P, G>
     where
@@ -106,6 +106,16 @@ macro_rules! define_entity_key {
       G: Grammar + 'static,
     {
       type ValueType = BTreeMap<$key_type<G>, Rc<$pass_value_type<P, G>>>;
+    }
+
+    impl<P, G> Default for $name<P, G>
+    where
+      P: $pass_subtype<G>,
+      G: Grammar + 'static,
+    {
+      fn default() -> Self {
+        Self(PhantomData)
+      }
     }
   };
 }
@@ -159,6 +169,30 @@ where
   {
     let key: ProdTypeKey<P, G> = ProdTypeKey(PhantomData);
     self.entity_map.get(&key).and_then(|m| m.get(prod).cloned())
+  }
+
+  fn get_term_values(&self) -> BTreeMap<TermKey<G>, Rc<P::TermValue>>
+  where
+    P: TermPass<G>,
+  {
+    let key: TermTypeKey<P, G> = Default::default();
+    self.entity_map.get(&key).cloned().unwrap_or_default()
+  }
+
+  fn get_non_term_values(&self) -> BTreeMap<NonTermKey<G>, Rc<P::NonTermValue>>
+  where
+    P: NonTermPass<G>,
+  {
+    let key: NonTermTypeKey<P, G> = Default::default();
+    self.entity_map.get(&key).cloned().unwrap_or_default()
+  }
+
+  fn get_prod_values(&self) -> BTreeMap<ProdKey<G>, Rc<P::ProdValue>>
+  where
+    P: ProdPass<G>,
+  {
+    let key: ProdTypeKey<P, G> = Default::default();
+    self.entity_map.get(&key).cloned().unwrap_or_default()
   }
 
   fn insert_term_value(&mut self, term: &G::Term, value: P::TermValue)
@@ -378,5 +412,35 @@ where
     P: ProdPass<G> + 'static,
   {
     self.get_single_pass_storage(pass).get_prod_value(prod)
+  }
+
+  pub fn get_term_values<P>(
+    &self,
+    pass: &P,
+  ) -> BTreeMap<TermKey<G>, Rc<P::TermValue>>
+  where
+    P: TermPass<G> + 'static,
+  {
+    self.get_single_pass_storage(pass).get_term_values()
+  }
+
+  pub fn get_non_term_values<P>(
+    &self,
+    pass: &P,
+  ) -> BTreeMap<NonTermKey<G>, Rc<P::NonTermValue>>
+  where
+    P: NonTermPass<G> + 'static,
+  {
+    self.get_single_pass_storage(pass).get_non_term_values()
+  }
+
+  pub fn get_prod_values<P>(
+    &self,
+    pass: &P,
+  ) -> BTreeMap<ProdKey<G>, Rc<P::ProdValue>>
+  where
+    P: ProdPass<G> + 'static,
+  {
+    self.get_single_pass_storage(pass).get_prod_values()
   }
 }

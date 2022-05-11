@@ -30,6 +30,10 @@ impl<V, F> SVec<V, F> {
   pub fn as_slice(&self) -> &[V] {
     &self.vec
   }
+
+  pub fn len(&self) -> usize {
+    self.vec.len()
+  }
 }
 
 impl<V, F> SVec<V, F>
@@ -76,6 +80,10 @@ where
 
   pub fn get_by_index(&self, index: usize) -> Option<&V> {
     self.vec.get(index)
+  }
+
+  pub fn get_mut_by_index(&mut self, index: usize) -> Option<&mut V> {
+    self.vec.get_mut(index)
   }
 }
 
