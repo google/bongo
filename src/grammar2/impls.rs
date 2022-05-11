@@ -300,6 +300,8 @@ pub struct NonTermHandle<T, NT, ProdID, AV> {
 
 impl<T, NT, ProdID, AV> NonTermHandle<T, NT, ProdID, AV>
 where
+  T: Ord,
+  NT: Ord,
   ProdID: Ord,
 {
   fn new(
@@ -310,6 +312,10 @@ where
       grammar,
       non_term_index,
     }
+  }
+
+  fn get_impl(&self) -> &NonTermImpl<NT> {
+    self.grammar.get_non_term_impl_by_index(self.non_term_index)
   }
 }
 
@@ -443,6 +449,7 @@ where
   ProdID: Ord + Clone + 'static,
 {
   type Key = NT;
+  type Term = T;
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
   fn key(&self) -> &Self::Key {
@@ -458,6 +465,30 @@ where
       .prods
       .iter()
       .map(|prod_index| self.grammar.get_prod_handle_by_index(*prod_index))
+      .collect()
+  }
+
+  fn is_nullable(&self) -> bool {
+    self.get_impl().nullable
+  }
+
+  fn firsts(&self) -> Vec<Self::Term> {
+    self
+      .get_impl()
+      .firsts
+      .iter()
+      .map(|&i| self.grammar.get_term_by_index(i))
+      .cloned()
+      .collect()
+  }
+
+  fn follows(&self) -> Vec<Self::Term> {
+    self
+      .get_impl()
+      .follows
+      .iter()
+      .map(|&i| self.grammar.get_term_by_index(i))
+      .cloned()
       .collect()
   }
 }

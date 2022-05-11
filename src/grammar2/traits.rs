@@ -10,13 +10,20 @@ pub trait NamedElem {
 
 pub trait NonTerm: Clone {
   type Key: Ord + Clone + 'static;
-  type Prod: Prod<NonTerm = Self>;
+  type Term: Ord + Clone + 'static;
+  type Prod: Prod<NonTerm = Self, Term = Self::Term>;
 
   /// Gets the key of the non-terminal.
   fn key(&self) -> &Self::Key;
 
   /// Gets the rule in the grammar that has this non-terminal as a head.
   fn prods(&self) -> Vec<Self::Prod>;
+
+  fn is_nullable(&self) -> bool;
+
+  fn firsts(&self) -> Vec<Self::Term>;
+
+  fn follows(&self) -> Vec<Self::Term>;
 }
 
 pub trait Prod: Clone {
@@ -38,7 +45,7 @@ pub trait Grammar: Clone {
   type Term: Ord + Clone + 'static;
 
   /// A handle to a non terminal.
-  type NonTerm: NonTerm<Prod = Self::Prod>;
+  type NonTerm: NonTerm<Prod = Self::Prod, Term = Self::Term>;
 
   /// A handle to a production.
   type Prod: Prod<Term = Self::Term, NonTerm = Self::NonTerm>;

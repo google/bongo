@@ -104,7 +104,7 @@ mod test {
       add_binop(Prod::AddExpr, Term::Plus);
       add_binop(Prod::SubExpr, Term::Minus);
       add_binop(Prod::MulExpr, Term::Times);
-      add_binop(Prod::DivExpr, Term::Minus);
+      add_binop(Prod::DivExpr, Term::Div);
     }
 
     builder
@@ -126,5 +126,35 @@ mod test {
     println!("{:#?}", grammar);
     assert_eq!(grammar.non_terminals().len(), 1);
     assert_eq!(grammar.start_non_term().prods().len(), 6);
+  }
+
+  #[test]
+  fn grammar_nullable() {
+    let grammar = create_arithmetic_grammar();
+    assert!(!grammar.get_non_term(&NTerm::Expr).unwrap().is_nullable());
+  }
+
+  #[test]
+  fn grammar_firsts() {
+    let grammar = create_arithmetic_grammar();
+    assert_eq!(
+      grammar.get_non_term(&NTerm::Expr).unwrap().firsts(),
+      vec![Term::Num, Term::LParen]
+    );
+  }
+
+  #[test]
+  fn grammar_follows() {
+    let grammar = create_arithmetic_grammar();
+    assert_eq!(
+      grammar.get_non_term(&NTerm::Expr).unwrap().follows(),
+      vec![
+        Term::Plus,
+        Term::Minus,
+        Term::Times,
+        Term::Div,
+        Term::RParen
+      ]
+    );
   }
 }
