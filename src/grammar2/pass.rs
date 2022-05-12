@@ -141,7 +141,7 @@ where
     }
   }
 
-  fn get_term_value(&self, term: &G::Term) -> Option<Rc<P::TermValue>>
+  fn get_term_value(&self, term: &TermKey<G>) -> Option<Rc<P::TermValue>>
   where
     P: TermPass<G>,
   {
@@ -195,7 +195,7 @@ where
     self.entity_map.get(&key).cloned().unwrap_or_default()
   }
 
-  fn insert_term_value(&mut self, term: &G::Term, value: P::TermValue)
+  fn insert_term_value(&mut self, term: &TermKey<G>, value: P::TermValue)
   where
     P: TermPass<G>,
   {

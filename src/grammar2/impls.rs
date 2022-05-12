@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::utils::svec::{IdentityKeyExtractor, KeyExtractor, SVec};
 
-use super::traits::{Grammar, NamedElem, NonTerm, Prod};
+use super::traits::{Grammar, NamedElem, NonTerm, Prod, Term};
 use super::Elem;
 
 /// An index into the term list for a grammar.
@@ -34,7 +34,7 @@ where
   NT: Ord + Clone,
   ProdID: Ord + Clone,
 {
-  type Term = T;
+  type Term = TermHandle<T, NT, ProdID, AV>;
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
 
   fn name(&self) -> Option<&str> {
@@ -44,7 +44,7 @@ where
   fn elem(&self) -> Elem<Self::Term, Self::NonTerm> {
     match self.elem {
       Elem::Term(t_i) => {
-        Elem::Term(self.grammar.get_term_by_index(t_i).clone())
+        Elem::Term(self.grammar.get_term_handle_by_index(t_i).clone())
       }
       Elem::NonTerm(nt_i) => {
         Elem::NonTerm(self.grammar.get_non_term_handle_by_index(nt_i))
@@ -55,7 +55,7 @@ where
 
 /// The primary storage of grammar data.
 struct GrammarImpl<T, NT, ProdID, AV> {
-  terminals: SVec<T, IdentityKeyExtractor>,
+  terminals: SVec<TermImpl<T>, TermImplKeyExtractor>,
   non_terminals: SVec<NonTermImpl<NT>, NonTermImplKeyExtractor>,
   prods: SVec<ProdImpl<ProdID, AV>, ProdImplKeyExtractor>,
   start_nt: NonTermIndex,
@@ -69,7 +69,7 @@ where
 {
   fn new(
     start_nt: NonTermIndex,
-    terminals: SVec<T, IdentityKeyExtractor>,
+    terminals: SVec<TermImpl<T>, TermImplKeyExtractor>,
     non_terminals: SVec<NonTermImpl<NT>, NonTermImplKeyExtractor>,
     prods: SVec<ProdImpl<ProdID, AV>, ProdImplKeyExtractor>,
   ) -> Self {
@@ -115,6 +115,11 @@ struct NonTermImpl<NT> {
   follows: SVec<TermIndex, IdentityKeyExtractor>,
 }
 
+#[derive(Debug)]
+struct TermImpl<T> {
+  key: T,
+}
+
 #[derive(Default)]
 struct ProdImplKeyExtractor;
 
@@ -133,6 +138,17 @@ impl<NT> KeyExtractor<NonTermImpl<NT>> for NonTermImplKeyExtractor {
   type Key = NT;
 
   fn extract_key<'a>(&self, non_term: &'a NonTermImpl<NT>) -> &'a NT {
+    &non_term.key
+  }
+}
+
+#[derive(Default)]
+struct TermImplKeyExtractor;
+
+impl<T> KeyExtractor<TermImpl<T>> for TermImplKeyExtractor {
+  type Key = T;
+
+  fn extract_key<'a>(&self, non_term: &'a TermImpl<T>) -> &'a T {
     &non_term.key
   }
 }
@@ -184,7 +200,7 @@ where
     GrammarHandle(Rc::new(grammar))
   }
 
-  fn get_term_by_index(&self, index: TermIndex) -> &T {
+  fn get_term_impl_by_index(&self, index: TermIndex) -> &TermImpl<T> {
     self.0.terminals.get_by_index(index.0).expect("valid index")
   }
 
@@ -201,6 +217,16 @@ where
 
   fn get_prod_impl_by_index(&self, index: ProdIndex) -> &ProdImpl<ProdID, AV> {
     self.0.prods.get_by_index(index.0).expect("valid index")
+  }
+
+  fn get_term_handle_by_index(
+    &self,
+    index: TermIndex,
+  ) -> TermHandle<T, NT, ProdID, AV> {
+    TermHandle {
+      grammar: self.clone(),
+      term_index: index,
+    }
   }
 
   fn get_non_term_handle_by_index(
@@ -342,13 +368,27 @@ where
   }
 }
 
+pub struct TermHandle<T, NT, ProdID, AV> {
+  grammar: GrammarHandle<T, NT, ProdID, AV>,
+  term_index: TermIndex,
+}
+
+impl<T, NT, ProdID, AV> Clone for TermHandle<T, NT, ProdID, AV> {
+  fn clone(&self) -> Self {
+    TermHandle {
+      grammar: self.grammar.clone(),
+      term_index: self.term_index,
+    }
+  }
+}
+
 impl<T, NT, ProdID, AV> Grammar for GrammarHandle<T, NT, ProdID, AV>
 where
   T: Ord + Clone + 'static,
   NT: Ord + Clone + 'static,
   ProdID: Ord + Clone + 'static,
 {
-  type Term = T;
+  type Term = TermHandle<T, NT, ProdID, AV>;
 
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
 
@@ -358,8 +398,10 @@ where
     self.get_non_term_handle_by_index(self.0.start_nt)
   }
 
-  fn terminals(&self) -> Vec<&Self::Term> {
-    self.0.terminals.iter().collect()
+  fn terminals(&self) -> Vec<Self::Term> {
+    (0..self.0.terminals.len())
+      .map(|i| self.get_term_handle_by_index(TermIndex(i)))
+      .collect()
   }
 
   fn non_terminals(&self) -> Vec<Self::NonTerm> {
@@ -403,7 +445,7 @@ where
   NT: Ord + Clone + 'static,
   ProdID: Ord + Clone + 'static,
 {
-  type Term = T;
+  type Term = TermHandle<T, NT, ProdID, AV>;
 
   type NonTerm = NonTermHandle<T, NT, ProdID, AV>;
 
@@ -449,7 +491,7 @@ where
   ProdID: Ord + Clone + 'static,
 {
   type Key = NT;
-  type Term = T;
+  type Term = TermHandle<T, NT, ProdID, AV>;
   type Prod = ProdHandle<T, NT, ProdID, AV>;
 
   fn key(&self) -> &Self::Key {
@@ -477,8 +519,7 @@ where
       .get_impl()
       .firsts
       .iter()
-      .map(|&i| self.grammar.get_term_by_index(i))
-      .cloned()
+      .map(|&i| self.grammar.get_term_handle_by_index(i))
       .collect()
   }
 
@@ -487,9 +528,21 @@ where
       .get_impl()
       .follows
       .iter()
-      .map(|&i| self.grammar.get_term_by_index(i))
-      .cloned()
+      .map(|&i| self.grammar.get_term_handle_by_index(i))
       .collect()
+  }
+}
+
+impl<T, NT, ProdID, AV> Term for TermHandle<T, NT, ProdID, AV>
+where
+  T: Ord + Clone + 'static,
+  NT: Ord + Clone + 'static,
+  ProdID: Ord + Clone + 'static,
+{
+  type Key = T;
+
+  fn key(&self) -> &Self::Key {
+    &self.grammar.get_term_impl_by_index(self.term_index).key
   }
 }
 

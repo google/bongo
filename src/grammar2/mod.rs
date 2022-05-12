@@ -9,7 +9,7 @@ pub use impls::builder::{ElementBuilder, GrammarBuilder};
 pub use impls::{GrammarHandle, NonTermHandle, ProdHandle};
 pub use pass::{NonTermPass, Pass, PassContext, PassSet, ProdPass, TermPass};
 pub use traits::{
-  Grammar, NamedElem, NonTerm, NonTermKey, Prod, ProdKey, TermKey,
+  Grammar, NamedElem, NonTerm, NonTermKey, Prod, ProdKey, Term, TermKey,
 };
 
 /// An element of a production. It is either a terminal or non-terminal.
@@ -61,9 +61,10 @@ mod test {
   use super::GrammarBuilder;
   use super::GrammarHandle;
   use super::NonTerm;
+  use super::Term;
 
   #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-  enum Term {
+  enum TermID {
     Plus,
     Minus,
     Times,
@@ -89,11 +90,11 @@ mod test {
   }
 
   /// Create simple arithmetic expression grammar.
-  fn create_arithmetic_grammar() -> GrammarHandle<Term, NTerm, Prod, ()> {
+  fn create_arithmetic_grammar() -> GrammarHandle<TermID, NTerm, Prod, ()> {
     let mut builder = GrammarBuilder::new(NTerm::Expr);
 
     {
-      let mut add_binop = |prod_id: Prod, op: Term| {
+      let mut add_binop = |prod_id: Prod, op: TermID| {
         builder.add_prod(prod_id, NTerm::Expr, (), move |mut e| {
           e.named_non_term(NTerm::Expr, "left")
             .term(op)
@@ -101,20 +102,20 @@ mod test {
         });
       };
 
-      add_binop(Prod::AddExpr, Term::Plus);
-      add_binop(Prod::SubExpr, Term::Minus);
-      add_binop(Prod::MulExpr, Term::Times);
-      add_binop(Prod::DivExpr, Term::Div);
+      add_binop(Prod::AddExpr, TermID::Plus);
+      add_binop(Prod::SubExpr, TermID::Minus);
+      add_binop(Prod::MulExpr, TermID::Times);
+      add_binop(Prod::DivExpr, TermID::Div);
     }
 
     builder
       .add_prod(Prod::ParenExpr, NTerm::Expr, (), move |mut e| {
-        e.term(Term::LParen)
+        e.term(TermID::LParen)
           .named_non_term(NTerm::Expr, "e")
-          .term(Term::RParen);
+          .term(TermID::RParen);
       })
       .add_prod(Prod::NumExpr, NTerm::Expr, (), move |mut e| {
-        e.named_term(Term::Num, "n");
+        e.named_term(TermID::Num, "n");
       });
 
     builder.build()
@@ -138,8 +139,14 @@ mod test {
   fn grammar_firsts() {
     let grammar = create_arithmetic_grammar();
     assert_eq!(
-      grammar.get_non_term(&NTerm::Expr).unwrap().firsts(),
-      vec![Term::Num, Term::LParen]
+      grammar
+        .get_non_term(&NTerm::Expr)
+        .unwrap()
+        .firsts()
+        .into_iter()
+        .map(|t| t.key().clone())
+        .collect::<Vec<_>>(),
+      vec![TermID::Num, TermID::LParen]
     );
   }
 
@@ -147,13 +154,19 @@ mod test {
   fn grammar_follows() {
     let grammar = create_arithmetic_grammar();
     assert_eq!(
-      grammar.get_non_term(&NTerm::Expr).unwrap().follows(),
+      grammar
+        .get_non_term(&NTerm::Expr)
+        .unwrap()
+        .follows()
+        .into_iter()
+        .map(|t| t.key().clone())
+        .collect::<Vec<_>>(),
       vec![
-        Term::Plus,
-        Term::Minus,
-        Term::Times,
-        Term::Div,
-        Term::RParen
+        TermID::Plus,
+        TermID::Minus,
+        TermID::Times,
+        TermID::Div,
+        TermID::RParen
       ]
     );
   }

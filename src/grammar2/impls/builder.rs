@@ -149,7 +149,11 @@ where
       })
       .collect();
     let mut grammar_impl = super::GrammarImpl {
-      terminals: self.terminals.into_iter().collect(),
+      terminals: self
+        .terminals
+        .into_iter()
+        .map(|key| super::TermImpl { key })
+        .collect(),
       non_terminals,
       start_nt: super::NonTermIndex(non_term_index_map[&self.start_nt]),
       prods,
